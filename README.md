@@ -5,6 +5,13 @@ distributed with XFileSuite. Keeping this workflow public gives its GitHub
 Actions jobs access to the public-repository allowance while keeping the App
 source private.
 
+## License
+
+The XFileSuite build scripts, manifests, workflow definitions, and documentation
+are proprietary and are published for audit only; see [LICENSE](LICENSE).
+Third-party components and generated corresponding-source archives retain their
+own upstream licenses.
+
 ## What the workflow publishes
 
 `Publish Native Dependencies` builds selected macOS and Windows components,
@@ -37,4 +44,3 @@ hand. The workflow writes them from the final artifact.
 
 The workflow's built-in `GITHUB_TOKEN` publishes releases in this repository.
 `XFILESUITE_SOURCE_WRITE_TOKEN` must not be exposed outside GitHub Actions.
-

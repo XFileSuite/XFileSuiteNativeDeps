@@ -1,0 +1,29 @@
+# XFileSuite Native Dependencies — Proprietary License
+
+Copyright (c) 2026 XFileSuite. All rights reserved.
+
+This repository, including its build scripts, workflow definitions, manifests,
+configuration, and documentation (the “XFileSuite Materials”), is made publicly
+available for inspection only. No permission is granted to use, copy, modify,
+merge, publish, distribute, sublicense, sell, or otherwise exploit any
+XFileSuite Materials, in whole or in part, without prior written permission
+from XFileSuite.
+
+You may view and audit the XFileSuite Materials solely for the purpose of
+understanding the native dependencies distributed with XFileSuite. You may not
+use the XFileSuite Materials to build, distribute, or support another product.
+
+## Third-party components
+
+This license does not alter or restrict any rights granted by the licenses of
+third-party components referenced, downloaded, or included in generated release
+archives, including FFmpeg, LAME, libogg, libvorbis, libvpx, ImageMagick,
+MozJPEG, libpng, libwebp, libtiff, giflib, and resvg. Those components remain
+subject to their respective upstream licenses. Corresponding source archives
+published in this repository retain their included notices and license texts.
+
+THE XFILESUITE MATERIALS ARE PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+XFILESUITE BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR
+IN CONNECTION WITH THE XFILESUITE MATERIALS.
