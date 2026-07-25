@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "platform": "macos",
+  "manifestId": "native-deps-macos-2026.07.20.1",
+  "components": {
+    "ffmpeg": {
+      "version": "8.0.1",
+      "releaseRevision": 1,
+      "architecture": "universal",
+      "r2Key": "deps/ffmpeg-macos-universal-a99db79c511140c75a7370f5b7ca1f9c6a7c0b5d59fe99f5f4689cf2ceae2c14",
+      "binarySha256": "a99db79c511140c75a7370f5b7ca1f9c6a7c0b5d59fe99f5f4689cf2ceae2c14",
+      "sourceRelease": "ffmpeg-macos-8.0.1-xfilesuite.1"
+    },
+    "imagemagick": {
+      "version": "7.1.2-27",
+      "releaseRevision": 1,
+      "architecture": "universal",
+      "r2Key": "deps/imagemagick-macos-universal-34d83d33313cdbb92c612dbcb59d2cc7ee1856642b26498b765519c3a4d6cb01",
+      "binarySha256": "34d83d33313cdbb92c612dbcb59d2cc7ee1856642b26498b765519c3a4d6cb01",
+      "sourceRelease": "imagemagick-macos-7.1.2-27-xfilesuite.1"
+    },
+    "resvg": {
+      "version": "0.47.0",
+      "releaseRevision": 1,
+      "architecture": "universal",
+      "r2Key": "deps/resvg-macos-universal-b65c1db03e99ea7424ad8e449eb97ec37d965de445a6cd97085192a278fe1497",
+      "binarySha256": "b65c1db03e99ea7424ad8e449eb97ec37d965de445a6cd97085192a278fe1497",
+      "sourceRelease": "resvg-macos-0.47.0-xfilesuite.1"
+    }
+  }
+}

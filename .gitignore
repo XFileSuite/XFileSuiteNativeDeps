@@ -1,0 +1,5 @@
+native_deps/*/work/
+native_deps/*/work-windows/
+native_deps/*/dist/
+native_deps/*/dist-windows/
+

@@ -1,0 +1,357 @@
+name: Publish Native Dependencies
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to rebuild and publish
+        type: choice
+        options: [all, ffmpeg, imagemagick, resvg]
+        default: all
+      platform:
+        description: Platform to rebuild and publish
+        type: choice
+        options: [all, macos, windows]
+        default: all
+
+concurrency:
+  group: publish-native-deps
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: ${{ inputs.platform != 'windows' }}
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      SOURCE_WRITE_TOKEN: ${{ secrets.XFILESUITE_SOURCE_WRITE_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      COMPONENT: ${{ inputs.component }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the canonical source branch
+        run: test "$GITHUB_REF" = "refs/heads/main"
+      - name: Set up Rust for resvg
+        if: ${{ inputs.component == 'all' || inputs.component == 'resvg' }}
+        uses: dtolnay/rust-toolchain@stable
+      - name: Validate release credentials
+        run: |
+          test -n "$SOURCE_WRITE_TOKEN"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Restore source tarballs cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            native_deps/ffmpeg/work
+            native_deps/imagemagick/work/downloads
+            native_deps/resvg/target
+          key: macos-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/macos.json') }}
+          restore-keys: |
+            macos-src-${{ inputs.component }}-
+      - name: Install nasm for x86_64 asm
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
+        run: brew install nasm
+      - name: Build FFmpeg when selected
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
+        run: native_deps/ffmpeg/build.sh --no-install
+      - name: Build ImageMagick when selected
+        if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
+        run: native_deps/imagemagick/build-macos.sh
+      - name: Build resvg when selected
+        if: ${{ inputs.component == 'all' || inputs.component == 'resvg' }}
+        run: native_deps/resvg/build-macos.sh
+      - name: Create corresponding-source archives
+        run: |
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
+            version="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "ffmpeg", "version")')"
+            revision="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "ffmpeg", "releaseRevision")')"
+            RELEASE_ID="ffmpeg-macos-${version}-xfilesuite.${revision}" native_deps/ffmpeg/package-source.sh
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
+            version="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "version")')"
+            revision="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "releaseRevision")')"
+            RELEASE_ID="imagemagick-macos-${version}-xfilesuite.${revision}" native_deps/imagemagick/package-source.sh
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
+            version="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "version")')"
+            revision="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "releaseRevision")')"
+            RELEASE_ID="resvg-macos-${version}-xfilesuite.${revision}" native_deps/resvg/package-source.sh
+          fi
+      - name: Record previous R2 dependency keys
+        run: |
+          ruby -rjson -e '
+            components = JSON.parse(File.read("native_deps/manifests/macos.json")).fetch("components")
+            File.open(ENV.fetch("GITHUB_ENV"), "a") do |f|
+              f.puts("PREVIOUS_FFMPEG_R2_KEY=#{components.fetch("ffmpeg").fetch("r2Key")}")
+              f.puts("PREVIOUS_IMAGEMAGICK_R2_KEY=#{components.fetch("imagemagick").fetch("r2Key")}")
+              f.puts("PREVIOUS_RESVG_R2_KEY=#{components.fetch("resvg").fetch("r2Key")}")
+            end
+          '
+      - name: Update manifest with final binary hashes
+        run: |
+          ruby -rjson -e '
+            path = "native_deps/manifests/macos.json"
+            data = JSON.parse(File.read(path))
+            component = ENV.fetch("COMPONENT")
+            if ["all", "ffmpeg"].include?(component)
+              item = data["components"]["ffmpeg"]
+              sha = `shasum -a 256 native_deps/ffmpeg/dist/*/bin/ffmpeg`.split.first
+              item["binarySha256"] = sha
+              item["r2Key"] = "deps/ffmpeg-macos-universal-#{sha}"
+              item["sourceRelease"] = "ffmpeg-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
+            end
+            if ["all", "imagemagick"].include?(component)
+              item = data["components"]["imagemagick"]
+              item["architecture"] = "universal"
+              sha = `shasum -a 256 native_deps/imagemagick/dist/imagemagick-macos-universal`.split.first
+              item["binarySha256"] = sha
+              item["r2Key"] = "deps/imagemagick-macos-universal-#{sha}"
+              item["sourceRelease"] = "imagemagick-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
+            end
+            if ["all", "resvg"].include?(component)
+              item = data["components"]["resvg"]
+              sha = `shasum -a 256 native_deps/resvg/dist/resvg-macos-universal`.split.first
+              item["binarySha256"] = sha
+              item["r2Key"] = "deps/resvg-macos-universal-#{sha}"
+              item["sourceRelease"] = "resvg-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
+            end
+            File.write(path, JSON.pretty_generate(data) + "\n")
+          '
+      - name: Publish corresponding source on GitHub
+        run: |
+          publish() {
+            release="$1"; archive="$2"
+            gh release view "$release" >/dev/null 2>&1 || \
+              gh release create "$release" --title "$release" --notes "Corresponding source, notices, build information, and checksums for XFileSuite macOS native dependencies."
+            gh release upload "$release" "$archive" "$archive.sha256" --clobber
+          }
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
+            archive="$(find native_deps/ffmpeg/dist -name 'xfilesuite-*-source.tar.gz' -maxdepth 1 -print -quit)"
+            publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "ffmpeg", "sourceRelease")')" "$archive"
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
+            archive="$(find native_deps/imagemagick/dist -name 'xfilesuite-*-source.tar.gz' -maxdepth 1 -print -quit)"
+            publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "sourceRelease")')" "$archive"
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
+            archive="$(find native_deps/resvg/dist -maxdepth 1 -name 'xfilesuite-*-source.tar.gz' -print -quit)"
+            publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "sourceRelease")')" "$archive"
+          fi
+      - name: Upload only selected runtime binaries to R2
+        run: |
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "ffmpeg", "r2Key")')" --file "$(find native_deps/ffmpeg/dist -path '*/bin/ffmpeg' -print -quit)" --remote
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "r2Key")')" --file native_deps/imagemagick/dist/imagemagick-macos-universal --remote
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "r2Key")')" --file native_deps/resvg/dist/resvg-macos-universal --remote
+          fi
+      - name: Commit the canonical public manifest
+        run: |
+          git config user.name "xfilesuite-release-bot"
+          git config user.email "release-bot@xfilesuite.com"
+          git add native_deps/manifests/macos.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: publish macOS native dependency manifest"
+            git push origin HEAD:main
+          fi
+      - name: Mirror manifest to the private App source repository
+        run: |
+          git clone "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuiteSource.git" "$RUNNER_TEMP/XFileSuiteSource" --depth 1
+          cp native_deps/manifests/macos.json "$RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/macos.json"
+          git -C "$RUNNER_TEMP/XFileSuiteSource" config user.name "xfilesuite-release-bot"
+          git -C "$RUNNER_TEMP/XFileSuiteSource" config user.email "release-bot@xfilesuite.com"
+          git -C "$RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/macos.json
+          if ! git -C "$RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; then
+            git -C "$RUNNER_TEMP/XFileSuiteSource" commit -m "chore: publish macOS native dependency manifest"
+            git -C "$RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
+          fi
+      - name: Publish current manifest to the public repository
+        run: |
+          gh repo clone XFileSuite/XFileSuite "$RUNNER_TEMP/XFileSuite" -- --depth 1
+          git -C "$RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuite.git"
+          mkdir -p "$RUNNER_TEMP/XFileSuite/native-deps"
+          cp native_deps/manifests/macos.json "$RUNNER_TEMP/XFileSuite/native-deps/macos.json"
+          git -C "$RUNNER_TEMP/XFileSuite" config user.name "xfilesuite-release-bot"
+          git -C "$RUNNER_TEMP/XFileSuite" config user.email "release-bot@xfilesuite.com"
+          git -C "$RUNNER_TEMP/XFileSuite" add native-deps/macos.json
+          if ! git -C "$RUNNER_TEMP/XFileSuite" diff --cached --quiet; then
+            git -C "$RUNNER_TEMP/XFileSuite" commit -m "chore: publish macOS native dependency manifest"
+            git -C "$RUNNER_TEMP/XFileSuite" push origin HEAD:main
+          fi
+      - name: Remove superseded R2 dependency objects
+        run: |
+          current_key() {
+            ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", ARGV.fetch(0), "r2Key")' "$1"
+          }
+          remove_previous() {
+            previous="$1"; current="$2"
+            if [ -n "$previous" ] && [ "$previous" != "$current" ]; then
+              npx wrangler r2 object delete "xfilesuite-releases/$previous" --remote || true
+            fi
+          }
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
+            remove_previous "$PREVIOUS_FFMPEG_R2_KEY" "$(current_key ffmpeg)"
+            npx wrangler r2 object delete "xfilesuite-releases/deps/ffmpeg-macos-universal" --remote || true
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
+            remove_previous "$PREVIOUS_IMAGEMAGICK_R2_KEY" "$(current_key imagemagick)"
+            npx wrangler r2 object delete "xfilesuite-releases/deps/imagemagick-macos-universal" --remote || true
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
+            remove_previous "$PREVIOUS_RESVG_R2_KEY" "$(current_key resvg)"
+            npx wrangler r2 object delete "xfilesuite-releases/deps/resvg-macos-universal" --remote || true
+          fi
+
+  publish-windows:
+    # Windows artifacts are continuously prepared, but this workflow never
+    # creates a Windows App installer or a public Windows App release.
+    if: ${{ always() && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    needs: publish
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      SOURCE_WRITE_TOKEN: ${{ secrets.XFILESUITE_SOURCE_WRITE_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      COMPONENT: ${{ inputs.component }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the canonical source branch
+        shell: pwsh
+        run: if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Run from main only.' }
+      - name: Validate release credentials
+        shell: pwsh
+        run: |
+          if (-not $env:SOURCE_WRITE_TOKEN -or -not $env:CLOUDFLARE_API_TOKEN -or -not $env:CLOUDFLARE_ACCOUNT_ID) {
+            throw 'Release and Cloudflare credentials are required.'
+          }
+      - name: Resolve Windows dependency versions from the manifest
+        shell: pwsh
+        run: |
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          "FFMPEG_VERSION=$($manifest.components.ffmpeg.version)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "IMAGEMAGICK_VERSION=$($manifest.components.imagemagick.version)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Restore source tarballs cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            native_deps/ffmpeg/work-windows
+            native_deps/imagemagick/work-windows
+          key: windows-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/windows.json') }}
+          restore-keys: |
+            windows-src-${{ inputs.component }}-
+      - name: Set up MSYS2 toolchain for LGPL FFmpeg
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make mingw-w64-x86_64-binutils mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx
+      - name: Build LGPL FFmpeg for Windows x64
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
+        shell: msys2 {0}
+        run: native_deps/ffmpeg/build-windows.sh
+      - name: Prepare the complete ImageMagick Windows runtime
+        if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
+        shell: pwsh
+        run: native_deps/imagemagick/build-windows.ps1
+      - name: Create Windows corresponding-source archives
+        shell: pwsh
+        run: |
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
+            $env:PLATFORM = 'windows'
+            $env:RELEASE_ID = "ffmpeg-windows-$($manifest.components.ffmpeg.version)-xfilesuite.$($manifest.components.ffmpeg.releaseRevision)"
+            $env:OUTPUT_DIR = 'native_deps/ffmpeg/dist-windows'
+            bash native_deps/ffmpeg/package-source.sh
+          }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) {
+            $env:PLATFORM = 'windows'
+            $env:RELEASE_ID = "imagemagick-windows-$($manifest.components.imagemagick.version)-xfilesuite.$($manifest.components.imagemagick.releaseRevision)"
+            $env:OUT_DIR = 'native_deps/imagemagick/dist-windows'
+            bash native_deps/imagemagick/package-source.sh
+          }
+      - name: Update the Windows manifest with final hashes
+        shell: pwsh
+        run: |
+          $path = 'native_deps/manifests/windows.json'
+          $data = Get-Content $path -Raw | ConvertFrom-Json
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
+            $item = $data.components.ffmpeg
+            $sha = (Get-FileHash -Algorithm SHA256 "native_deps/ffmpeg/dist-windows/ffmpeg-$($item.version)-windows-x64/ffmpeg.exe").Hash.ToLowerInvariant()
+            $item.binarySha256 = $sha; $item.r2Key = "deps/ffmpeg-windows-x64-$sha"
+            $item.sourceRelease = "ffmpeg-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
+          }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) {
+            $item = $data.components.imagemagick
+            $sha = (Get-FileHash -Algorithm SHA256 "native_deps/imagemagick/dist-windows/imagemagick-$($item.version)-windows-x64.zip").Hash.ToLowerInvariant()
+            $item.bundleSha256 = $sha; $item.r2Key = "deps/imagemagick-windows-x64-$sha.zip"
+            $item.sourceRelease = "imagemagick-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
+          }
+          $data | ConvertTo-Json -Depth 8 | Set-Content $path
+      - name: Publish Windows source, notices and build records on GitHub
+        shell: pwsh
+        run: |
+          function Publish-Source($release, $archive) {
+          gh release view $release 2>$null
+          if ($LASTEXITCODE -ne 0) { gh release create $release --title $release --notes 'Corresponding source, notices, build information, and checksums for XFileSuite Windows native dependencies.' }
+          gh release upload $release $archive "$archive.sha256" --clobber
+          }
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) { Publish-Source $manifest.components.ffmpeg.sourceRelease (Get-ChildItem native_deps/ffmpeg/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) { Publish-Source $manifest.components.imagemagick.sourceRelease (Get-ChildItem native_deps/imagemagick/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
+      - name: Record previous Windows R2 dependency keys
+        shell: pwsh
+        run: |
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          "PREVIOUS_WIN_FFMPEG_R2_KEY=$($manifest.components.ffmpeg.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "PREVIOUS_WIN_IMAGEMAGICK_R2_KEY=$($manifest.components.imagemagick.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Upload Windows runtime dependencies to R2
+        shell: pwsh
+        run: |
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/ffmpeg.exe" --remote }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
+      - name: Commit and mirror the Windows manifest
+        shell: pwsh
+        run: |
+          git config user.name 'xfilesuite-release-bot'; git config user.email 'release-bot@xfilesuite.com'
+          git add native_deps/manifests/windows.json
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'chore: publish Windows native dependency manifest'; git push origin HEAD:main }
+          git clone "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuiteSource.git" "$env:RUNNER_TEMP/XFileSuiteSource" --depth 1
+          Copy-Item native_deps/manifests/windows.json "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/windows.json"
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.email 'release-bot@xfilesuite.com'
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/windows.json
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main }
+          gh repo clone XFileSuite/XFileSuite "$env:RUNNER_TEMP/XFileSuite" -- --depth 1
+          git -C "$env:RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuite.git"
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/XFileSuite/native-deps" | Out-Null
+          Copy-Item native_deps/manifests/windows.json "$env:RUNNER_TEMP/XFileSuite/native-deps/windows.json"
+          git -C "$env:RUNNER_TEMP/XFileSuite" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuite" config user.email 'release-bot@xfilesuite.com'
+          git -C "$env:RUNNER_TEMP/XFileSuite" add native-deps/windows.json
+          git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest'; git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main }
+      - name: Remove superseded Windows R2 dependency objects
+        shell: pwsh
+        run: |
+          $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
+          function Remove-Previous($previous, $current) {
+            if ($previous -and $previous -ne $current) {
+              npx wrangler r2 object delete "xfilesuite-releases/$previous" --remote 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  (object not found or already deleted: $previous)" }
+            }
+          }
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
+            Remove-Previous $env:PREVIOUS_WIN_FFMPEG_R2_KEY $manifest.components.ffmpeg.r2Key
+            npx wrangler r2 object delete "xfilesuite-releases/deps/ffmpeg-windows-x64.exe" --remote 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host '  (legacy key not found: deps/ffmpeg-windows-x64.exe)' }
+          }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) {
+            Remove-Previous $env:PREVIOUS_WIN_IMAGEMAGICK_R2_KEY $manifest.components.imagemagick.r2Key
+          }
