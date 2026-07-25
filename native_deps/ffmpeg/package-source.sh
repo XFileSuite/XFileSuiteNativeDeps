@@ -158,7 +158,9 @@ EOF
 
 (
   cd "$STAGE_DIR"
-  find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS
+  while IFS= read -r -d '' file; do
+    shasum -a 256 "$file"
+  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
 )
 mkdir -p "$OUTPUT_DIR"
 tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$WORK_DIR" "$RELEASE_ID"

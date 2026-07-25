@@ -100,7 +100,12 @@ binary. XFileSuite publishes this archive so that native dependencies are audita
 in one public GitHub location.
 EOF
 
-(cd "$WORK_DIR" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS)
+(
+  cd "$WORK_DIR"
+  while IFS= read -r -d '' file; do
+    shasum -a 256 "$file"
+  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
+)
 tar -czf "$OUT_DIR/xfilesuite-${RELEASE_ID}-source.tar.gz" -C "$(dirname "$WORK_DIR")" "$(basename "$WORK_DIR")"
 (cd "$OUT_DIR" && shasum -a 256 "xfilesuite-${RELEASE_ID}-source.tar.gz" > "xfilesuite-${RELEASE_ID}-source.tar.gz.sha256")
 echo "$OUT_DIR/xfilesuite-${RELEASE_ID}-source.tar.gz"

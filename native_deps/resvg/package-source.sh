@@ -43,7 +43,12 @@ This archive contains the exact tagged resvg source, Cargo.lock, vendored Rust
 dependencies, license texts and the macOS universal build script. XFileSuite has
 not modified resvg source files.
 EOF
-(cd "$WORK_DIR" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > SHA256SUMS)
+(
+  cd "$WORK_DIR"
+  while IFS= read -r -d '' file; do
+    shasum -a 256 "$file"
+  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
+)
 archive="$OUT_DIR/xfilesuite-$RELEASE_ID-source.tar.gz"
 tar -czf "$archive" -C "$(dirname "$WORK_DIR")" "$(basename "$WORK_DIR")"
 shasum -a 256 "$archive" > "$archive.sha256"
