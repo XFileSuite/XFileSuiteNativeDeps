@@ -7,16 +7,16 @@
       "version": "8.0.1",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/ffmpeg-macos-universal-6ec0e8c1e7abdc73ad380804028a34c6ccb894cb99cd96c60a5d3845f28fdab5",
-      "binarySha256": "6ec0e8c1e7abdc73ad380804028a34c6ccb894cb99cd96c60a5d3845f28fdab5",
+      "r2Key": "deps/ffmpeg-macos-universal-9a3b3c349c91b57737edc757fe3b5225a9c98b9cd56e298e6949be48fcb7db44",
+      "binarySha256": "9a3b3c349c91b57737edc757fe3b5225a9c98b9cd56e298e6949be48fcb7db44",
       "sourceRelease": "ffmpeg-macos-8.0.1-xfilesuite.1"
     },
     "imagemagick": {
       "version": "7.1.2-27",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-f7f37cf4c502f0cdc72aa40b41832f45d369ae7b8dee54ea48a62e9db9aec9a3",
-      "binarySha256": "f7f37cf4c502f0cdc72aa40b41832f45d369ae7b8dee54ea48a62e9db9aec9a3",
+      "r2Key": "deps/imagemagick-macos-universal-0af56357a40df78a8cc824593665b70bc3c2a72cf9868a697af45b095cce6c97",
+      "binarySha256": "0af56357a40df78a8cc824593665b70bc3c2a72cf9868a697af45b095cce6c97",
       "sourceRelease": "imagemagick-macos-7.1.2-27-xfilesuite.1"
     },
     "resvg": {
