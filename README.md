@@ -1,5 +1,7 @@
 # XFileSuite Native Dependencies
 
+![Publish Native Dependencies](https://github.com/XFileSuite/XFileSuiteNativeDeps/actions/workflows/publish-native-deps.yml/badge.svg)
+
 This public repository builds and publishes the native runtime dependencies
 distributed with XFileSuite. Keeping this workflow public gives its GitHub
 Actions jobs access to the public-repository allowance while keeping the App
