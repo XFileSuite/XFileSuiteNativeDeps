@@ -13,6 +13,10 @@ on:
         type: choice
         options: [all, macos, windows]
         default: all
+      purge_all_deps:
+        description: Delete all existing ffmpeg, ImageMagick, and resvg objects in R2 before a full rebuild
+        type: boolean
+        default: false
 
 concurrency:
   group: publish-native-deps
@@ -123,11 +127,12 @@ jobs:
           '
       - name: Publish corresponding source on GitHub
         run: |
+          release_repo="XFileSuite/XFileSuite"
           publish() {
             release="$1"; archive="$2"
-            gh release view "$release" >/dev/null 2>&1 || \
-              gh release create "$release" --title "$release" --notes "Corresponding source, notices, build information, and checksums for XFileSuite macOS native dependencies."
-            gh release upload "$release" "$archive" "$archive.sha256" --clobber
+            GH_TOKEN="$SOURCE_WRITE_TOKEN" gh release view "$release" --repo "$release_repo" >/dev/null 2>&1 || \
+              GH_TOKEN="$SOURCE_WRITE_TOKEN" gh release create "$release" --repo "$release_repo" --title "$release" --notes "Corresponding source, notices, build information, and checksums for XFileSuite macOS native dependencies."
+            GH_TOKEN="$SOURCE_WRITE_TOKEN" gh release upload "$release" "$archive" "$archive.sha256" --repo "$release_repo" --clobber
           }
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
             archive="$(find native_deps/ffmpeg/dist -name 'xfilesuite-*-source.tar.gz' -maxdepth 1 -print -quit)"
@@ -141,6 +146,53 @@ jobs:
             archive="$(find native_deps/resvg/dist -maxdepth 1 -name 'xfilesuite-*-source.tar.gz' -print -quit)"
             publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "sourceRelease")')" "$archive"
           fi
+      - name: Purge all native dependency objects before a full rebuild
+        if: ${{ inputs.purge_all_deps }}
+        run: |
+          if [ "$COMPONENT" != all ] || [ "${{ inputs.platform }}" != all ]; then
+            echo "::error::purge_all_deps requires component=all and platform=all"
+            exit 1
+          fi
+          node <<'NODE'
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/xfilesuite-releases/objects`;
+
+          async function request(path, options = {}) {
+            const response = await fetch(`${baseUrl}${path}`, {
+              ...options,
+              headers: { Authorization: `Bearer ${token}`, ...options.headers },
+            });
+            const body = await response.json();
+            if (!response.ok || !body.success) {
+              throw new Error(JSON.stringify(body.errors || body));
+            }
+            return body;
+          }
+
+          async function main() {
+            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-']) {
+              let cursor;
+              do {
+                const query = new URLSearchParams({ prefix, per_page: '1000' });
+                if (cursor) query.set('cursor', cursor);
+                const page = await request(`?${query}`);
+                for (const object of page.result || []) {
+                  const key = object.key;
+                  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+                  await request(`/${encodedKey}`, { method: 'DELETE' });
+                  console.log(`Deleted ${key}`);
+                }
+                cursor = page.result_info?.cursor || page.result_info?.cursors?.after;
+              } while (cursor);
+            }
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
       - name: Upload only selected runtime binaries to R2
         run: |
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = ffmpeg ]; then
@@ -303,10 +355,17 @@ jobs:
       - name: Publish Windows source, notices and build records on GitHub
         shell: pwsh
         run: |
+          $releaseRepo = 'XFileSuite/XFileSuite'
           function Publish-Source($release, $archive) {
-          gh release view $release 2>$null
-          if ($LASTEXITCODE -ne 0) { gh release create $release --title $release --notes 'Corresponding source, notices, build information, and checksums for XFileSuite Windows native dependencies.' }
-          gh release upload $release $archive "$archive.sha256" --clobber
+          $originalGhToken = $env:GH_TOKEN
+          $env:GH_TOKEN = $env:SOURCE_WRITE_TOKEN
+          try {
+            gh release view $release --repo $releaseRepo 2>$null
+            if ($LASTEXITCODE -ne 0) { gh release create $release --repo $releaseRepo --title $release --notes 'Corresponding source, notices, build information, and checksums for XFileSuite Windows native dependencies.' }
+            gh release upload $release $archive "$archive.sha256" --repo $releaseRepo --clobber
+          } finally {
+            $env:GH_TOKEN = $originalGhToken
+          }
           }
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
           if ($env:COMPONENT -in @('all', 'ffmpeg')) { Publish-Source $manifest.components.ffmpeg.sourceRelease (Get-ChildItem native_deps/ffmpeg/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
