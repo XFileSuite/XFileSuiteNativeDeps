@@ -5,11 +5,11 @@
   "components": {
     "ffmpeg": {
       "version": "8.0.1",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "x64",
       "r2Key": "deps/ffmpeg-windows-x64-990794939683b6bdf20bdf9606403533858e7f2e92a6fc66b4ebafa97fb05c10",
       "binarySha256": "990794939683b6bdf20bdf9606403533858e7f2e92a6fc66b4ebafa97fb05c10",
-      "sourceRelease": "ffmpeg-windows-8.0.1-xfilesuite.1"
+      "sourceRelease": "ffmpeg-windows-8.0.1-xfilesuite.2"
     },
     "imagemagick": {
       "version": "7.1.2-27",

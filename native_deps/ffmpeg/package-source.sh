@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work/source-package}"
 PLATFORM="${PLATFORM:-macos}"
-RELEASE_ID="${RELEASE_ID:-ffmpeg-${PLATFORM}-8.0.1-xfilesuite.1}"
+RELEASE_ID="${RELEASE_ID:-ffmpeg-${PLATFORM}-8.0.1-xfilesuite.2}"
 if [ "$PLATFORM" = windows ]; then
   DEFAULT_FFMPEG_BINARY="$ROOT_DIR/dist-windows/ffmpeg-${FFMPEG_VERSION:-8.0.1}-windows-x64/ffmpeg.exe"
   BUILD_SCRIPT="$ROOT_DIR/build-windows.sh"
@@ -24,6 +24,7 @@ LAME_VERSION=3.100
 OGG_VERSION=1.3.5
 VORBIS_VERSION=1.3.7
 VPX_VERSION=1.15.2
+WEBP_VERSION=1.6.0
 
 ARCHIVE_NAME="xfilesuite-${RELEASE_ID}-source.tar.gz"
 STAGE_DIR="$WORK_DIR/$RELEASE_ID"
@@ -71,6 +72,7 @@ fetch "https://sourceforge.net/projects/lame/files/lame/${LAME_VERSION}/lame-${L
 fetch "https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.xz" "libogg-${OGG_VERSION}.tar.xz"
 fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.xz" "libvorbis-${VORBIS_VERSION}.tar.xz"
 fetch "https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}" "libvpx-${VPX_VERSION}.tar.gz"
+fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" "libwebp-${WEBP_VERSION}.tar.gz"
 
 tar -xf "$DOWNLOAD_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 tar -xzf "$DOWNLOAD_DIR/lame-${LAME_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
@@ -78,6 +80,7 @@ tar -xf "$DOWNLOAD_DIR/libogg-${OGG_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 tar -xf "$DOWNLOAD_DIR/libvorbis-${VORBIS_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 mkdir -p "$STAGE_DIR/sources/libvpx-${VPX_VERSION}"
 tar -xzf "$DOWNLOAD_DIR/libvpx-${VPX_VERSION}.tar.gz" --strip-components=1 -C "$STAGE_DIR/sources/libvpx-${VPX_VERSION}"
+tar -xzf "$DOWNLOAD_DIR/libwebp-${WEBP_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
 
 # This is the only source-tree adjustment made by build.sh. Record the exact
 # patch against the extracted upstream source in every compliance archive.
@@ -95,6 +98,7 @@ copy_license "$STAGE_DIR/sources/lame-${LAME_VERSION}" "$STAGE_DIR/licenses/LAME
 copy_license "$STAGE_DIR/sources/libogg-${OGG_VERSION}" "$STAGE_DIR/licenses/libogg-BSD.txt"
 copy_license "$STAGE_DIR/sources/libvorbis-${VORBIS_VERSION}" "$STAGE_DIR/licenses/libvorbis-BSD.txt"
 copy_license "$STAGE_DIR/sources/libvpx-${VPX_VERSION}" "$STAGE_DIR/licenses/libvpx-BSD.txt"
+copy_license "$STAGE_DIR/sources/libwebp-${WEBP_VERSION}" "$STAGE_DIR/licenses/libwebp-BSD-3-Clause.txt"
 
 cat > "$STAGE_DIR/SOURCE-URLS.txt" <<EOF
 FFmpeg ${FFMPEG_VERSION}
@@ -107,6 +111,8 @@ libvorbis ${VORBIS_VERSION}
 https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.xz
 libvpx ${VPX_VERSION}
 https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}
+libwebp ${WEBP_VERSION}
+https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz
 EOF
 
 if [[ -f "$FFMPEG_BINARY" ]]; then
@@ -132,6 +138,7 @@ cat > "$STAGE_DIR/BUILDINFO.md" <<EOF
 | libogg | ${OGG_VERSION} | BSD-style |
 | libvorbis | ${VORBIS_VERSION} | BSD-style |
 | libvpx | ${VPX_VERSION} | BSD-style |
+| libwebp | ${WEBP_VERSION} | BSD-3-Clause |
 
 ## Build and modification information
 

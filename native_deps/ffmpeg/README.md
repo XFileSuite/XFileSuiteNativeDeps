@@ -21,6 +21,7 @@
 | **libogg** | BSD | OGG 容器格式 | 1.3.5 |
 | **libvorbis** | BSD | Vorbis 音频编码 | 1.3.7 |
 | **libvpx** | BSD | VP8/VP9 视频编码 (WebM) | 1.15.2 |
+| **libwebp** | BSD-3-Clause | WebP / 动画 WebP 编码 | 1.6.0 |
 | **VideoToolbox** | Apple | H.264/H.265/ProRes 硬件编解码 | 系统内置 |
 | **AudioToolbox** | Apple | AAC/ALAC 等音频编解码 | 系统内置 |
 | **SecureTransport** | Apple | HTTPS/TLS 支持 | 系统内置 |
@@ -76,6 +77,7 @@ MIN_MACOS=12.0 FFMPEG_VERSION=7.0 ./build.sh
 | `OGG_VERSION` | `1.3.5` | libogg 版本 |
 | `VORBIS_VERSION` | `1.3.7` | libvorbis 版本 |
 | `VPX_VERSION` | `1.15.2` | libvpx 版本 |
+| `WEBP_VERSION` | `1.6.0` | libwebp 版本 |
 | `JOBS` | CPU 核心数 | 并行编译任务数 |
 | `BUILD_ID` | (空) | 可选的构建 ID |
 
@@ -130,6 +132,7 @@ native_deps/ffmpeg/
 │   ├── libogg-1.3.5/     # libogg 源码
 │   ├── libvorbis-1.3.7/  # libvorbis 源码
 │   ├── libvpx-1.15.2/    # libvpx 源码
+│   ├── libwebp-1.6.0/    # libwebp 源码
 │   ├── prefix-arm64/     # arm64 安装前缀
 │   ├── prefix-x86_64/    # x86_64 安装前缀
 │   └── build-*/          # 各架构构建目录
@@ -157,8 +160,8 @@ native_deps/ffmpeg/
 ./package-source.sh
 ```
 
-默认生成 `dist/xfilesuite-ffmpeg-macos-8.0.1-xfilesuite.1-source.tar.gz` 及其 SHA-256 文件。
-该包对应内置 macOS `ffmpeg` 的 SHA-256 `30579dcf2b32729e833d3a818d9b311e4290849d185dad9bcb4aa8cf89783dbd`。
+默认生成 `dist/xfilesuite-ffmpeg-macos-8.0.1-xfilesuite.2-source.tar.gz` 及其 SHA-256 文件。
+构建并发布后，源码包中的 `BUILDINFO.md` 会记录该次内置 macOS `ffmpeg` 的 SHA-256。
 只有 FFmpeg、静态链接库或构建参数改变时，才需要创建新的合规源码包和新的 GitHub Release。
 
 > 本构建不包含任何 GPL 或 nonfree 组件（如 x264、x265、libfdk_aac 等）。

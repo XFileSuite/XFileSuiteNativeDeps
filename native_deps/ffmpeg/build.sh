@@ -9,6 +9,7 @@ set -euo pipefail
 #   - libogg      (BSD)         — OGG container
 #   - libvorbis   (BSD)         — Vorbis encoding
 #   - libvpx      (BSD)         — VP8/VP9 encoding for WebM
+#   - libwebp     (BSD)         — animated WebP encoding
 # All additions are LGPL-compatible (no GPL, no nonfree).
 #
 # Output:
@@ -56,6 +57,11 @@ VPX_TARBALL_URL="https://chromium.googlesource.com/webm/libvpx/+archive/v${VPX_V
 VPX_TARBALL_PATH="$WORK_DIR/libvpx-${VPX_VERSION}.tar.gz"
 VPX_SRC_DIR="$WORK_DIR/libvpx-${VPX_VERSION}"
 
+WEBP_VERSION="${WEBP_VERSION:-1.6.0}"
+WEBP_TARBALL_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz"
+WEBP_TARBALL_PATH="$WORK_DIR/libwebp-${WEBP_VERSION}.tar.gz"
+WEBP_SRC_DIR="$WORK_DIR/libwebp-${WEBP_VERSION}"
+
 BUILD_STAMP="${BUILD_STAMP:-$(date -u +%Y%m%d%H%M)}"
 BUILD_ID="${BUILD_ID:-}"
 
@@ -73,6 +79,7 @@ need tar
 need xcrun
 need lipo
 need otool
+need cmake
 
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 CC="$(xcrun --sdk macosx -f clang)"
@@ -230,6 +237,20 @@ fetch_vpx() {
   fi
   echo "Extracting libvpx..."
   tar -xzf "$VPX_TARBALL_PATH" -C "$VPX_SRC_DIR"
+}
+
+fetch_webp() {
+  if [[ -d "$WEBP_SRC_DIR" && -f "$WEBP_SRC_DIR/CMakeLists.txt" ]]; then
+    echo "Using existing libwebp source: $WEBP_SRC_DIR"
+    return 0
+  fi
+  rm -rf "$WEBP_SRC_DIR"
+  if [[ ! -f "$WEBP_TARBALL_PATH" ]]; then
+    echo "Downloading libwebp ${WEBP_VERSION}..."
+    curl -fL --retry 3 --retry-delay 1 -o "$WEBP_TARBALL_PATH" "$WEBP_TARBALL_URL"
+  fi
+  echo "Extracting libwebp..."
+  tar -xzf "$WEBP_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 # ── Per-arch build functions for each dependency ─────────────────
@@ -397,6 +418,27 @@ build_vpx_arch() {
   echo "libvpx built for $ARCH -> $PREFIX"
 }
 
+build_webp_arch() {
+  local ARCH="$1"
+  local PREFIX="$WORK_DIR/prefix-$ARCH"
+  local BUILD_OUT="$WORK_DIR/build-webp-$ARCH"
+  rm -rf "$BUILD_OUT"
+  echo "==> Building libwebp for $ARCH"
+  cmake -S "$WEBP_SRC_DIR" -B "$BUILD_OUT" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+    -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_MACOS" \
+    -DCMAKE_OSX_SYSROOT="$SDK" \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF \
+    -DWEBP_BUILD_DWEBP=OFF -DWEBP_BUILD_GIF2WEBP=OFF \
+    -DWEBP_BUILD_IMG2WEBP=OFF -DWEBP_BUILD_VWEBP=OFF \
+    -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF
+  cmake --build "$BUILD_OUT" --parallel "$JOBS"
+  cmake --install "$BUILD_OUT"
+}
+
 # ── FFmpeg build per arch ────────────────────────────────────────
 
 build_one_arch() {
@@ -414,6 +456,7 @@ build_one_arch() {
   build_ogg_arch "$ARCH"
   build_vorbis_arch "$ARCH"
   build_vpx_arch "$ARCH"
+  build_webp_arch "$ARCH"
 
   export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
   export CC CXX SDKROOT="$SDK"
@@ -431,7 +474,7 @@ build_one_arch() {
 
   # Point FFmpeg at all the static libs we just built
   local LIB_CFLAGS="-I$PREFIX/include"
-  local LIB_LDFLAGS="-L$PREFIX/lib -lvorbisenc -lvorbis -logg -lvpx -lmp3lame -lm"
+  local LIB_LDFLAGS="-L$PREFIX/lib -lvorbisenc -lvorbis -logg -lvpx -lwebp -lsharpyuv -lmp3lame -lm"
 
   local CROSS_CONFIG=()
   if [[ "$ARCH" != "$HOST_MACHINE" ]]; then
@@ -479,6 +522,7 @@ build_one_arch() {
     --enable-libmp3lame \
     --enable-libvorbis \
     --enable-libvpx \
+    --enable-libwebp \
     \
     --enable-videotoolbox \
     --enable-audiotoolbox \
@@ -553,7 +597,7 @@ make_universal() {
 
     echo ""
     echo "==> Verifying encoders"
-    for enc in libmp3lame libvorbis libvpx-vp8 libvpx-vp9; do
+    for enc in libmp3lame libvorbis libvpx-vp8 libvpx-vp9 libwebp; do
       "$OUT/bin/ffmpeg" -hide_banner -encoders 2>&1 | grep -i "$enc" | sed 's/^/  /' || echo "  WARNING: $enc not found!"
     done
 
@@ -564,6 +608,7 @@ lame_version=$LAME_VERSION
 ogg_version=$OGG_VERSION
 vorbis_version=$VORBIS_VERSION
 vpx_version=$VPX_VERSION
+webp_version=$WEBP_VERSION
 build_stamp_utc=$BUILD_STAMP
 build_id=${BUILD_ID:-}
 min_macos=$MIN_MACOS
@@ -600,6 +645,7 @@ Env vars:
   OGG_VERSION=1.3.5       libogg version (default: 1.3.5)
   VORBIS_VERSION=1.3.7    libvorbis version (default: 1.3.7)
   VPX_VERSION=1.15.2      libvpx version (default: 1.15.2)
+  WEBP_VERSION=1.6.0      libwebp version (default: 1.6.0)
   BUILD_STAMP=YYYYMMDDHHMM  Stamp used in output name (default: current UTC)
   BUILD_ID=123            Optional build number/id appended after version
   WORK_DIR=... DIST_DIR=... JOBS=...
@@ -623,6 +669,7 @@ EOF
   fetch_ogg
   fetch_vorbis
   fetch_vpx
+  fetch_webp
   fetch_ffmpeg
   build_one_arch arm64
   build_one_arch x86_64

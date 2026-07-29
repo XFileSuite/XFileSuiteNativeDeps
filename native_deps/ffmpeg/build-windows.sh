@@ -14,7 +14,7 @@ for tool in curl tar make pkg-config; do command -v "$tool" >/dev/null || { echo
 # The workflow installs these exact MSYS2 packages.  Keeping the dependency list
 # here makes a local rebuild use the same LGPL/BSD codec set as macOS.
 for package in mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf \
-  mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx; do
+  mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp; do
   pacman -Q "$package" >/dev/null || { echo "Missing MSYS2 package: $package" >&2; exit 1; }
 done
 
@@ -39,7 +39,7 @@ mkdir -p "$build_dir"
     --pkg-config=/mingw64/bin/pkg-config --pkg-config-flags=--static \
     --disable-shared --enable-static --disable-debug --disable-doc --disable-network \
     --disable-gpl --disable-nonfree --disable-version3 \
-    --enable-libmp3lame --enable-libvorbis --enable-libvpx \
+    --enable-libmp3lame --enable-libvorbis --enable-libvpx --enable-libwebp \
     --extra-libs='-lstdc++ -lws2_32 -lbcrypt -lz'
   make -j"$JOBS"
   make install

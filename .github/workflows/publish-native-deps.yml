@@ -309,7 +309,7 @@ jobs:
           update: true
           install: >-
             make mingw-w64-x86_64-binutils mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx
+            mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp
       - name: Build LGPL FFmpeg for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
         shell: msys2 {0}
