@@ -28,7 +28,7 @@ assert_relocatable() {
   local invalid
   invalid="$(
     otool -L "$binary" |
-      awk 'NR > 1 {print $1}' |
+      awk '/^[[:space:]]/ {print $1}' |
       grep -E '^/' |
       grep -Ev '^(/usr/lib/|/System/Library/)' || true
   )"
