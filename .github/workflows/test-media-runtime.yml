@@ -38,6 +38,7 @@ jobs:
           echo "$RUNNER_TEMP/media-build-tools/bin" >> "$GITHUB_PATH"
 
       - name: Restore source and intermediate cache
+        id: media-cache
         uses: actions/cache@v4
         with:
           path: native_deps/media_runtime/work
@@ -59,6 +60,13 @@ jobs:
           name: media-runtime-build-log-${{ github.run_attempt }}
           path: media-runtime-build.log
           if-no-files-found: warn
+
+      - name: Save source and intermediate cache after failed diagnostics
+        if: always() && steps.media-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: native_deps/media_runtime/work
+          key: media-runtime-macos-v1-${{ hashFiles('native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/**') }}
 
       - name: Upload runtime test artifact
         uses: actions/upload-artifact@v4
