@@ -136,8 +136,53 @@ while IFS= read -r framework; do
 done < <(find "$frameworks" -type d -name '*.framework' -print)
 codesign --force --sign - --timestamp=none "$shared_ffmpeg"
 
+echo "==> Collecting distributable license texts"
+licenses="$WORK_DIR/licenses"
+rm -rf "$licenses"
+mkdir -p "$licenses"
+cp "$ffmpeg_work/ffmpeg-8.0.1/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
+cp "$ffmpeg_work/ffmpeg-8.0.1/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
+cp "$ffmpeg_work/lame-3.100/COPYING" "$licenses/LAME-LGPL-2.0.txt"
+cp "$ffmpeg_work/opus-1.5.2/COPYING" "$licenses/Opus-COPYING.txt"
+cp "$ffmpeg_work/libogg-1.3.5/COPYING" "$licenses/libogg-COPYING.txt"
+cp "$ffmpeg_work/libvorbis-1.3.7/COPYING" "$licenses/libvorbis-COPYING.txt"
+cp "$ffmpeg_work/libvpx-1.15.2/LICENSE" "$licenses/libvpx-LICENSE.txt"
+cp "$ffmpeg_work/libwebp-1.6.0/COPYING" "$licenses/libwebp-COPYING.txt"
+cp "$upstream/LICENSE.txt" "$licenses/libmpv-darwin-build-LICENSE.txt"
+
+downloads="$upstream/build/tmp/downloads/output"
+extract_license() {
+  archive="$1" pattern="$2" destination="$3"
+  member="$(tar -tf "$archive" | grep -E "$pattern" | sed -n '1p')"
+  test -n "$member"
+  tar -xOf "$archive" "$member" > "$licenses/$destination"
+}
+extract_license "$downloads/mpv-0.41.0.tar.gz" '/Copyright$' mpv-Copyright.txt
+extract_license "$downloads/dav1d-1.2.1.tar.bz2" '/COPYING$' dav1d-COPYING.txt
+extract_license "$downloads/freetype-2.13.2.tar.xz" '/docs/FTL.TXT$' FreeType-FTL.txt
+extract_license "$downloads/fribidi-1.0.13.tar.xz" '/COPYING$' FriBidi-COPYING.txt
+extract_license "$downloads/harfbuzz-8.1.1.tar.gz" '/COPYING$' HarfBuzz-COPYING.txt
+extract_license "$downloads/libass-0.17.1.tar.xz" '/COPYING$' libass-COPYING.txt
+extract_license "$downloads/mbedtls-3.4.1.tar.gz" '/LICENSE$' MbedTLS-LICENSE.txt
+extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyright.txt
+extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
+
+cat > "$licenses/NOTICE.md" <<'EOF'
+# XFileSuite shared media runtime notices
+
+This bundle contains FFmpeg 8.0.1 shared libraries and CLI, mpv 0.41.0,
+libass, dav1d, FreeType, FriBidi, HarfBuzz, Mbed TLS, libxml2, libpng,
+uchardet, LAME, Opus, libogg, libvorbis, libvpx, and libwebp.
+
+FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
+included. Exact source archives, patches, checksums, and build scripts are
+published in the corresponding-source GitHub Release named in the manifest.
+EOF
+
 FRAMEWORKS_SOURCE="$frameworks" \
 FFMPEG_BINARY="$shared_ffmpeg" \
+LICENSES_SOURCE="$licenses" \
 VERSION="$RUNTIME_VERSION" \
 RELEASE_REVISION="$RELEASE_REVISION" \
 DIST_DIR="$DIST_DIR" \

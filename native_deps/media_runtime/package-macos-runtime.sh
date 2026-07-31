@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRAMEWORKS_SOURCE="${FRAMEWORKS_SOURCE:?set FRAMEWORKS_SOURCE to the directory containing *.xcframework}"
 FFMPEG_BINARY="${FFMPEG_BINARY:?set FFMPEG_BINARY to the shared-runtime ffmpeg executable}"
+LICENSES_SOURCE="${LICENSES_SOURCE:?set LICENSES_SOURCE to the collected runtime licenses}"
 VERSION="${VERSION:-8.0.1-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
@@ -13,10 +14,11 @@ STAGE_DIR="$WORK_DIR/$RELEASE_ID"
 ARCHIVE="$DIST_DIR/$RELEASE_ID.tar.gz"
 
 rm -rf "$STAGE_DIR"
-mkdir -p "$STAGE_DIR/Frameworks" "$STAGE_DIR/Tools" "$STAGE_DIR/lib" "$STAGE_DIR/metadata" "$DIST_DIR"
+mkdir -p "$STAGE_DIR/Frameworks" "$STAGE_DIR/Tools" "$STAGE_DIR/lib" "$STAGE_DIR/licenses" "$STAGE_DIR/metadata" "$DIST_DIR"
 cp -R "$FRAMEWORKS_SOURCE"/*.xcframework "$STAGE_DIR/Frameworks/"
 cp "$FFMPEG_BINARY" "$STAGE_DIR/Tools/ffmpeg"
 chmod +x "$STAGE_DIR/Tools/ffmpeg"
+cp -R "$LICENSES_SOURCE"/. "$STAGE_DIR/licenses/"
 
 # FFmpeg already records @rpath/libav*.dylib and searches ../lib. These aliases
 # point into the same framework binaries used by libmpv; no dylib is duplicated.
@@ -45,7 +47,7 @@ EOF
 (
   cd "$STAGE_DIR"
   {
-    find Frameworks Tools metadata -type f ! -path 'metadata/SHA256SUMS' -print0
+    find Frameworks Tools licenses metadata -type f ! -path 'metadata/SHA256SUMS' -print0
     find lib \( -type f -o -type l \) -print0
   } |
     sort -z |

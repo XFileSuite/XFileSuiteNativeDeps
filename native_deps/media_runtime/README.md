@@ -24,6 +24,9 @@ Tools/
 metadata/
   BUILDINFO.md
   SHA256SUMS
+licenses/
+  NOTICE.md
+  ... exact license texts for bundled native components
 ```
 
 `Mpv` and `Tools/ffmpeg` must both resolve FFmpeg through the same
@@ -44,4 +47,3 @@ The legacy standalone FFmpeg component remains published until the shared
 runtime passes playback and all existing CLI regression tests. XFileSuiteSource
 must not switch its manifest entry until `verify-macos-runtime.sh` succeeds on
 the final archive.
-
