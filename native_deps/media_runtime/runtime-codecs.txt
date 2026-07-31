@@ -2,7 +2,6 @@
 decoder:h264
 decoder:hevc
 decoder:av1
-decoder:libdav1d
 decoder:vp8
 decoder:vp9
 decoder:prores
@@ -21,4 +20,3 @@ filter:paletteuse
 filter:scale
 filter:trim
 filter:concat
-
