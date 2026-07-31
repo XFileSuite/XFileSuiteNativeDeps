@@ -113,6 +113,19 @@ rm -rf "$frameworks"
 mkdir -p "$frameworks"
 cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
+echo "==> Relinking libmpv to the shared FFmpeg frameworks"
+while IFS= read -r mpv_binary; do
+  while IFS= read -r dependency; do
+    dylib_name="$(basename "$dependency")"
+    stem="${dylib_name#lib}"
+    stem="${stem%%.*}"
+    framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
+    install_name_tool -change "$dependency" \
+      "@rpath/$framework_name.framework/Versions/A/$framework_name" \
+      "$mpv_binary"
+  done < <(otool -L "$mpv_binary" | awk '/lib(av|sw)[^/]*\.dylib/ {print $1}')
+done < <(find "$frameworks/Mpv.xcframework" -type f -name Mpv -print)
+
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
 cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
 chmod +x "$shared_ffmpeg"
