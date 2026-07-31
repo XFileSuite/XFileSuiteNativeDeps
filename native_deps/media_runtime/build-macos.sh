@@ -74,9 +74,9 @@ sed -i '' 's/-mmacosx-version-min=10.9/-mmacosx-version-min=11.0/g' \
   "$upstream/cross-files/macos-arm64.ini" \
   "$upstream/cross-files/macos-amd64.ini"
 # SourceForge's redirect endpoint regularly stalls on GitHub macOS runners.
-# Savannah serves the byte-identical, checksum-pinned FreeType release.
+# OSUOSL mirrors the byte-identical, checksum-pinned FreeType release.
 sed -i '' \
-  's#https://downloads.sourceforge.net/project/freetype/freetype2/2.13.2/#https://download.savannah.gnu.org/releases/freetype/#' \
+  's#https://downloads.sourceforge.net/project/freetype/freetype2/2.13.2/#https://ftp.osuosl.org/pub/blfs/conglomeration/freetype/#' \
   "$upstream/downloads.lock"
 sed -i '' \
   -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s/version: 0.36.0/version: 0.41.0/' \
