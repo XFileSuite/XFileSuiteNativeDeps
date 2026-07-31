@@ -47,8 +47,12 @@ if [[ ! -d "$upstream/.git" ]]; then
 fi
 git -C "$upstream" fetch --tags --force
 git -C "$upstream" checkout --detach "$UPSTREAM_COMMIT"
-git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- cmd/downloads/main.go downloads.lock
+git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
+  cmd/downloads/main.go \
+  downloads.lock \
+  scripts/pkg-config/build.sh
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
+git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 # SourceForge's redirect endpoint regularly stalls on GitHub macOS runners.
 # Savannah serves the byte-identical, checksum-pinned FreeType release.
 sed -i '' \
@@ -73,9 +77,7 @@ xcframework_target="build/intermediate/xcframeworks_macos-universal-video-defaul
 echo "==> Building LGPL libmpv and the XCFramework set"
 (
   cd "$upstream"
-  # pkg-config 0.29.2 embeds an old GLib whose atomic fallback triggers
-  # Clang 17's promoted integer/pointer conversion diagnostic.
-  CFLAGS="${CFLAGS:-} -Wno-int-conversion" make -j"$JOBS" \
+  make -j"$JOBS" \
     -o "$arm_ffmpeg" \
     -o "$amd_ffmpeg" \
     "$xcframework_target"
