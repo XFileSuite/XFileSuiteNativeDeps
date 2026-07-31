@@ -25,7 +25,7 @@ fi
 # generated with swift-build. media-kit uses libmpv and does not need the
 # standalone player's system clipboard backend.
 sed -i '' \
-    -e '/player\/clipboard\/clipboard-mac\.m/d' \
+    -e "s#.*'player/clipboard/clipboard-mac.m')#                     )#" \
     -e "s#'osdep/mac/app_bridge.m',#'osdep/mac/app_bridge.m'#" \
     meson.build
 
