@@ -159,12 +159,17 @@ relink_media_binary() {
 }
 
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
-cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
-chmod +x "$shared_ffmpeg"
-codesign --remove-signature "$shared_ffmpeg" 2>/dev/null || true
+shared_ffmpeg_arm64="$WORK_DIR/ffmpeg-shared-arm64"
+shared_ffmpeg_x86_64="$WORK_DIR/ffmpeg-shared-x86_64"
+cp "$WORK_DIR/ffmpeg/prefix-arm64/bin/ffmpeg" "$shared_ffmpeg_arm64"
+cp "$WORK_DIR/ffmpeg/prefix-x86_64/bin/ffmpeg" "$shared_ffmpeg_x86_64"
+chmod +x "$shared_ffmpeg_arm64" "$shared_ffmpeg_x86_64"
 
 echo "==> Relinking FFmpeg CLI to the same XCFramework binaries used by libmpv"
-relink_media_binary "$shared_ffmpeg" 1
+relink_media_binary "$shared_ffmpeg_arm64" 1
+relink_media_binary "$shared_ffmpeg_x86_64" 1
+lipo -create "$shared_ffmpeg_arm64" "$shared_ffmpeg_x86_64" -output "$shared_ffmpeg"
+chmod +x "$shared_ffmpeg"
 
 echo "==> Ad-hoc signing the relocatable runtime"
 while IFS= read -r framework; do
