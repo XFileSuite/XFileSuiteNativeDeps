@@ -114,33 +114,47 @@ mkdir -p "$frameworks"
 cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
 echo "==> Relinking the shared FFmpeg framework dependency graph"
-while IFS= read -r framework_binary; do
-  # Xcode 15 install_name_tool cannot rewrite some signed universal binaries
-  # whose signature occupies the tail of __LINKEDIT. They are re-signed below.
-  codesign --remove-signature "$framework_binary" 2>/dev/null || true
-  while IFS= read -r dependency; do
-    dylib_name="$(basename "$dependency")"
-    stem="${dylib_name#lib}"
-    stem="${stem%%.*}"
-    framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
-    install_name_tool -change "$dependency" \
-      "@rpath/$framework_name.framework/Versions/A/$framework_name" \
-      "$framework_binary"
-  done < <(otool -L "$framework_binary" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
-done < <(find "$frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
+relink_media_binary() {
+  local binary="$1"
+  local add_app_rpath="${2:-0}"
+  local rewrite_dir
+  local -a targets
+  rewrite_dir="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-relink.XXXXXX")"
+  codesign --remove-signature "$binary" 2>/dev/null || true
 
-echo "==> Relinking libmpv to the shared FFmpeg frameworks"
-while IFS= read -r mpv_binary; do
-  while IFS= read -r dependency; do
-    dylib_name="$(basename "$dependency")"
-    stem="${dylib_name#lib}"
-    stem="${stem%%.*}"
-    framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
-    install_name_tool -change "$dependency" \
-      "@rpath/$framework_name.framework/Versions/A/$framework_name" \
-      "$mpv_binary"
-  done < <(otool -L "$mpv_binary" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
-done < <(find "$frameworks/Mpv.xcframework" -type f -name Mpv -print)
+  if lipo -archs "$binary" | grep -q arm64 && lipo -archs "$binary" | grep -q x86_64; then
+    lipo "$binary" -thin arm64 -output "$rewrite_dir/arm64"
+    lipo "$binary" -thin x86_64 -output "$rewrite_dir/x86_64"
+    targets=("$rewrite_dir/arm64" "$rewrite_dir/x86_64")
+  else
+    targets=("$binary")
+  fi
+
+  local target dependency dylib_name stem framework_name
+  for target in "${targets[@]}"; do
+    while IFS= read -r dependency; do
+      dylib_name="$(basename "$dependency")"
+      stem="${dylib_name#lib}"
+      stem="${stem%%.*}"
+      framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
+      install_name_tool -change "$dependency" \
+        "@rpath/$framework_name.framework/Versions/A/$framework_name" \
+        "$target"
+    done < <(otool -L "$target" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
+    if [[ "$add_app_rpath" == "1" ]]; then
+      install_name_tool -add_rpath "@executable_path/../Frameworks" "$target" 2>/dev/null || true
+    fi
+  done
+
+  if [[ "${#targets[@]}" == "2" ]]; then
+    lipo -create "${targets[@]}" -output "$binary"
+  fi
+  rm -rf "$rewrite_dir"
+}
+
+while IFS= read -r framework_binary; do
+  relink_media_binary "$framework_binary"
+done < <(find "$frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
 
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
 cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
@@ -148,18 +162,7 @@ chmod +x "$shared_ffmpeg"
 codesign --remove-signature "$shared_ffmpeg" 2>/dev/null || true
 
 echo "==> Relinking FFmpeg CLI to the same XCFramework binaries used by libmpv"
-while IFS= read -r dependency; do
-  dylib_name="$(basename "$dependency")"
-  stem="${dylib_name#lib}"
-  stem="${stem%%.*}"
-  framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
-  if [[ -d "$frameworks/$framework_name.xcframework" ]]; then
-    install_name_tool -change "$dependency" \
-      "@rpath/$framework_name.framework/Versions/A/$framework_name" \
-      "$shared_ffmpeg"
-  fi
-done < <(otool -L "$shared_ffmpeg" | awk '/@rpath\/(libav|libsw).*\.dylib/ {print $1}')
-install_name_tool -add_rpath "@executable_path/../Frameworks" "$shared_ffmpeg" 2>/dev/null || true
+relink_media_binary "$shared_ffmpeg" 1
 
 echo "==> Ad-hoc signing the relocatable runtime"
 while IFS= read -r framework; do
