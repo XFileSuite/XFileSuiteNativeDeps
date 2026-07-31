@@ -20,6 +20,12 @@ if [[ ! -d subprojects/libplacebo ]]; then
     test "$(git -C subprojects/libplacebo rev-parse HEAD)" = "${libplacebo_commit}"
 fi
 
+# mpv 0.41 adds the macOS clipboard Objective-C bridge whenever Cocoa is
+# enabled, although that file requires the Swift header which is only
+# generated with swift-build. media-kit uses libmpv and does not need the
+# standalone player's system clipboard backend.
+sed -i '' '/player\/clipboard\/clipboard-mac\.m/d' meson.build
+
 options=(
     -Dauto_features=disabled
     -Dgpl=false
