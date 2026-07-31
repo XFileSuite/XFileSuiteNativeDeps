@@ -115,6 +115,9 @@ cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
 echo "==> Relinking the shared FFmpeg framework dependency graph"
 while IFS= read -r framework_binary; do
+  # Xcode 15 install_name_tool cannot rewrite some signed universal binaries
+  # whose signature occupies the tail of __LINKEDIT. They are re-signed below.
+  codesign --remove-signature "$framework_binary" 2>/dev/null || true
   while IFS= read -r dependency; do
     dylib_name="$(basename "$dependency")"
     stem="${dylib_name#lib}"
@@ -142,6 +145,7 @@ done < <(find "$frameworks/Mpv.xcframework" -type f -name Mpv -print)
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
 cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
 chmod +x "$shared_ffmpeg"
+codesign --remove-signature "$shared_ffmpeg" 2>/dev/null || true
 
 echo "==> Relinking FFmpeg CLI to the same XCFramework binaries used by libmpv"
 while IFS= read -r dependency; do
