@@ -8,7 +8,7 @@ cd "${SRC_DIR}"
 # libmpv: the public runtime remains libmpv + the shared FFmpeg frameworks.
 libplacebo_version="6.338.2"
 libplacebo_sha256="2f1e624e09d72a8c9db70f910f7560e764a1c126dae42acc5b3bcef836a7aec6"
-libplacebo_archive="${BUILD_DIR}/libplacebo-${libplacebo_version}.tar.gz"
+libplacebo_archive="${SRC_DIR}/libplacebo-${libplacebo_version}.tar.gz"
 mkdir -p subprojects
 if [[ ! -d subprojects/libplacebo ]]; then
     curl -L --fail --retry 5 --retry-all-errors \
