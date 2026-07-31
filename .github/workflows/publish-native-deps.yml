@@ -64,6 +64,8 @@ jobs:
         run: |
           set -o pipefail
           native_deps/media_runtime/build-macos.sh 2>&1 | tee media-runtime-build.log
+      - name: Package complete corresponding source
+        run: VERSION=8.0.1-mpv-0.41.0 RELEASE_REVISION=1 native_deps/media_runtime/package-source.sh
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
