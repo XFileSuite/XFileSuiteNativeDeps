@@ -28,7 +28,11 @@ jobs:
           cache: false
 
       - name: Install native build tools
-        run: brew install cmake meson ninja nasm pkg-config
+        run: |
+          brew install cmake ninja nasm pkg-config
+          python3 -m venv "$RUNNER_TEMP/media-build-tools"
+          "$RUNNER_TEMP/media-build-tools/bin/pip" install "meson==1.2.3"
+          echo "$RUNNER_TEMP/media-build-tools/bin" >> "$GITHUB_PATH"
 
       - name: Restore source and intermediate cache
         uses: actions/cache@v4
