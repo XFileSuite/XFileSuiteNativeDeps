@@ -52,6 +52,7 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cross-files/macos-amd64.ini \
   cross-files/macos-arm64.ini \
   downloads.lock \
+  scripts/libs-arch/relink-dylibs.sh \
   scripts/mpv/build.sh \
   scripts/pkg-config/build.sh \
   scripts/pkg-config/meson.build \
@@ -60,6 +61,11 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
+# The injected FFmpeg prefix lives outside libmpv-darwin-build. Teach its
+# per-architecture relinker to normalize those paths before lipo/frameworks.
+sed -i '' \
+  's#grep -E "$SOURCE_PREFIX|\^lib"#grep -E "$SOURCE_PREFIX|/native_deps/media_runtime/work/ffmpeg/prefix-|^lib"#' \
+  "$upstream/scripts/libs-arch/relink-dylibs.sh"
 cp "$SCRIPT_DIR/upstream/mpv-build-0.41.sh" "$upstream/scripts/mpv/build.sh"
 chmod +x "$upstream/scripts/mpv/build.sh"
 # New Meson versions require CMake to be declared explicitly for cross builds.
@@ -113,7 +119,7 @@ rm -rf "$frameworks"
 mkdir -p "$frameworks"
 cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
-echo "==> Relinking the shared FFmpeg framework dependency graph"
+echo "==> Preparing the thin FFmpeg CLI relinker"
 relink_media_binary() {
   local binary="$1"
   local add_app_rpath="${2:-0}"
@@ -151,10 +157,6 @@ relink_media_binary() {
   fi
   rm -rf "$rewrite_dir"
 }
-
-while IFS= read -r framework_binary; do
-  relink_media_binary "$framework_binary"
-done < <(find "$frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
 
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
 cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
