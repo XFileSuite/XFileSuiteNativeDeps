@@ -6,7 +6,7 @@ on:
       component:
         description: Component to rebuild and publish
         type: choice
-        options: [all, ffmpeg, imagemagick, resvg]
+        options: [all, media-runtime, ffmpeg, imagemagick, resvg]
         default: all
       platform:
         description: Platform to rebuild and publish
@@ -14,7 +14,7 @@ on:
         options: [all, macos, windows]
         default: all
       purge_all_deps:
-        description: Delete all existing ffmpeg, ImageMagick, and resvg objects in R2 before a full rebuild
+        description: Delete all existing native dependency objects in R2 before a full rebuild
         type: boolean
         default: false
 
@@ -41,6 +41,12 @@ jobs:
       - name: Set up Rust for resvg
         if: ${{ inputs.component == 'all' || inputs.component == 'resvg' }}
         uses: dtolnay/rust-toolchain@stable
+      - name: Set up Go for the media runtime
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
       - name: Validate release credentials
         run: |
           test -n "$SOURCE_WRITE_TOKEN"
@@ -53,15 +59,19 @@ jobs:
             native_deps/ffmpeg/work
             native_deps/imagemagick/work/downloads
             native_deps/resvg/target
+            native_deps/media_runtime/work
           key: macos-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/macos.json') }}
           restore-keys: |
             macos-src-${{ inputs.component }}-
       - name: Install nasm for x86_64 asm
-        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
-        run: brew install nasm
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
+        run: brew install nasm cmake ninja pkg-config meson
       - name: Build FFmpeg when selected
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
         run: native_deps/ffmpeg/build.sh --no-install
+      - name: Build shared media runtime when selected
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
+        run: native_deps/media_runtime/build-macos.sh
       - name: Build ImageMagick when selected
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
         run: native_deps/imagemagick/build-macos.sh
@@ -85,6 +95,9 @@ jobs:
             revision="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "releaseRevision")')"
             RELEASE_ID="resvg-macos-${version}-xfilesuite.${revision}" native_deps/resvg/package-source.sh
           fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
+            VERSION=8.0.1-mpv-0.41.0 RELEASE_REVISION=1 native_deps/media_runtime/package-source.sh
+          fi
       - name: Record previous R2 dependency keys
         run: |
           ruby -rjson -e '
@@ -93,6 +106,7 @@ jobs:
               f.puts("PREVIOUS_FFMPEG_R2_KEY=#{components.fetch("ffmpeg").fetch("r2Key")}")
               f.puts("PREVIOUS_IMAGEMAGICK_R2_KEY=#{components.fetch("imagemagick").fetch("r2Key")}")
               f.puts("PREVIOUS_RESVG_R2_KEY=#{components.fetch("resvg").fetch("r2Key")}")
+              f.puts("PREVIOUS_MEDIA_RUNTIME_R2_KEY=#{components.dig("mediaRuntime", "r2Key")}")
             end
           '
       - name: Update manifest with final binary hashes
@@ -123,6 +137,18 @@ jobs:
               item["r2Key"] = "deps/resvg-macos-universal-#{sha}"
               item["sourceRelease"] = "resvg-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
             end
+            if ["all", "media-runtime"].include?(component)
+              item = data["components"]["mediaRuntime"] ||= {
+                "version" => "8.0.1-mpv-0.41.0",
+                "releaseRevision" => 1,
+                "architecture" => "universal"
+              }
+              archive = Dir["native_deps/media_runtime/dist/media-runtime-*.tar.gz"].first
+              sha = `shasum -a 256 #{archive}`.split.first
+              item["bundleSha256"] = sha
+              item["r2Key"] = "deps/media-runtime-macos-#{item["version"]}-#{sha}"
+              item["sourceRelease"] = "media-runtime-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
+            end
             File.write(path, JSON.pretty_generate(data) + "\n")
           '
       - name: Publish corresponding source on GitHub
@@ -145,6 +171,10 @@ jobs:
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
             archive="$(find native_deps/resvg/dist -maxdepth 1 -name 'xfilesuite-*-source.tar.gz' -print -quit)"
             publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "sourceRelease")')" "$archive"
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
+            archive="$(find native_deps/media_runtime/dist -name 'xfilesuite-*-source.tar.gz' -maxdepth 1 -print -quit)"
+            publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "sourceRelease")')" "$archive"
           fi
       - name: Purge all native dependency objects before a full rebuild
         if: ${{ inputs.purge_all_deps }}
@@ -171,7 +201,7 @@ jobs:
           }
 
           async function main() {
-            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-']) {
+            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/media-runtime-']) {
               let cursor;
               do {
                 const query = new URLSearchParams({ prefix, per_page: '1000' });
@@ -203,6 +233,9 @@ jobs:
           fi
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "r2Key")')" --file native_deps/resvg/dist/resvg-macos-universal --remote
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "r2Key")')" --file "$(find native_deps/media_runtime/dist -name 'media-runtime-*.tar.gz' -maxdepth 1 -print -quit)" --remote
           fi
       - name: Commit the canonical public manifest
         run: |
@@ -260,11 +293,14 @@ jobs:
             remove_previous "$PREVIOUS_RESVG_R2_KEY" "$(current_key resvg)"
             npx wrangler r2 object delete "xfilesuite-releases/deps/resvg-macos-universal" --remote || true
           fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
+            remove_previous "$PREVIOUS_MEDIA_RUNTIME_R2_KEY" "$(current_key mediaRuntime)"
+          fi
 
   publish-windows:
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ always() && inputs.component != 'media-runtime' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     needs: publish
     runs-on: windows-latest
     permissions:
