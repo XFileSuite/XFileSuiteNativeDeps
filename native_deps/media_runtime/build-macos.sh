@@ -53,9 +53,12 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cross-files/macos-arm64.ini \
   downloads.lock \
   scripts/pkg-config/build.sh \
-  scripts/pkg-config/meson.build
+  scripts/pkg-config/meson.build \
+  scripts/uchardet/build.sh \
+  scripts/uchardet/meson.build
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
+git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
 # New Meson versions require CMake to be declared explicitly for cross builds.
 for cross_file in macos-arm64.ini macos-amd64.ini; do
   sed -i '' "/pkgconfig = \\['pkg-config'\\]/a\\

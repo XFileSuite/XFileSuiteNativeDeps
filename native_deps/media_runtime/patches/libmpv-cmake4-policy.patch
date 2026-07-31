@@ -1,0 +1,19 @@
+diff --git a/scripts/uchardet/build.sh b/scripts/uchardet/build.sh
+index c407333..0c53b04 100644
+--- a/scripts/uchardet/build.sh
++++ b/scripts/uchardet/build.sh
+@@ -19,3 +19,4 @@
+     -B build_native \
+     -DCMAKE_INSTALL_PREFIX="${OUTPUT_DIR}" \
++    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+     -DBUILD_STATIC=OFF
+diff --git a/scripts/uchardet/meson.build b/scripts/uchardet/meson.build
+index a7ca18a..b41a5c5 100644
+--- a/scripts/uchardet/meson.build
++++ b/scripts/uchardet/meson.build
+@@ -16,4 +16,5 @@
+ options.add_cmake_defines({
+     'CMAKE_OSX_ARCHITECTURES': arch,
+     'CMAKE_OSX_SYSROOT': meson.get_cross_property('cmake_osx_sysroot'),
++    'CMAKE_POLICY_VERSION_MINIMUM': '3.5',
+     'BUILD_STATIC': false,
