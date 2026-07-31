@@ -31,7 +31,7 @@ EOF
 
 (
   cd "$STAGE_DIR"
-  find Frameworks Tools metadata -type f -print0 |
+  find Frameworks Tools metadata -type f ! -path 'metadata/SHA256SUMS' -print0 |
     sort -z |
     while IFS= read -r -d '' file; do
       shasum -a 256 "$file"

@@ -18,7 +18,7 @@ need() {
   }
 }
 
-for tool in git make meson ninja go xcodebuild lipo otool install_name_tool; do
+for tool in git make meson ninja go xcodebuild lipo otool install_name_tool codesign; do
   need "$tool"
 done
 
@@ -113,6 +113,19 @@ rm -rf "$frameworks"
 mkdir -p "$frameworks"
 cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
+echo "==> Relinking the shared FFmpeg framework dependency graph"
+while IFS= read -r framework_binary; do
+  while IFS= read -r dependency; do
+    dylib_name="$(basename "$dependency")"
+    stem="${dylib_name#lib}"
+    stem="${stem%%.*}"
+    framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
+    install_name_tool -change "$dependency" \
+      "@rpath/$framework_name.framework/Versions/A/$framework_name" \
+      "$framework_binary"
+  done < <(otool -L "$framework_binary" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
+done < <(find "$frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
+
 echo "==> Relinking libmpv to the shared FFmpeg frameworks"
 while IFS= read -r mpv_binary; do
   while IFS= read -r dependency; do
@@ -143,6 +156,12 @@ while IFS= read -r dependency; do
   fi
 done < <(otool -L "$shared_ffmpeg" | awk '/@rpath\/(libav|libsw).*\.dylib/ {print $1}')
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$shared_ffmpeg" 2>/dev/null || true
+
+echo "==> Ad-hoc signing the relocatable runtime"
+while IFS= read -r framework; do
+  codesign --force --sign - --timestamp=none "$framework"
+done < <(find "$frameworks" -type d -name '*.framework' -print)
+codesign --force --sign - --timestamp=none "$shared_ffmpeg"
 
 FRAMEWORKS_SOURCE="$frameworks" \
 FFMPEG_BINARY="$shared_ffmpeg" \

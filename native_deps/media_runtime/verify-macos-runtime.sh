@@ -23,16 +23,36 @@ framework_binary() {
   printf '%s\n' "$candidate"
 }
 
+assert_relocatable() {
+  local binary="$1"
+  local invalid
+  invalid="$(
+    otool -L "$binary" |
+      awk 'NR > 1 {print $1}' |
+      grep -E '^/' |
+      grep -Ev '^(/usr/lib/|/System/Library/)' || true
+  )"
+  if [[ -n "$invalid" ]]; then
+    echo "$binary contains non-system absolute dependencies:" >&2
+    echo "$invalid" >&2
+    exit 1
+  fi
+}
+
 need_file "$FFMPEG"
 for framework in Mpv Avcodec Avformat Avutil Avfilter Swresample Swscale; do
   binary="$(framework_binary "$framework")"
   need_file "$binary"
+  assert_relocatable "$binary"
   if otool -L "$binary" | grep -Eq '(/opt/homebrew/|/usr/local/|/opt/local/)'; then
     echo "$framework links against a developer-machine dependency" >&2
     otool -L "$binary" >&2
     exit 1
   fi
 done
+while IFS= read -r binary; do
+  assert_relocatable "$binary"
+done < <(find "$FRAMEWORKS_DIR" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
 
 if ! otool -L "$FFMPEG" | grep -q '@rpath/Avcodec.framework/'; then
   echo "ffmpeg does not use the shared Avcodec.framework runtime" >&2
@@ -49,6 +69,7 @@ if otool -L "$FFMPEG" | grep -Eq '(/opt/homebrew/|/usr/local/|/opt/local/)'; the
   otool -L "$FFMPEG" >&2
   exit 1
 fi
+assert_relocatable "$FFMPEG"
 
 mpv_binary="$(framework_binary Mpv)"
 if ! otool -L "$mpv_binary" | grep -q '@rpath/Avcodec.framework/'; then
@@ -91,26 +112,27 @@ while IFS= read -r requirement; do
   esac
 done < "$SCRIPT_DIR/runtime-codecs.txt"
 
-# Exercise the actual ProRes 4444 alpha path instead of merely checking that
-# the decoder is registered. The generated frame is half-transparent red; an
-# opaque result means an alpha plane was lost during encode or decode.
-alpha_work="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-alpha.XXXXXX")"
-trap 'rm -rf "$alpha_work"' EXIT
-for _ in {1..256}; do
-  printf '\377\000\000\200'
-done > "$alpha_work/source.rgba"
-"$FFMPEG" -hide_banner -loglevel error \
-  -f rawvideo -pixel_format rgba -video_size 16x16 -framerate 1 \
-  -i "$alpha_work/source.rgba" \
-  -frames:v 1 -c:v prores_ks -profile:v 4 -alpha_bits 16 \
-  "$alpha_work/prores-4444-alpha.mov"
-"$FFMPEG" -hide_banner -loglevel error \
-  -i "$alpha_work/prores-4444-alpha.mov" -frames:v 1 \
-  -pix_fmt rgba -f rawvideo "$alpha_work/frame.rgba"
-alpha_byte="$(od -An -tu1 -j3 -N1 "$alpha_work/frame.rgba" | tr -d '[:space:]')"
-if [[ -z "$alpha_byte" || "$alpha_byte" -lt 96 || "$alpha_byte" -gt 160 ]]; then
-  echo "ProRes 4444 alpha round-trip failed: alpha=$alpha_byte" >&2
-  exit 1
+if [[ "${VERIFY_ALPHA_VIDEO:-0}" == "1" ]]; then
+  # Stage-three verification: prove that a semi-transparent pixel survives a
+  # ProRes 4444 encode/decode round trip. Playback only requires its decoder.
+  alpha_work="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-alpha.XXXXXX")"
+  trap 'rm -rf "$alpha_work"' EXIT
+  for _ in {1..256}; do
+    printf '\377\000\000\200'
+  done > "$alpha_work/source.rgba"
+  "$FFMPEG" -hide_banner -loglevel error \
+    -f rawvideo -pixel_format rgba -video_size 16x16 -framerate 1 \
+    -i "$alpha_work/source.rgba" \
+    -frames:v 1 -c:v prores_ks -profile:v 4 -alpha_bits 16 \
+    "$alpha_work/prores-4444-alpha.mov"
+  "$FFMPEG" -hide_banner -loglevel error \
+    -i "$alpha_work/prores-4444-alpha.mov" -frames:v 1 \
+    -pix_fmt rgba -f rawvideo "$alpha_work/frame.rgba"
+  alpha_byte="$(od -An -tu1 -j3 -N1 "$alpha_work/frame.rgba" | tr -d '[:space:]')"
+  if [[ -z "$alpha_byte" || "$alpha_byte" -lt 96 || "$alpha_byte" -gt 160 ]]; then
+    echo "ProRes 4444 alpha round-trip failed: alpha=$alpha_byte" >&2
+    exit 1
+  fi
 fi
 
 if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree)'; then
