@@ -73,7 +73,9 @@ xcframework_target="build/intermediate/xcframeworks_macos-universal-video-defaul
 echo "==> Building LGPL libmpv and the XCFramework set"
 (
   cd "$upstream"
-  make -j"$JOBS" \
+  # pkg-config 0.29.2 embeds an old GLib whose atomic fallback triggers
+  # Clang 17's promoted integer/pointer conversion diagnostic.
+  CFLAGS="${CFLAGS:-} -Wno-int-conversion" make -j"$JOBS" \
     -o "$arm_ffmpeg" \
     -o "$amd_ffmpeg" \
     "$xcframework_target"
