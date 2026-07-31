@@ -62,7 +62,8 @@ framework_search_path="$(
     paste -sd: -
 )"
 export DYLD_FRAMEWORK_PATH="$framework_search_path"
-codes="$("$FFMPEG" -hide_banner -codecs 2>&1)"
+decoders="$("$FFMPEG" -hide_banner -decoders 2>&1)"
+encoders="$("$FFMPEG" -hide_banner -encoders 2>&1)"
 filters="$("$FFMPEG" -hide_banner -filters 2>&1)"
 while IFS= read -r requirement; do
   [[ -z "$requirement" || "$requirement" == \#* ]] && continue
@@ -70,13 +71,13 @@ while IFS= read -r requirement; do
   name="${requirement#*:}"
   case "$kind" in
     decoder)
-      grep -Eq "[[:space:]]${name}([[:space:]]|$)" <<<"$codes" || {
+      grep -Eq "[[:space:]]${name}([[:space:]]|$)" <<<"$decoders" || {
         echo "Missing required decoder: $name" >&2
         exit 1
       }
       ;;
     encoder)
-      grep -Eq "[[:space:]]${name}([[:space:]]|$)" <<<"$codes" || {
+      grep -Eq "[[:space:]]${name}([[:space:]]|$)" <<<"$encoders" || {
         echo "Missing required encoder: $name" >&2
         exit 1
       }
