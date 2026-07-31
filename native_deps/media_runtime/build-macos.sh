@@ -150,7 +150,9 @@ cp "$ffmpeg_work/libvpx-1.15.2/LICENSE" "$licenses/libvpx-LICENSE.txt"
 cp "$ffmpeg_work/libwebp-1.6.0/COPYING" "$licenses/libwebp-COPYING.txt"
 cp "$upstream/LICENSE.txt" "$licenses/libmpv-darwin-build-LICENSE.txt"
 
-downloads="$upstream/build/tmp/downloads/output"
+# Upstream moves the verified downloads from tmp/ into intermediate/ before
+# compiling. Keep license collection on the canonical cached archive set.
+downloads="$upstream/build/intermediate/downloads"
 extract_license() {
   archive="$1" pattern="$2" destination="$3"
   member="$(tar -tf "$archive" | grep -E "$pattern" | sed -n '1p')"
