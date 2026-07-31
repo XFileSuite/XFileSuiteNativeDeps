@@ -85,6 +85,12 @@ sed -i '' 's/-mmacosx-version-min=10.9/-mmacosx-version-min=11.0/g' \
 sed -i '' \
   's#https://downloads.sourceforge.net/project/freetype/freetype2/2.13.2/#https://ftp.osuosl.org/pub/blfs/conglomeration/freetype/#' \
   "$upstream/downloads.lock"
+# ffmpeg.org intermittently blackholes GitHub-hosted macOS runners. This
+# checksum-identical BLFS mirror is only fetched because the upstream build
+# downloads its complete lockfile; our linked FFmpeg is the injected 8.0.1.
+sed -i '' \
+  's#https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz#https://ftp.osuosl.org/pub/blfs/conglomeration/ffmpeg/ffmpeg-6.0.tar.xz#' \
+  "$upstream/downloads.lock"
 sed -i '' \
   -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s/version: 0.36.0/version: 0.41.0/' \
   -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s#v0.36.0.tar.gz#v0.41.0.tar.gz#' \
