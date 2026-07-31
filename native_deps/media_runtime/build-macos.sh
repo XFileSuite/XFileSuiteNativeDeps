@@ -67,6 +67,7 @@ sed -i '' \
   's#grep -E "$SOURCE_PREFIX|\^lib"#grep -E "$SOURCE_PREFIX|/native_deps/media_runtime/work/ffmpeg/prefix-|^lib"#' \
   "$upstream/scripts/libs-arch/relink-dylibs.sh"
 cp "$SCRIPT_DIR/upstream/mpv-build-0.41.sh" "$upstream/scripts/mpv/build.sh"
+cp "$SCRIPT_DIR/upstream/app-bridge-no-swift.m" "$upstream/scripts/mpv/app-bridge-no-swift.m"
 chmod +x "$upstream/scripts/mpv/build.sh"
 # New Meson versions require CMake to be declared explicitly for cross builds.
 for cross_file in macos-arm64.ini macos-amd64.ini; do

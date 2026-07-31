@@ -83,8 +83,8 @@ for mapping in 'libavcodec*:Avcodec' 'libavformat*:Avformat'; do
 done
 
 mpv_binary="$(framework_binary Mpv)"
-if nm -u "$mpv_binary" | grep -q '_clipboard_backend_mac'; then
-  echo "libmpv contains an unresolved macOS clipboard backend" >&2
+if nm -u "$mpv_binary" | grep -Eq '_(clipboard_backend_mac|cocoa_(init|uninit|set)_)'; then
+  echo "libmpv contains an unresolved macOS application bridge" >&2
   exit 1
 fi
 if ! otool -L "$mpv_binary" | grep -q '@rpath/Avcodec.framework/'; then

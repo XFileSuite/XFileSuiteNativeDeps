@@ -28,6 +28,11 @@ sed -i '' \
     -e "s#.*'player/clipboard/clipboard-mac.m')#                     )#" \
     -e "s#'osdep/mac/app_bridge.m',#'osdep/mac/app_bridge.m'#" \
     meson.build
+cp "${PROJECT_DIR}/scripts/mpv/app-bridge-no-swift.m" \
+    osdep/mac/app_bridge_no_swift.m
+sed -i '' \
+    "s#'osdep/mac/app_bridge.m'#'osdep/mac/app_bridge.m', 'osdep/mac/app_bridge_no_swift.m'#" \
+    meson.build
 # clipboard.c registers the Cocoa backend based on HAVE_COCOA even when the
 # Objective-C/Swift implementation above is intentionally excluded. Disable
 # only that registration so libmpv has no unresolved clipboard_backend_mac.
