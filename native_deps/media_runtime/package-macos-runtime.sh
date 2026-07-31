@@ -29,7 +29,7 @@ while IFS= read -r dependency; do
     -type f -path "*/$framework_name.framework/Versions/A/$framework_name" -print -quit)"
   test -n "$framework_binary"
   ln -s "../${framework_binary#"$STAGE_DIR/"}" "$STAGE_DIR/lib/$dylib_name"
-done < <(otool -L "$STAGE_DIR/Tools/ffmpeg" | awk '$1 ~ /@rpath\/(libav|libsw).*[.]dylib/ {print $1}')
+done < <(otool -L "$STAGE_DIR/Tools/ffmpeg" | awk '$1 ~ /@rpath\/(libav|libsw).*[.]dylib/ {print $1}' | sort -u)
 
 cat > "$STAGE_DIR/metadata/BUILDINFO.md" <<EOF
 # XFileSuite macOS media runtime
