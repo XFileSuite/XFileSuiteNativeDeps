@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRAMEWORKS_SOURCE="${FRAMEWORKS_SOURCE:?set FRAMEWORKS_SOURCE to the directory containing *.xcframework}"
 FFMPEG_BINARY="${FFMPEG_BINARY:?set FFMPEG_BINARY to the shared-runtime ffmpeg executable}"
-VERSION="${VERSION:-8.0.1-mpv-0.36.0}"
+VERSION="${VERSION:-8.0.1-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
@@ -43,4 +43,3 @@ rm -f "$ARCHIVE" "$ARCHIVE.sha256"
 tar -czf "$ARCHIVE" -C "$WORK_DIR" "$RELEASE_ID"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
 echo "$ARCHIVE"
-

@@ -34,7 +34,7 @@ jobs:
         run: |
           brew install cmake ninja nasm pkg-config
           python3 -m venv "$RUNNER_TEMP/media-build-tools"
-          "$RUNNER_TEMP/media-build-tools/bin/pip" install "meson==1.2.3"
+          "$RUNNER_TEMP/media-build-tools/bin/pip" install "meson==1.7.2"
           echo "$RUNNER_TEMP/media-build-tools/bin" >> "$GITHUB_PATH"
 
       - name: Restore source and intermediate cache

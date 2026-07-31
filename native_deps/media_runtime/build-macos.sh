@@ -7,7 +7,7 @@ WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 UPSTREAM_TAG="${LIBMPV_DARWIN_BUILD_TAG:-v0.6.0}"
 UPSTREAM_COMMIT="${LIBMPV_DARWIN_BUILD_COMMIT:-4286f5557bdccc0747030e3c376ce5cd160a96a0}"
-RUNTIME_VERSION="${RUNTIME_VERSION:-8.0.1-mpv-0.36.0}"
+RUNTIME_VERSION="${RUNTIME_VERSION:-8.0.1-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
@@ -52,6 +52,7 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cross-files/macos-amd64.ini \
   cross-files/macos-arm64.ini \
   downloads.lock \
+  scripts/mpv/build.sh \
   scripts/pkg-config/build.sh \
   scripts/pkg-config/meson.build \
   scripts/uchardet/build.sh \
@@ -59,16 +60,28 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
+cp "$SCRIPT_DIR/upstream/mpv-build-0.41.sh" "$upstream/scripts/mpv/build.sh"
+chmod +x "$upstream/scripts/mpv/build.sh"
 # New Meson versions require CMake to be declared explicitly for cross builds.
 for cross_file in macos-arm64.ini macos-amd64.ini; do
   sed -i '' "/pkgconfig = \\['pkg-config'\\]/a\\
 cmake = ['cmake']
 " "$upstream/cross-files/$cross_file"
 done
+# Align mpv and all of its static helper libraries with the application and
+# shared FFmpeg deployment target.
+sed -i '' 's/-mmacosx-version-min=10.9/-mmacosx-version-min=11.0/g' \
+  "$upstream/cross-files/macos-arm64.ini" \
+  "$upstream/cross-files/macos-amd64.ini"
 # SourceForge's redirect endpoint regularly stalls on GitHub macOS runners.
 # Savannah serves the byte-identical, checksum-pinned FreeType release.
 sed -i '' \
   's#https://downloads.sourceforge.net/project/freetype/freetype2/2.13.2/#https://download.savannah.gnu.org/releases/freetype/#' \
+  "$upstream/downloads.lock"
+sed -i '' \
+  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s/version: 0.36.0/version: 0.41.0/' \
+  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s#v0.36.0.tar.gz#v0.41.0.tar.gz#' \
+  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s#29abc44f8ebee013bb2f9fe14d80b30db19b534c679056e4851ceadf5a5e8bf6#ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209#' \
   "$upstream/downloads.lock"
 
 echo "==> Injecting the ABI-identical shared FFmpeg prefixes into the libmpv build"
