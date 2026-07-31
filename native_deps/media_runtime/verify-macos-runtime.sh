@@ -54,12 +54,12 @@ while IFS= read -r binary; do
   assert_relocatable "$binary"
 done < <(find "$FRAMEWORKS_DIR" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
 
-if ! otool -L "$FFMPEG" | grep -q '@rpath/Avcodec.framework/'; then
+if ! otool -L "$FFMPEG" | grep -q '@rpath/libavcodec'; then
   echo "ffmpeg does not use the shared Avcodec.framework runtime" >&2
   otool -L "$FFMPEG" >&2
   exit 1
 fi
-if ! otool -L "$FFMPEG" | grep -q '@rpath/Avformat.framework/'; then
+if ! otool -L "$FFMPEG" | grep -q '@rpath/libavformat'; then
   echo "ffmpeg does not use the shared Avformat.framework runtime" >&2
   otool -L "$FFMPEG" >&2
   exit 1
@@ -70,6 +70,17 @@ if otool -L "$FFMPEG" | grep -Eq '(/opt/homebrew/|/usr/local/|/opt/local/)'; the
   exit 1
 fi
 assert_relocatable "$FFMPEG"
+
+for mapping in 'libavcodec*:Avcodec' 'libavformat*:Avformat'; do
+  alias_pattern="${mapping%%:*}"
+  framework="${mapping##*:}"
+  alias_path="$(find "$RUNTIME_DIR/lib" -type l -name "$alias_pattern" -print -quit)"
+  need_file "$alias_path"
+  if [[ "$(stat -f %i "$alias_path")" != "$(stat -f %i "$(framework_binary "$framework")")" ]]; then
+    echo "$alias_path does not resolve to $framework.framework" >&2
+    exit 1
+  fi
+done
 
 mpv_binary="$(framework_binary Mpv)"
 if nm -u "$mpv_binary" | grep -q '_clipboard_backend_mac'; then

@@ -119,56 +119,8 @@ rm -rf "$frameworks"
 mkdir -p "$frameworks"
 cp -R "$upstream/$xcframework_target/"*.xcframework "$frameworks/"
 
-echo "==> Preparing the thin FFmpeg CLI relinker"
-relink_media_binary() {
-  local binary="$1"
-  local add_app_rpath="${2:-0}"
-  local rewrite_dir
-  local -a targets
-  rewrite_dir="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-relink.XXXXXX")"
-  codesign --remove-signature "$binary" 2>/dev/null || true
-
-  if lipo -archs "$binary" | grep -q arm64 && lipo -archs "$binary" | grep -q x86_64; then
-    lipo "$binary" -thin arm64 -output "$rewrite_dir/arm64"
-    lipo "$binary" -thin x86_64 -output "$rewrite_dir/x86_64"
-    targets=("$rewrite_dir/arm64" "$rewrite_dir/x86_64")
-  else
-    targets=("$binary")
-  fi
-
-  local target dependency dylib_name stem framework_name
-  for target in "${targets[@]}"; do
-    while IFS= read -r dependency; do
-      dylib_name="$(basename "$dependency")"
-      stem="${dylib_name#lib}"
-      stem="${stem%%.*}"
-      framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
-      install_name_tool -change "$dependency" \
-        "@rpath/$framework_name.framework/Versions/A/$framework_name" \
-        "$target"
-    done < <(otool -L "$target" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
-    if [[ "$add_app_rpath" == "1" ]]; then
-      install_name_tool -add_rpath "@executable_path/../Frameworks" "$target" 2>/dev/null || true
-    fi
-  done
-
-  if [[ "${#targets[@]}" == "2" ]]; then
-    lipo -create "${targets[@]}" -output "$binary"
-  fi
-  rm -rf "$rewrite_dir"
-}
-
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
-shared_ffmpeg_arm64="$WORK_DIR/ffmpeg-shared-arm64"
-shared_ffmpeg_x86_64="$WORK_DIR/ffmpeg-shared-x86_64"
-cp "$WORK_DIR/ffmpeg/prefix-arm64/bin/ffmpeg" "$shared_ffmpeg_arm64"
-cp "$WORK_DIR/ffmpeg/prefix-x86_64/bin/ffmpeg" "$shared_ffmpeg_x86_64"
-chmod +x "$shared_ffmpeg_arm64" "$shared_ffmpeg_x86_64"
-
-echo "==> Relinking FFmpeg CLI to the same XCFramework binaries used by libmpv"
-relink_media_binary "$shared_ffmpeg_arm64" 1
-relink_media_binary "$shared_ffmpeg_x86_64" 1
-lipo -create "$shared_ffmpeg_arm64" "$shared_ffmpeg_x86_64" -output "$shared_ffmpeg"
+cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
 chmod +x "$shared_ffmpeg"
 
 echo "==> Ad-hoc signing the relocatable runtime"

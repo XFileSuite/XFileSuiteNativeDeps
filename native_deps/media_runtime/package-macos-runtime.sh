@@ -13,10 +13,23 @@ STAGE_DIR="$WORK_DIR/$RELEASE_ID"
 ARCHIVE="$DIST_DIR/$RELEASE_ID.tar.gz"
 
 rm -rf "$STAGE_DIR"
-mkdir -p "$STAGE_DIR/Frameworks" "$STAGE_DIR/Tools" "$STAGE_DIR/metadata" "$DIST_DIR"
+mkdir -p "$STAGE_DIR/Frameworks" "$STAGE_DIR/Tools" "$STAGE_DIR/lib" "$STAGE_DIR/metadata" "$DIST_DIR"
 cp -R "$FRAMEWORKS_SOURCE"/*.xcframework "$STAGE_DIR/Frameworks/"
 cp "$FFMPEG_BINARY" "$STAGE_DIR/Tools/ffmpeg"
 chmod +x "$STAGE_DIR/Tools/ffmpeg"
+
+# FFmpeg already records @rpath/libav*.dylib and searches ../lib. These aliases
+# point into the same framework binaries used by libmpv; no dylib is duplicated.
+while IFS= read -r dependency; do
+  dylib_name="$(basename "$dependency")"
+  stem="${dylib_name#lib}"
+  stem="${stem%%.*}"
+  framework_name="$(tr '[:lower:]' '[:upper:]' <<<"${stem:0:1}")${stem:1}"
+  framework_binary="$(find "$STAGE_DIR/Frameworks/$framework_name.xcframework" \
+    -type f -path "*/$framework_name.framework/Versions/A/$framework_name" -print -quit)"
+  test -n "$framework_binary"
+  ln -s "../${framework_binary#"$STAGE_DIR/"}" "$STAGE_DIR/lib/$dylib_name"
+done < <(otool -L "$STAGE_DIR/Tools/ffmpeg" | awk '$1 ~ /@rpath\/(libav|libsw).*[.]dylib/ {print $1}')
 
 cat > "$STAGE_DIR/metadata/BUILDINFO.md" <<EOF
 # XFileSuite macOS media runtime
@@ -31,7 +44,7 @@ EOF
 
 (
   cd "$STAGE_DIR"
-  find Frameworks Tools metadata -type f ! -path 'metadata/SHA256SUMS' -print0 |
+  find Frameworks Tools lib metadata \( -type f -o -type l \) ! -path 'metadata/SHA256SUMS' -print0 |
     sort -z |
     while IFS= read -r -d '' file; do
       shasum -a 256 "$file"
