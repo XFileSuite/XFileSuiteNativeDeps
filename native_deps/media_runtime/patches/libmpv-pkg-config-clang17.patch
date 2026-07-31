@@ -13,3 +13,11 @@ index d63f487..9374a8c 100644
  cd ${SRC_DIR}
  
  cp ${PROJECT_DIR}/scripts/pkg-config/meson.build ./meson.build
+diff --git a/scripts/pkg-config/meson.build b/scripts/pkg-config/meson.build
+index 053f7ca..8c78e8c 100644
+--- a/scripts/pkg-config/meson.build
++++ b/scripts/pkg-config/meson.build
+@@ -7,2 +7,3 @@
+ p = mod.add_project('configure',
++    env : ['CFLAGS=-Wno-int-conversion'],
+     configure_options : [

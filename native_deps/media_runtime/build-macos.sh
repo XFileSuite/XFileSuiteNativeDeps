@@ -50,7 +50,8 @@ git -C "$upstream" checkout --detach "$UPSTREAM_COMMIT"
 git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cmd/downloads/main.go \
   downloads.lock \
-  scripts/pkg-config/build.sh
+  scripts/pkg-config/build.sh \
+  scripts/pkg-config/meson.build
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 # SourceForge's redirect endpoint regularly stalls on GitHub macOS runners.
