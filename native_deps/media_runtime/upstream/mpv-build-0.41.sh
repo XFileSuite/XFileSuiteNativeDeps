@@ -24,7 +24,10 @@ fi
 # enabled, although that file requires the Swift header which is only
 # generated with swift-build. media-kit uses libmpv and does not need the
 # standalone player's system clipboard backend.
-sed -i '' '/player\/clipboard\/clipboard-mac\.m/d' meson.build
+sed -i '' \
+    -e '/player\/clipboard\/clipboard-mac\.m/d' \
+    -e "s#'osdep/mac/app_bridge.m',#'osdep/mac/app_bridge.m'#" \
+    meson.build
 
 options=(
     -Dauto_features=disabled
