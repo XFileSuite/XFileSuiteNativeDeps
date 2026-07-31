@@ -123,7 +123,7 @@ while IFS= read -r mpv_binary; do
     install_name_tool -change "$dependency" \
       "@rpath/$framework_name.framework/Versions/A/$framework_name" \
       "$mpv_binary"
-  done < <(otool -L "$mpv_binary" | awk '/lib(av|sw)[^/]*\.dylib/ {print $1}')
+  done < <(otool -L "$mpv_binary" | awk '$1 ~ /libav.*[.]dylib|libsw.*[.]dylib/ {print $1}')
 done < <(find "$frameworks/Mpv.xcframework" -type f -name Mpv -print)
 
 shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
