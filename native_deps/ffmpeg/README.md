@@ -22,6 +22,7 @@
 | **libvorbis** | BSD | Vorbis 音频编码 | 1.3.7 |
 | **libvpx** | BSD | VP8/VP9 视频编码 (WebM) | 1.15.2 |
 | **libwebp** | BSD-3-Clause | WebP / 动画 WebP 编码 | 1.6.0 |
+| **libopus** | BSD-3-Clause | Opus 音频编码 | 1.5.2 |
 | **VideoToolbox** | Apple | H.264/H.265/ProRes 硬件编解码 | 系统内置 |
 | **AudioToolbox** | Apple | AAC/ALAC 等音频编解码 | 系统内置 |
 | **SecureTransport** | Apple | HTTPS/TLS 支持 | 系统内置 |

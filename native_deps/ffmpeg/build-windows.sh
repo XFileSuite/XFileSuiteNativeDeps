@@ -39,7 +39,7 @@ mkdir -p "$build_dir"
     --pkg-config=/mingw64/bin/pkg-config --pkg-config-flags=--static \
     --disable-shared --enable-static --disable-debug --disable-doc --disable-network \
     --disable-gpl --disable-nonfree --disable-version3 \
-    --enable-libmp3lame --enable-libvorbis --enable-libvpx --enable-libwebp \
+    --enable-libmp3lame --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libopus \
     --extra-libs='-lstdc++ -lws2_32 -lbcrypt -lz'
   make -j"$JOBS"
   make install

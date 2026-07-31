@@ -1,0 +1,24 @@
+# Required by media_kit playback.
+decoder:h264
+decoder:hevc
+decoder:av1
+decoder:libdav1d
+decoder:vp8
+decoder:vp9
+decoder:prores
+decoder:prores_raw
+
+# Required by existing XFileSuite FFmpeg CLI call sites.
+encoder:libmp3lame
+encoder:aac
+encoder:pcm_s16le
+encoder:flac
+encoder:libvorbis
+encoder:libopus
+encoder:libwebp
+filter:palettegen
+filter:paletteuse
+filter:scale
+filter:trim
+filter:concat
+
