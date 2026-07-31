@@ -96,8 +96,12 @@ done < "$SCRIPT_DIR/runtime-codecs.txt"
 # opaque result means an alpha plane was lost during encode or decode.
 alpha_work="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-alpha.XXXXXX")"
 trap 'rm -rf "$alpha_work"' EXIT
+for _ in {1..256}; do
+  printf '\377\000\000\200'
+done > "$alpha_work/source.rgba"
 "$FFMPEG" -hide_banner -loglevel error \
-  -f lavfi -i 'color=c=red@0.5:s=16x16:d=0.04,format=yuva444p10le' \
+  -f rawvideo -pixel_format rgba -video_size 16x16 -framerate 1 \
+  -i "$alpha_work/source.rgba" \
   -frames:v 1 -c:v prores_ks -profile:v 4 -alpha_bits 16 \
   "$alpha_work/prores-4444-alpha.mov"
 "$FFMPEG" -hide_banner -loglevel error \
