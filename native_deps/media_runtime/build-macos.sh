@@ -168,6 +168,9 @@ extract_license "$downloads/libass-0.17.1.tar.xz" '/COPYING$' libass-COPYING.txt
 extract_license "$downloads/mbedtls-3.4.1.tar.gz" '/LICENSE$' MbedTLS-LICENSE.txt
 extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyright.txt
 extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
+libpng_license="$(find "$upstream/build/tmp" -type f -path '*/subprojects/libpng-1.6.40/LICENSE' -print -quit)"
+test -n "$libpng_license"
+cp "$libpng_license" "$licenses/libpng-LICENSE.txt"
 
 cat > "$licenses/NOTICE.md" <<'EOF'
 # XFileSuite shared media runtime notices

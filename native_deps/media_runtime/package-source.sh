@@ -23,9 +23,16 @@ if [[ -d "$WORK_DIR/libmpv-darwin-build/.git" ]]; then
 fi
 
 mkdir -p "$STAGE/upstream/downloads"
-find "$WORK_DIR/ffmpeg" "$WORK_DIR/libmpv-darwin-build/build/tmp/downloads/output" \
+find "$WORK_DIR/ffmpeg" "$WORK_DIR/libmpv-darwin-build/build/intermediate/downloads" \
   -maxdepth 2 -type f \( -name '*.tar.gz' -o -name '*.tar.xz' -o -name '*.tar.bz2' -o -name '*.zip' \) \
   -exec cp {} "$STAGE/upstream/downloads/" \; 2>/dev/null || true
+
+# FreeType's Meson wrap downloads libpng outside downloads.lock. Preserve the
+# exact expanded source used by this build so the corresponding-source archive
+# is complete even if the wrap URL changes later.
+libpng_source="$(find "$WORK_DIR/libmpv-darwin-build/build/tmp" -type d -path '*/subprojects/libpng-1.6.40' -print -quit)"
+test -n "$libpng_source"
+cp -R "$libpng_source" "$STAGE/upstream/libpng-1.6.40"
 
 cat > "$STAGE/BUILDINFO.md" <<EOF
 # XFileSuite media runtime corresponding source
