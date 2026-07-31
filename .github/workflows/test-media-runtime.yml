@@ -16,7 +16,10 @@ concurrency:
 
 jobs:
   build-macos:
-    runs-on: macos-15
+    # media-kit's upstream builder is designed for an Intel host and
+    # cross-compiles arm64; reverse-cross-building x86_64 on Apple Silicon
+    # misdetects legacy libpng floating-point headers.
+    runs-on: macos-13
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
