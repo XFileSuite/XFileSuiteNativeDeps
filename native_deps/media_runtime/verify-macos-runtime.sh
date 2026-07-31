@@ -72,6 +72,10 @@ fi
 assert_relocatable "$FFMPEG"
 
 mpv_binary="$(framework_binary Mpv)"
+if nm -u "$mpv_binary" | grep -q '_clipboard_backend_mac'; then
+  echo "libmpv contains an unresolved macOS clipboard backend" >&2
+  exit 1
+fi
 if ! otool -L "$mpv_binary" | grep -q '@rpath/Avcodec.framework/'; then
   echo "Mpv.framework does not use the shared Avcodec.framework runtime" >&2
   otool -L "$mpv_binary" >&2
