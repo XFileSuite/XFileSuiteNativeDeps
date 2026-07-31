@@ -43,7 +43,7 @@ The build remains LGPL-compatible:
 
 ## Migration safety
 
-The legacy standalone FFmpeg component remains published until the shared
-runtime passes playback and all existing CLI regression tests. XFileSuiteSource
-must not switch its manifest entry until `verify-macos-runtime.sh` succeeds on
-the final archive.
+The macOS manifest publishes only this shared runtime. It does not publish or
+download a second standalone FFmpeg bundle. `native_deps/ffmpeg/build.sh` is
+retained as the common FFmpeg 8.0.1 builder used by this runtime and by the
+separate Windows dependency workflow.

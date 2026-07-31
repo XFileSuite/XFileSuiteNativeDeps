@@ -36,36 +36,43 @@ FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.0.1}"
 FFMPEG_TARBALL_URL="${FFMPEG_TARBALL_URL:-https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz}"
 FFMPEG_TARBALL_PATH="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+FFMPEG_TARBALL_SHA256="${FFMPEG_TARBALL_SHA256:-05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41}"
 FFMPEG_SRC_DIR="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}"
 
 LAME_VERSION="${LAME_VERSION:-3.100}"
 LAME_TARBALL_URL="https://sourceforge.net/projects/lame/files/lame/${LAME_VERSION}/lame-${LAME_VERSION}.tar.gz/download"
 LAME_TARBALL_PATH="$WORK_DIR/lame-${LAME_VERSION}.tar.gz"
+LAME_TARBALL_SHA256="ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e"
 LAME_SRC_DIR="$WORK_DIR/lame-${LAME_VERSION}"
 
 OGG_VERSION="${OGG_VERSION:-1.3.5}"
 OGG_TARBALL_URL="https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.xz"
 OGG_TARBALL_PATH="$WORK_DIR/libogg-${OGG_VERSION}.tar.xz"
+OGG_TARBALL_SHA256="c4d91be36fc8e54deae7575241e03f4211eb102afb3fc0775fbbc1b740016705"
 OGG_SRC_DIR="$WORK_DIR/libogg-${OGG_VERSION}"
 
 VORBIS_VERSION="${VORBIS_VERSION:-1.3.7}"
 VORBIS_TARBALL_URL="https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.xz"
 VORBIS_TARBALL_PATH="$WORK_DIR/libvorbis-${VORBIS_VERSION}.tar.xz"
+VORBIS_TARBALL_SHA256="b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b"
 VORBIS_SRC_DIR="$WORK_DIR/libvorbis-${VORBIS_VERSION}"
 
 VPX_VERSION="${VPX_VERSION:-1.15.2}"
 VPX_TARBALL_URL="https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}"
 VPX_TARBALL_PATH="$WORK_DIR/libvpx-${VPX_VERSION}.tar.gz"
+VPX_TARBALL_SHA256="26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa"
 VPX_SRC_DIR="$WORK_DIR/libvpx-${VPX_VERSION}"
 
 WEBP_VERSION="${WEBP_VERSION:-1.6.0}"
 WEBP_TARBALL_URL="https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz"
 WEBP_TARBALL_PATH="$WORK_DIR/libwebp-${WEBP_VERSION}.tar.gz"
+WEBP_TARBALL_SHA256="e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564"
 WEBP_SRC_DIR="$WORK_DIR/libwebp-${WEBP_VERSION}"
 
 OPUS_VERSION="${OPUS_VERSION:-1.5.2}"
 OPUS_TARBALL_URL="https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v${OPUS_VERSION}"
 OPUS_TARBALL_PATH="$WORK_DIR/opus-${OPUS_VERSION}.tar.gz"
+OPUS_TARBALL_SHA256="9480e329e989f70d69886ded470c7f8cfe6c0667cc4196d4837ac9e668fb7404"
 OPUS_SRC_DIR="$WORK_DIR/opus-${OPUS_VERSION}"
 
 BUILD_STAMP="${BUILD_STAMP:-$(date -u +%Y%m%d%H%M)}"
@@ -169,60 +176,59 @@ install_to_project() {
 
 # ── Fetch functions ──────────────────────────────────────────────
 
+ensure_source_archive() {
+  local url="$1" archive="$2" expected_sha="$3" label="$4"
+  if [[ ! -f "$archive" ]] || [[ "$(shasum -a 256 "$archive" | awk '{print $1}')" != "$expected_sha" ]]; then
+    rm -f "$archive"
+    echo "Downloading $label..."
+    curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 \
+      --connect-timeout 30 --output "$archive" "$url"
+  else
+    echo "Using checksum-verified archive: $archive"
+  fi
+  test "$(shasum -a 256 "$archive" | awk '{print $1}')" = "$expected_sha"
+}
+
 fetch_ffmpeg() {
+  ensure_source_archive "$FFMPEG_TARBALL_URL" "$FFMPEG_TARBALL_PATH" "$FFMPEG_TARBALL_SHA256" "FFmpeg ${FFMPEG_VERSION}"
   if [[ -d "$FFMPEG_SRC_DIR" && -f "$FFMPEG_SRC_DIR/configure" ]]; then
     echo "Using existing FFmpeg source: $FFMPEG_SRC_DIR"
     return 0
   fi
   rm -rf "$FFMPEG_SRC_DIR"
-  if [[ ! -f "$FFMPEG_TARBALL_PATH" ]]; then
-    echo "Downloading FFmpeg ${FFMPEG_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$FFMPEG_TARBALL_PATH" "$FFMPEG_TARBALL_URL"
-  else
-    echo "Using cached tarball: $FFMPEG_TARBALL_PATH"
-  fi
   echo "Extracting..."
   tar -xf "$FFMPEG_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 fetch_lame() {
+  ensure_source_archive "$LAME_TARBALL_URL" "$LAME_TARBALL_PATH" "$LAME_TARBALL_SHA256" "LAME ${LAME_VERSION}"
   if [[ -d "$LAME_SRC_DIR" && -f "$LAME_SRC_DIR/configure" ]]; then
     echo "Using existing LAME source: $LAME_SRC_DIR"
     return 0
   fi
   rm -rf "$LAME_SRC_DIR"
-  if [[ ! -f "$LAME_TARBALL_PATH" ]]; then
-    echo "Downloading LAME ${LAME_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -L -o "$LAME_TARBALL_PATH" "$LAME_TARBALL_URL"
-  fi
   echo "Extracting LAME..."
   tar -xzf "$LAME_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 fetch_ogg() {
+  ensure_source_archive "$OGG_TARBALL_URL" "$OGG_TARBALL_PATH" "$OGG_TARBALL_SHA256" "libogg ${OGG_VERSION}"
   if [[ -d "$OGG_SRC_DIR" && -f "$OGG_SRC_DIR/configure" ]]; then
     echo "Using existing libogg source: $OGG_SRC_DIR"
     return 0
   fi
   rm -rf "$OGG_SRC_DIR"
-  if [[ ! -f "$OGG_TARBALL_PATH" ]]; then
-    echo "Downloading libogg ${OGG_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$OGG_TARBALL_PATH" "$OGG_TARBALL_URL"
-  fi
   echo "Extracting libogg..."
   tar -xf "$OGG_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 fetch_vorbis() {
+  ensure_source_archive "$VORBIS_TARBALL_URL" "$VORBIS_TARBALL_PATH" "$VORBIS_TARBALL_SHA256" "libvorbis ${VORBIS_VERSION}"
   if [[ -d "$VORBIS_SRC_DIR" && -f "$VORBIS_SRC_DIR/configure" ]]; then
     echo "Using existing libvorbis source: $VORBIS_SRC_DIR"
     return 0
   fi
   rm -rf "$VORBIS_SRC_DIR"
-  if [[ ! -f "$VORBIS_TARBALL_PATH" ]]; then
-    echo "Downloading libvorbis ${VORBIS_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$VORBIS_TARBALL_PATH" "$VORBIS_TARBALL_URL"
-  fi
   echo "Extracting libvorbis..."
   tar -xf "$VORBIS_TARBALL_PATH" -C "$WORK_DIR"
   # Patch out obsolete -force_cpusubtype_ALL that breaks on modern Xcode.
@@ -231,44 +237,35 @@ fetch_vorbis() {
 }
 
 fetch_vpx() {
+  ensure_source_archive "$VPX_TARBALL_URL" "$VPX_TARBALL_PATH" "$VPX_TARBALL_SHA256" "libvpx ${VPX_VERSION}"
   if [[ -d "$VPX_SRC_DIR" && -f "$VPX_SRC_DIR/configure" ]]; then
     echo "Using existing libvpx source: $VPX_SRC_DIR"
     return 0
   fi
   rm -rf "$VPX_SRC_DIR"
   mkdir -p "$VPX_SRC_DIR"
-  if [[ ! -f "$VPX_TARBALL_PATH" ]]; then
-    echo "Downloading libvpx ${VPX_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$VPX_TARBALL_PATH" "$VPX_TARBALL_URL"
-  fi
   echo "Extracting libvpx..."
   tar -xzf "$VPX_TARBALL_PATH" --strip-components=1 -C "$VPX_SRC_DIR"
 }
 
 fetch_webp() {
+  ensure_source_archive "$WEBP_TARBALL_URL" "$WEBP_TARBALL_PATH" "$WEBP_TARBALL_SHA256" "libwebp ${WEBP_VERSION}"
   if [[ -d "$WEBP_SRC_DIR" && -f "$WEBP_SRC_DIR/CMakeLists.txt" ]]; then
     echo "Using existing libwebp source: $WEBP_SRC_DIR"
     return 0
   fi
   rm -rf "$WEBP_SRC_DIR"
-  if [[ ! -f "$WEBP_TARBALL_PATH" ]]; then
-    echo "Downloading libwebp ${WEBP_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$WEBP_TARBALL_PATH" "$WEBP_TARBALL_URL"
-  fi
   echo "Extracting libwebp..."
   tar -xzf "$WEBP_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 fetch_opus() {
+  ensure_source_archive "$OPUS_TARBALL_URL" "$OPUS_TARBALL_PATH" "$OPUS_TARBALL_SHA256" "libopus ${OPUS_VERSION}"
   if [[ -d "$OPUS_SRC_DIR" && -f "$OPUS_SRC_DIR/CMakeLists.txt" ]]; then
     echo "Using existing libopus source: $OPUS_SRC_DIR"
     return 0
   fi
   rm -rf "$OPUS_SRC_DIR"
-  if [[ ! -f "$OPUS_TARBALL_PATH" ]]; then
-    echo "Downloading libopus ${OPUS_VERSION}..."
-    curl -fL --retry 3 --retry-delay 1 -o "$OPUS_TARBALL_PATH" "$OPUS_TARBALL_URL"
-  fi
   echo "Extracting libopus..."
   mkdir -p "$OPUS_SRC_DIR"
   tar -xzf "$OPUS_TARBALL_PATH" --strip-components=1 -C "$OPUS_SRC_DIR"
@@ -399,7 +396,7 @@ build_vpx_arch() {
   export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
   export CC CXX SDKROOT="$SDK"
 
-  local CFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O3"
+  local VPX_FLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O3"
   local LDFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS"
 
   echo ""
@@ -415,7 +412,7 @@ build_vpx_arch() {
     VPX_TARGET="x86_64-darwin20-gcc"
   fi
 
-  CC="$CC" CXX="$CXX" CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+  CC="$CC" CXX="$CXX" CFLAGS="$VPX_FLAGS" CXXFLAGS="$VPX_FLAGS" LDFLAGS="$LDFLAGS" \
     "$VPX_SRC_DIR/configure" \
     --prefix="$PREFIX" \
     --target="$VPX_TARGET" \
@@ -510,7 +507,8 @@ build_one_arch() {
   export HOSTCFLAGS="-isysroot $SDK"
   export HOSTLDFLAGS="-isysroot $SDK"
   # Use real pkg-config but only look in our prefix to avoid pulling brew libs
-  export PKG_CONFIG="$(command -v pkg-config || echo /usr/bin/pkg-config)"
+  PKG_CONFIG="$(command -v pkg-config || echo /usr/bin/pkg-config)"
+  export PKG_CONFIG
   export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
   export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig"
   unset CPATH LIBRARY_PATH DYLD_LIBRARY_PATH
@@ -604,7 +602,8 @@ build_one_arch() {
 # ── Universal binary creation ────────────────────────────────────
 
 make_universal() {
-  local OUT="$DIST_DIR/$(OUT_BASENAME)"
+  local OUT
+  OUT="$DIST_DIR/$(OUT_BASENAME)"
   {
     rm -rf "$OUT"
     mkdir -p "$OUT/bin" "$OUT/lib"

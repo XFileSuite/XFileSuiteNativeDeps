@@ -3,7 +3,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work/source-package}"
 PLATFORM="${PLATFORM:-macos}"
@@ -173,9 +172,11 @@ EOF
 
 (
   cd "$STAGE_DIR"
+  # SHA256SUMS is explicitly excluded from find.
+  # shellcheck disable=SC2094
   while IFS= read -r -d '' file; do
     shasum -a 256 "$file"
-  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
+  done < <(find . -type f ! -name SHA256SUMS -print0 | sort -z) > SHA256SUMS
 )
 mkdir -p "$OUTPUT_DIR"
 tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$WORK_DIR" "$RELEASE_ID"

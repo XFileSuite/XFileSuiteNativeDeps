@@ -18,7 +18,7 @@ need() {
   }
 }
 
-for tool in git make meson ninja go xcodebuild lipo otool install_name_tool codesign; do
+for tool in git make meson ninja go ruby curl xcodebuild lipo otool install_name_tool codesign; do
   need "$tool"
 done
 
@@ -63,6 +63,8 @@ git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
 # The injected FFmpeg prefix lives outside libmpv-darwin-build. Teach its
 # per-architecture relinker to normalize those paths before lipo/frameworks.
+# The replacement must preserve upstream shell variables.
+# shellcheck disable=SC2016
 sed -i '' \
   's#grep -E "$SOURCE_PREFIX|\^lib"#grep -E "$SOURCE_PREFIX|/native_deps/media_runtime/work/ffmpeg/prefix-|^lib"#' \
   "$upstream/scripts/libs-arch/relink-dylibs.sh"
@@ -85,17 +87,20 @@ sed -i '' 's/-mmacosx-version-min=10.9/-mmacosx-version-min=11.0/g' \
 sed -i '' \
   's#https://downloads.sourceforge.net/project/freetype/freetype2/2.13.2/#https://ftp.osuosl.org/pub/blfs/conglomeration/freetype/#' \
   "$upstream/downloads.lock"
-# ffmpeg.org intermittently blackholes GitHub-hosted macOS runners. This
-# checksum-identical BLFS mirror is only fetched because the upstream build
-# downloads its complete lockfile; our linked FFmpeg is the injected 8.0.1.
-sed -i '' \
-  's#https://ffmpeg.org/releases/ffmpeg-6.0.tar.xz#https://ftp.osuosl.org/pub/blfs/conglomeration/ffmpeg/ffmpeg-6.0.tar.xz#' \
-  "$upstream/downloads.lock"
-sed -i '' \
-  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s/version: 0.36.0/version: 0.41.0/' \
-  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s#v0.36.0.tar.gz#v0.41.0.tar.gz#' \
-  -e '/^mpv:/,/^[a-zA-Z0-9_-]*:/ s#29abc44f8ebee013bb2f9fe14d80b30db19b534c679056e4851ceadf5a5e8bf6#ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209#' \
-  "$upstream/downloads.lock"
+ruby -ryaml -e '
+  path = ARGV.fetch(0)
+  lock = YAML.load_file(path)
+  keep = %w[dav1d freetype fribidi harfbuzz libass libxml2 mbedtls mpv pkg-config uchardet]
+  missing = keep - lock.keys
+  abort "missing locked dependencies: #{missing.join(", ")}" unless missing.empty?
+  lock.select! { |name, _| keep.include?(name) }
+  lock.fetch("mpv").merge!(
+    "version" => "0.41.0",
+    "url" => "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz",
+    "sha256" => "ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209"
+  )
+  File.write(path, YAML.dump(lock))
+' "$upstream/downloads.lock"
 
 echo "==> Injecting the ABI-identical shared FFmpeg prefixes into the libmpv build"
 for mapping in "arm64:arm64" "amd64:x86_64"; do
@@ -168,9 +173,30 @@ extract_license "$downloads/libass-0.17.1.tar.xz" '/COPYING$' libass-COPYING.txt
 extract_license "$downloads/mbedtls-3.4.1.tar.gz" '/LICENSE$' MbedTLS-LICENSE.txt
 extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyright.txt
 extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
-libpng_license="$(find "$upstream/build/tmp" -type f -path '*/subprojects/libpng-1.6.40/LICENSE' -print -quit)"
-test -n "$libpng_license"
-cp "$libpng_license" "$licenses/libpng-LICENSE.txt"
+
+# FreeType declares libpng as a checksum-pinned Meson wrap rather than in the
+# parent downloads.lock. Cache both wrap assets beside the other verified
+# sources so licenses and corresponding source never depend on cleaned tmp dirs.
+freetype_archive="$downloads/freetype-2.13.2.tar.xz"
+wrap_member="$(tar -tf "$freetype_archive" | grep -E '/subprojects/libpng[.]wrap$' | sed -n '1p')"
+test -n "$wrap_member"
+wrap_contents="$(tar -xOf "$freetype_archive" "$wrap_member")"
+wrap_value() {
+  printf '%s\n' "$wrap_contents" | awk -F= -v key="$1" '$1 ~ "^[[:space:]]*" key "[[:space:]]*$" {sub(/^[[:space:]]*/, "", $2); sub(/[[:space:]]*$/, "", $2); print $2; exit}'
+}
+cache_wrap_asset() {
+  url="$1" expected_sha="$2" output="$3"
+  if [[ ! -f "$output" ]] || [[ "$(shasum -a 256 "$output" | awk '{print $1}')" != "$expected_sha" ]]; then
+    rm -f "$output"
+    curl --fail --location --retry 5 --retry-all-errors --connect-timeout 30 "$url" --output "$output"
+  fi
+  test "$(shasum -a 256 "$output" | awk '{print $1}')" = "$expected_sha"
+}
+libpng_archive="$downloads/libpng-1.6.40.tar.gz"
+libpng_patch="$downloads/libpng-1.6.40-wrap-patch.zip"
+cache_wrap_asset "$(wrap_value source_url)" "$(wrap_value source_hash)" "$libpng_archive"
+cache_wrap_asset "$(wrap_value patch_url)" "$(wrap_value patch_hash)" "$libpng_patch"
+extract_license "$libpng_archive" '/LICENSE$' libpng-LICENSE.txt
 
 cat > "$licenses/NOTICE.md" <<'EOF'
 # XFileSuite shared media runtime notices

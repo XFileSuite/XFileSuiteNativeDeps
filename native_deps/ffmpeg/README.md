@@ -1,6 +1,8 @@
 # FFmpeg LGPL Universal Binary Builder
 
-为 XFileSuite 构建 LGPL 合规的 macOS Universal FFmpeg 二进制文件。
+为 XFileSuite 构建 LGPL 合规的 FFmpeg。macOS shared media runtime 会以
+`FFMPEG_LINKAGE=shared` 调用本脚本；默认静态模式仅用于独立构建和 Windows
+工作流，不再作为 macOS App 的第二份 FFmpeg 产物发布。
 
 ## 许可证
 

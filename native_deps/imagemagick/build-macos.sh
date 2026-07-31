@@ -153,7 +153,7 @@ for arch in "${ARCHITECTURES[@]}"; do
     test -s "$source"
     for target_extension in "${target_extensions[@]}"; do
       output="$verification_dir/$source_extension-to-$target_extension.$target_extension"
-      input="$source[0]"
+      input="${source}[0]"
       if [ "$target_extension" = gif ] || [ "$target_extension" = webp ]; then
         input="$source"
       fi

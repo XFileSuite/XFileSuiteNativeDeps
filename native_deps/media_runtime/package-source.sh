@@ -16,23 +16,47 @@ rm -rf "$STAGE/build-scripts/work" "$STAGE/build-scripts/dist"
 cp -R "$(cd "$SCRIPT_DIR/../ffmpeg" && pwd)" "$STAGE/build-scripts/ffmpeg"
 rm -rf "$STAGE/build-scripts/ffmpeg/work" "$STAGE/build-scripts/ffmpeg/dist"
 
-if [[ -d "$WORK_DIR/libmpv-darwin-build/.git" ]]; then
-  git -C "$WORK_DIR/libmpv-darwin-build" archive --format=tar HEAD |
-    tar -xf - -C "$STAGE/upstream"
-  git -C "$WORK_DIR/libmpv-darwin-build" diff --binary > "$STAGE/upstream/xfilesuite-build.patch"
-fi
+test -d "$WORK_DIR/libmpv-darwin-build/.git"
+git -C "$WORK_DIR/libmpv-darwin-build" archive --format=tar HEAD |
+  tar -xf - -C "$STAGE/upstream"
+git -C "$WORK_DIR/libmpv-darwin-build" diff --binary > "$STAGE/upstream/xfilesuite-build.patch"
+test -s "$STAGE/upstream/xfilesuite-build.patch"
 
 mkdir -p "$STAGE/upstream/downloads"
-find "$WORK_DIR/ffmpeg" "$WORK_DIR/libmpv-darwin-build/build/intermediate/downloads" \
+locked_downloads="$WORK_DIR/libmpv-darwin-build/build/intermediate/downloads"
+while IFS=$'\t' read -r filename expected_sha; do
+  source="$locked_downloads/$filename"
+  test -f "$source"
+  test "$(shasum -a 256 "$source" | awk '{print $1}')" = "$expected_sha"
+  cp "$source" "$STAGE/upstream/downloads/$filename"
+done < <(ruby -ryaml -ruri -e '
+  YAML.load_file(ARGV.fetch(0)).each do |name, dep|
+    path = URI.parse(dep.fetch("url")).path
+    extension = File.extname(path)
+    path = path.delete_suffix(extension)
+    extension = File.extname(path) + extension
+    puts ["#{name}-#{dep.fetch("version")}#{extension}", dep.fetch("sha256")].join("\t")
+  end
+' "$WORK_DIR/libmpv-darwin-build/downloads.lock")
+find "$WORK_DIR/ffmpeg" \
   -maxdepth 2 -type f \( -name '*.tar.gz' -o -name '*.tar.xz' -o -name '*.tar.bz2' -o -name '*.zip' \) \
   -exec cp {} "$STAGE/upstream/downloads/" \; 2>/dev/null || true
 
-# FreeType's Meson wrap downloads libpng outside downloads.lock. Preserve the
-# exact expanded source used by this build so the corresponding-source archive
-# is complete even if the wrap URL changes later.
-libpng_source="$(find "$WORK_DIR/libmpv-darwin-build/build/tmp" -type d -path '*/subprojects/libpng-1.6.40' -print -quit)"
-test -n "$libpng_source"
-cp -R "$libpng_source" "$STAGE/upstream/libpng-1.6.40"
+while IFS= read -r source; do
+  test -f "$STAGE/upstream/downloads/$(basename "$source")"
+done < <(find "$WORK_DIR/ffmpeg" \
+  -maxdepth 2 -type f \( -name '*.tar.gz' -o -name '*.tar.xz' -o -name '*.tar.bz2' -o -name '*.zip' \) -print)
+
+# These are cached explicitly from FreeType's checksum-pinned Meson wrap by
+# build-macos.sh; require them so corresponding source includes both inputs.
+cp "$locked_downloads/libpng-1.6.40.tar.gz" "$STAGE/upstream/downloads/"
+cp "$locked_downloads/libpng-1.6.40-wrap-patch.zip" "$STAGE/upstream/downloads/"
+test -f "$STAGE/upstream/downloads/libpng-1.6.40.tar.gz"
+test -f "$STAGE/upstream/downloads/libpng-1.6.40-wrap-patch.zip"
+test "$(shasum -a 256 "$STAGE/upstream/downloads/libpng-1.6.40.tar.gz" | awk '{print $1}')" = \
+  62d25af25e636454b005c93cae51ddcd5383c40fa14aa3dae8f6576feb5692c2
+test "$(shasum -a 256 "$STAGE/upstream/downloads/libpng-1.6.40-wrap-patch.zip" | awk '{print $1}')" = \
+  bad558070e0a82faa5c0ae553bcd12d49021fc4b628f232a8e58c3fbd281aae1
 
 cat > "$STAGE/BUILDINFO.md" <<EOF
 # XFileSuite media runtime corresponding source
@@ -44,7 +68,7 @@ cat > "$STAGE/BUILDINFO.md" <<EOF
 - Exact upstream checksums are recorded by the vendored build scripts and downloads.lock.
 EOF
 
-(cd "$STAGE" && find . -type f -print0 | sort -z | xargs -0 shasum -a 256) > "$STAGE/SHA256SUMS"
+(cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 shasum -a 256) > "$STAGE/SHA256SUMS"
 ARCHIVE="$DIST_DIR/xfilesuite-$RELEASE_ID-source.tar.gz"
 tar -czf "$ARCHIVE" -C "$STAGE" .
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"

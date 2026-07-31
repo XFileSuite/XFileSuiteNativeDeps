@@ -40,6 +40,13 @@ assert_relocatable() {
 }
 
 need_file "$FFMPEG"
+for license in \
+  NOTICE.md FFmpeg-LGPL-2.1.txt mpv-Copyright.txt libpng-LICENSE.txt \
+  dav1d-COPYING.txt libass-COPYING.txt FreeType-FTL.txt \
+  FriBidi-COPYING.txt HarfBuzz-COPYING.txt MbedTLS-LICENSE.txt \
+  libxml2-Copyright.txt uchardet-COPYING.txt; do
+  need_file "$RUNTIME_DIR/licenses/$license"
+done
 for framework in Mpv Avcodec Avformat Avutil Avfilter Swresample Swscale; do
   binary="$(framework_binary "$framework")"
   need_file "$binary"
