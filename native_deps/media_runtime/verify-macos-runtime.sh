@@ -76,7 +76,7 @@ for mapping in 'libavcodec*:Avcodec' 'libavformat*:Avformat'; do
   framework="${mapping##*:}"
   alias_path="$(find "$RUNTIME_DIR/lib" -type l -name "$alias_pattern" -print -quit)"
   need_file "$alias_path"
-  if [[ "$(stat -f %i "$alias_path")" != "$(stat -f %i "$(framework_binary "$framework")")" ]]; then
+  if [[ "$(stat -L -f %i "$alias_path")" != "$(stat -f %i "$(framework_binary "$framework")")" ]]; then
     echo "$alias_path does not resolve to $framework.framework" >&2
     exit 1
   fi
