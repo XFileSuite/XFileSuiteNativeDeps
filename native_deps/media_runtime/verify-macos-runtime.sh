@@ -91,6 +91,24 @@ while IFS= read -r requirement; do
   esac
 done < "$SCRIPT_DIR/runtime-codecs.txt"
 
+# Exercise the actual ProRes 4444 alpha path instead of merely checking that
+# the decoder is registered. The generated frame is half-transparent red; an
+# opaque result means an alpha plane was lost during encode or decode.
+alpha_work="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-alpha.XXXXXX")"
+trap 'rm -rf "$alpha_work"' EXIT
+"$FFMPEG" -hide_banner -loglevel error \
+  -f lavfi -i 'color=c=red@0.5:s=16x16:d=0.04,format=yuva444p10le' \
+  -frames:v 1 -c:v prores_ks -profile:v 4 -alpha_bits 16 \
+  "$alpha_work/prores-4444-alpha.mov"
+"$FFMPEG" -hide_banner -loglevel error \
+  -i "$alpha_work/prores-4444-alpha.mov" -frames:v 1 \
+  -pix_fmt rgba -f rawvideo "$alpha_work/frame.rgba"
+alpha_byte="$(od -An -tu1 -j3 -N1 "$alpha_work/frame.rgba" | tr -d '[:space:]')"
+if [[ -z "$alpha_byte" || "$alpha_byte" -lt 96 || "$alpha_byte" -gt 160 ]]; then
+  echo "ProRes 4444 alpha round-trip failed: alpha=$alpha_byte" >&2
+  exit 1
+fi
+
 if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree)'; then
   echo "GPL or nonfree FFmpeg configuration detected" >&2
   exit 1
