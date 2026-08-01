@@ -55,9 +55,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: native_deps/media_runtime/work
-          key: media-runtime-macos-v1-${{ hashFiles('native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/**') }}
+          key: media-runtime-macos-v2-${{ hashFiles('native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/build-macos.sh') }}
           restore-keys: |
-            media-runtime-macos-v1-
+            media-runtime-macos-v2-
       - name: Build and package shared media runtime
         env:
           GOPROXY: https://proxy.golang.org,direct
@@ -78,7 +78,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: native_deps/media_runtime/work
-          key: media-runtime-macos-v1-${{ hashFiles('native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/**') }}
+          key: media-runtime-macos-v2-${{ hashFiles('native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/build-macos.sh') }}
       - name: Upload runtime artifact
         uses: actions/upload-artifact@v4
         with:
@@ -125,9 +125,10 @@ jobs:
             native_deps/imagemagick/work/downloads
             native_deps/resvg/target
             native_deps/media_runtime/work
-          key: macos-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/macos.json') }}
+          key: macos-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/imagemagick/build-macos.sh', 'native_deps/resvg/build-macos.sh', 'native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/build-macos.sh') }}
           restore-keys: |
-            macos-src-${{ inputs.component }}-
+            macos-src-v2-${{ inputs.component }}-
+            macos-src-v2-
       - name: Install native build tools
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         run: |
@@ -392,10 +393,22 @@ jobs:
         with:
           path: |
             native_deps/ffmpeg/work-windows
+            native_deps/media_runtime/work/*.tar.gz
+            native_deps/media_runtime/work/*.7z
+            native_deps/media_runtime/work/ffmpeg/*.tar.xz
             native_deps/imagemagick/work-windows
-          key: windows-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/windows.json') }}
+          key: windows-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.ps1') }}
           restore-keys: |
-            windows-src-${{ inputs.component }}-
+            windows-src-v2-${{ inputs.component }}-
+            windows-src-v2-
+      - name: Restore Windows compiler cache
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
+        uses: actions/cache@v4
+        with:
+          path: .cache/ccache/windows
+          key: windows-ccache-v1-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh') }}
+          restore-keys: |
+            windows-ccache-v1-
       - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
         uses: msys2/setup-msys2@v2
@@ -404,6 +417,7 @@ jobs:
           update: true
           install: >-
             make git mingw-w64-x86_64-binutils mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-ccache
             mingw-w64-x86_64-pkgconf mingw-w64-x86_64-meson mingw-w64-x86_64-ninja
             mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis
             mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
@@ -414,10 +428,16 @@ jobs:
       - name: Build LGPL FFmpeg for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
         shell: msys2 {0}
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.cache/ccache/windows
+          CC: ccache gcc
+          CXX: ccache g++
         run: native_deps/ffmpeg/build-windows.sh
       - name: Build shared media runtime for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         shell: msys2 {0}
+        env:
+          CCACHE_DIR: ${{ github.workspace }}/.cache/ccache/windows
         run: |
           set +e
           native_deps/media_runtime/build-windows.sh > media-runtime-windows-build.log 2>&1

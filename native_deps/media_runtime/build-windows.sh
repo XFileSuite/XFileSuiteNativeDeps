@@ -55,19 +55,33 @@ for tool in pacman curl tar make pkg-config meson ninja git python3; do
   need "$tool"
 done
 
+# Reuse compiler objects across Actions runs while always rebuilding and
+# re-verifying the final runtime. ccache hashes the compiler command and source
+# contents, so stale objects are not accepted when flags or inputs change.
+if command -v ccache >/dev/null 2>&1; then
+  export CCACHE_DIR="${CCACHE_DIR:-$WORK_DIR/ccache}"
+  mkdir -p "$CCACHE_DIR"
+  ccache --max-size "${CCACHE_MAXSIZE:-2G}"
+  export CC="${CC:-ccache gcc}"
+  export CXX="${CXX:-ccache g++}"
+  echo "==> Compiler cache enabled at $CCACHE_DIR"
+fi
+
 mkdir -p "$WORK_DIR" "$DIST_DIR"
 
 # ── 1. Build shared FFmpeg DLLs + ffmpeg.exe ──────────────────────
 echo "==> Building the shared FFmpeg 8 runtime for Windows x64"
 current_phase="shared FFmpeg build"
 ffmpeg_builder_status=0
+ffmpeg_work="$WORK_DIR/ffmpeg"
+ffmpeg_dist="$WORK_DIR/ffmpeg-dist"
 FFMPEG_LINKAGE=shared \
-WORK_DIR="$WORK_DIR/ffmpeg" \
-DIST_DIR="$WORK_DIR/ffmpeg-dist" \
+WORK_DIR="$ffmpeg_work" \
+DIST_DIR="$ffmpeg_dist" \
 JOBS="$JOBS" \
   bash "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh" || ffmpeg_builder_status=$?
 
-ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
+ffmpeg_output="$ffmpeg_dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
 # Execute the produced PE file as the intermediate smoke test. The final
 # package verifier checks every DLL, import library and public header after
 # staging, avoiding unreliable intermediate MSYS glob/file predicates.
