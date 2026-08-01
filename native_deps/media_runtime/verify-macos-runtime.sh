@@ -105,10 +105,11 @@ framework_search_path="$(
     paste -sd: -
 )"
 export DYLD_FRAMEWORK_PATH="$framework_search_path"
-decoders="$("$FFMPEG" -hide_banner -decoders 2>&1)"
-encoders="$("$FFMPEG" -hide_banner -encoders 2>&1)"
-filters="$("$FFMPEG" -hide_banner -filters 2>&1)"
+decoders="$("$FFMPEG" -hide_banner -decoders 2>&1 | tr -d '\r')"
+encoders="$("$FFMPEG" -hide_banner -encoders 2>&1 | tr -d '\r')"
+filters="$("$FFMPEG" -hide_banner -filters 2>&1 | tr -d '\r')"
 while IFS= read -r requirement; do
+  requirement="${requirement%$'\r'}"
   [[ -z "$requirement" || "$requirement" == \#* ]] && continue
   kind="${requirement%%:*}"
   name="${requirement#*:}"

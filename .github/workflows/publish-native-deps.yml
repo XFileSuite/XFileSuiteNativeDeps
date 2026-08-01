@@ -441,12 +441,9 @@ jobs:
         env:
           CCACHE_DIR: ${{ github.workspace }}/.cache/ccache/windows
         run: |
-          set +e
-          native_deps/media_runtime/build-windows.sh > media-runtime-windows-build.log 2>&1
-          build_status=$?
-          set -e
-          cat media-runtime-windows-build.log
-          exit "$build_status"
+          set -o pipefail
+          native_deps/media_runtime/build-windows.sh 2>&1 | tee media-runtime-windows-build.log
+          exit "${PIPESTATUS[0]}"
       - name: Upload media runtime build log
         if: ${{ always() && (inputs.component == 'all' || inputs.component == 'media-runtime') }}
         uses: actions/upload-artifact@v4
