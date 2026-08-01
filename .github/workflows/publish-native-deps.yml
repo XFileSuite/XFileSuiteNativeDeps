@@ -119,6 +119,7 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
       - name: Restore source tarballs cache
+        id: windows-source-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -402,6 +403,7 @@ jobs:
             windows-src-v2-${{ inputs.component }}-
             windows-src-v2-
       - name: Restore Windows compiler cache
+        id: windows-compiler-cache
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
         uses: actions/cache@v4
         with:
@@ -452,6 +454,23 @@ jobs:
           name: media-runtime-windows-build-log-${{ github.run_attempt }}
           path: media-runtime-windows-build.log
           if-no-files-found: warn
+      - name: Save Windows source cache after diagnostics
+        if: ${{ always() && steps.windows-source-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            native_deps/ffmpeg/work-windows
+            native_deps/media_runtime/work/*.tar.gz
+            native_deps/media_runtime/work/*.7z
+            native_deps/media_runtime/work/ffmpeg/*.tar.xz
+            native_deps/imagemagick/work-windows
+          key: windows-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.ps1') }}
+      - name: Save Windows compiler cache after diagnostics
+        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime') && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/ccache/windows
+          key: windows-ccache-v1-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh') }}
       - name: Prepare the complete ImageMagick Windows runtime
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
         shell: pwsh

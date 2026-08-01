@@ -262,10 +262,23 @@ collect_msys2_package_licenses() {
     cp "$license_file" "$destination/$(basename "$license_file")"
     copied=1
   done < <(pacman -Ql "$package" | awk '$2 ~ /\/share\/licenses\// { print $2 }')
-  [[ "$copied" == 1 ]] || {
-    echo "No installed license files found for $package" >&2
-    return 1
-  }
+  if [[ "$copied" != 1 ]]; then
+    # MinGW packages commonly omit upstream license files from the binary
+    # package (for example libass). Preserve the installed package's exact
+    # version, declared license and upstream URL instead of silently skipping
+    # it. Full corresponding source is published by the source-package step.
+    mkdir -p "$destination"
+    {
+      echo "MSYS2 binary package metadata"
+      echo
+      LC_ALL=C pacman -Qi "$package" |
+        awk '/^(Name|Version|Description|URL|Licenses|Packager|Build Date)[[:space:]]*:/ { print }'
+      echo
+      echo "Package file list: https://packages.msys2.org/packages/$package"
+      echo "The package page links the matching MSYS2 source-only archive."
+    } > "$destination/PACKAGE-METADATA.txt"
+    echo "  ! $package omits license text; bundled package metadata and source reference"
+  fi
 }
 
 # Collect licenses for direct dependencies. Owners of recursively discovered
@@ -311,6 +324,11 @@ This bundle contains the following third-party components:
 | Opus | BSD-3-Clause |
 | ANGLE (libEGL, libGLESv2, d3dcompiler) | BSD-3-Clause |
 | Additional MinGW runtime DLLs | See `msys2-*` license directories |
+
+Some MSYS2 MinGW binary packages do not install their upstream license file.
+For those packages the matching `msys2-*` directory contains the installed
+package version, declared license, upstream URL and the MSYS2 page that links
+the matching source-only archive.
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
 Mbed TLS and HTTPS/TLS/RTMPS playback protocols are intentionally excluded so
