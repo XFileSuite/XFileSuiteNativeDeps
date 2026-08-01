@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-01T13:17:14Z",
+  "generatedAt": "2026-08-01T19:20:05Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -54,8 +54,8 @@
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "license": "LGPL-2.1 (aggregate: FFmpeg LGPL-2.1, mpv LGPL-2.1, libplacebo LGPL-2.1, libass ISC, dav1d BSD-2-Clause, FreeType FTL, FriBidi LGPL-2.1, HarfBuzz MIT, Mbed TLS Apache-2.0, libxml2 MIT, libpng BSD-2-Clause, uchardet MPL-2.0, LAME LGPL-2.0, Opus BSD-3-Clause, libogg BSD-3-Clause, libvorbis BSD-3-Clause, libvpx BSD-3-Clause, libwebp BSD-3-Clause)",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e3dcee463dcb07b48d2ee72879b8efb7f96a8937e525bc551af324eae9b20b6c",
+      "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-25df0bf8efe513e2a8f83e2b433c5cdb95d0dc466b933c891e33ac7aeaf0a964",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.1",
       "subComponents": [
         {
@@ -89,10 +89,6 @@
         {
           "name": "harfbuzz",
           "license": "MIT"
-        },
-        {
-          "name": "mbedtls",
-          "license": "Apache-2.0"
         },
         {
           "name": "libxml2",
@@ -131,7 +127,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "e3dcee463dcb07b48d2ee72879b8efb7f96a8937e525bc551af324eae9b20b6c"
+      "bundleSha256": "25df0bf8efe513e2a8f83e2b433c5cdb95d0dc466b933c891e33ac7aeaf0a964"
     }
   ]
 }
