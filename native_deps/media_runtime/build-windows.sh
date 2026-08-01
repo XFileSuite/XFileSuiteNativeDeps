@@ -60,7 +60,7 @@ MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-fribidi
   mingw-w64-x86_64-harfbuzz
   mingw-w64-x86_64-libxml2
-  mingw-w64-x86_64-mbedtls2
+  mingw-w64-x86_64-mbedtls
   mingw-w64-x86_64-uchardet
   mingw-w64-x86_64-lcms2
   mingw-w64-x86_64-zlib
@@ -290,8 +290,8 @@ cp -R "$angle_dir/include/KHR/." "$stage/include/KHR/"
 # MSYS2 runtime DLLs that mpv depends on
 for msys_dll in \
   libdav1d.dll libass-9.dll libfreetype-6.dll libfribidi-0.dll \
-  libharfbuzz-0.dll libxml2-2.dll libmbedcrypto.dll libmbedtls.dll \
-  libmbedx509.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
+  libharfbuzz-0.dll libxml2-2.dll libmbedcrypto-16.dll libmbedtls-21.dll \
+  libmbedx509-7.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
   libbz2-1.dll liblzma-5.dll libpng16-16.dll libzstd.dll libbrotlidec.dll \
   libbrotlicommon.dll libgcc_s_seh-1.dll libwinpthread-1.dll libstdc++-6.dll; do
   [[ -f "/mingw64/bin/$msys_dll" ]] && cp "/mingw64/bin/$msys_dll" "$stage/bin/"

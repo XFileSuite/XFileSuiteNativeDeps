@@ -409,7 +409,7 @@ jobs:
             mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
             mingw-w64-x86_64-dav1d mingw-w64-x86_64-libass mingw-w64-x86_64-freetype
             mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
-            mingw-w64-x86_64-mbedtls2 mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2
+            mingw-w64-x86_64-mbedtls mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2
             mingw-w64-x86_64-iconv p7zip
       - name: Build LGPL FFmpeg for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
