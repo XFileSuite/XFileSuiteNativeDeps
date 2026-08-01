@@ -1,0 +1,57 @@
+{
+  "sbomVersion": "1.0",
+  "generatedAt": "2026-08-01T03:14:41Z",
+  "platform": "windows",
+  "manifestId": "native-deps-windows-2026.07.20.1",
+  "components": [
+    {
+      "name": "ffmpeg",
+      "version": "8.0.1",
+      "releaseRevision": 2,
+      "architecture": "x64",
+      "license": "LGPL-2.1",
+      "r2Key": "deps/ffmpeg-windows-x64-1d5ff7104608b1fa9dfdf0a02c49f0094f35674ae6ce52c01b65b4cd587c9b21",
+      "sourceRelease": "ffmpeg-windows-8.0.1-xfilesuite.2",
+      "subComponents": [
+        {
+          "name": "lame",
+          "license": "LGPL-2.0"
+        },
+        {
+          "name": "libogg",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libvorbis",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libvpx",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libwebp",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libopus",
+          "license": "BSD-3-Clause"
+        }
+      ],
+      "binarySha256": "1d5ff7104608b1fa9dfdf0a02c49f0094f35674ae6ce52c01b65b4cd587c9b21"
+    },
+    {
+      "name": "imagemagick",
+      "version": "7.1.2-27",
+      "releaseRevision": 1,
+      "architecture": "x64",
+      "license": "ImageMagick License",
+      "r2Key": "deps/imagemagick-windows-x64-04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c.zip",
+      "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.1",
+      "subComponents": [
+
+      ],
+      "bundleSha256": "04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c"
+    }
+  ]
+}
