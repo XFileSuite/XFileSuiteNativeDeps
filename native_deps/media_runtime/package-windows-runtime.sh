@@ -16,16 +16,23 @@ WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 RELEASE_ID="media-runtime-windows-${VERSION}-xfilesuite.${RELEASE_REVISION}"
 ARCHIVE="$DIST_DIR/$RELEASE_ID.tar.gz"
 
-test -d "$STAGE/bin"
-test -f "$STAGE/bin/libmpv-2.dll"
-test -f "$STAGE/bin/ffmpeg.exe"
-test -f "$STAGE/bin/libEGL.dll"
+need_path() {
+  [[ -e "$1" ]] || {
+    echo "Missing package input: $1" >&2
+    exit 1
+  }
+}
+
+need_path "$STAGE/bin"
+need_path "$STAGE/bin/libmpv-2.dll"
+need_path "$STAGE/bin/ffmpeg.exe"
+need_path "$STAGE/bin/libEGL.dll"
 
 # Verify that ffmpeg.exe and libmpv-2.dll both link the shared FFmpeg DLLs.
 # On Windows, `objdump -p` lists DLL imports.
 if command -v objdump >/dev/null 2>&1; then
   for binary in "$STAGE/bin/ffmpeg.exe" "$STAGE/bin/libmpv-2.dll"; do
-    if ! objdump -p "$binary" | grep -qi 'avcodec'; then
+    if ! objdump -p "$binary" | grep -i 'avcodec' >/dev/null; then
       echo "$binary does not import the shared avcodec DLL" >&2
       exit 1
     fi

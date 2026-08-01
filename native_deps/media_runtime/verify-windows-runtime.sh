@@ -33,12 +33,14 @@ need_file "$LIB_DIR/libmpv.dll.a"
 
 for dll in avcodec avdevice avformat avutil avfilter swresample swscale; do
   match="$(find "$BIN_DIR" -maxdepth 1 -name "${dll}-*.dll" -print -quit)"
-  test -n "$match" || { echo "Missing shared FFmpeg DLL: ${dll}-*.dll" >&2; exit 1; }
+  [[ -n "$match" ]] || { echo "Missing shared FFmpeg DLL: ${dll}-*.dll" >&2; exit 1; }
   need_file "$match"
 done
 need_file "$RUNTIME_DIR/licenses/msys2-libass"
 need_file "$RUNTIME_DIR/licenses/msys2-freetype"
 need_file "$RUNTIME_DIR/licenses/msys2-fontconfig"
+need_file "$RUNTIME_DIR/licenses/msys2-expat"
+need_file "$RUNTIME_DIR/licenses/ANGLE-BSD-3-Clause.txt"
 
 for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
   need_file "$LIB_DIR/$imp"
@@ -56,11 +58,12 @@ done
 # ── Shared FFmpeg linkage ─────────────────────────────────────────
 if command -v objdump >/dev/null 2>&1; then
   for binary in "$FFMPEG" "$BIN_DIR/libmpv-2.dll"; do
-    if ! objdump -p "$binary" 2>/dev/null | grep -qi 'avcodec'; then
+    imports="$(objdump -p "$binary" 2>/dev/null)"
+    if ! grep -i 'avcodec' <<<"$imports" >/dev/null; then
       echo "$binary does not import the shared avcodec DLL" >&2
       exit 1
     fi
-    if ! objdump -p "$binary" 2>/dev/null | grep -qi 'avformat'; then
+    if ! grep -i 'avformat' <<<"$imports" >/dev/null; then
       echo "$binary does not import the shared avformat DLL" >&2
       exit 1
     fi
@@ -71,8 +74,9 @@ if command -v objdump >/dev/null 2>&1; then
   while IFS= read -r binary; do
     while IFS= read -r imported_dll; do
       imported_dll="${imported_dll//$'\r'/}"
-      if find /mingw64/bin -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q . &&
-         ! find "$BIN_DIR" -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q .; then
+      system_dependency="$(find /mingw64/bin -maxdepth 1 -type f -iname "$imported_dll" -print -quit)"
+      bundled_dependency="$(find "$BIN_DIR" -maxdepth 1 -type f -iname "$imported_dll" -print -quit)"
+      if [[ -n "$system_dependency" && -z "$bundled_dependency" ]]; then
         echo "Missing MinGW runtime dependency: $imported_dll (imported by $(basename "$binary"))" >&2
         exit 1
       fi
@@ -114,7 +118,8 @@ while IFS= read -r requirement; do
 done < "$SCRIPT_DIR/runtime-codecs.txt"
 
 # ── No GPL / nonfree ──────────────────────────────────────────────
-if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree|version3|mbedtls)'; then
+build_configuration="$("$FFMPEG" -buildconf 2>&1)"
+if grep -Eq -- '--enable-(gpl|nonfree|version3|mbedtls)' <<<"$build_configuration"; then
   echo "GPL, nonfree, version3, or Mbed TLS FFmpeg configuration detected" >&2
   exit 1
 fi

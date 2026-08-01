@@ -27,7 +27,10 @@ LICENSES = {
   'freetype'      => 'FTL',
   'fribidi'       => 'LGPL-2.1',
   'harfbuzz'      => 'MIT',
-  'mbedtls'       => 'Apache-2.0',
+  'fontconfig'    => 'MIT-style',
+  'expat'         => 'MIT',
+  'lcms2'         => 'MIT',
+  'angle'         => 'BSD-3-Clause',
   'libxml2'       => 'MIT',
   'libpng'        => 'BSD-2-Clause',
   'uchardet'      => 'MPL-2.0',
@@ -36,15 +39,19 @@ LICENSES = {
   'libtiff'       => 'MIT',
   'giflib'        => 'MIT',
   'resvg'         => 'Apache-2.0 OR MIT',
-  'mediaRuntime'  => 'LGPL-2.1 (aggregate: FFmpeg LGPL-2.1, mpv LGPL-2.1, libplacebo LGPL-2.1, libass ISC, dav1d BSD-2-Clause, FreeType FTL, FriBidi LGPL-2.1, HarfBuzz MIT, Mbed TLS Apache-2.0, libxml2 MIT, libpng BSD-2-Clause, uchardet MPL-2.0, LAME LGPL-2.0, Opus BSD-3-Clause, libogg BSD-3-Clause, libvorbis BSD-3-Clause, libvpx BSD-3-Clause, libwebp BSD-3-Clause)'
+  'mediaRuntime'  => 'LGPL-2.1 aggregate; see subComponents for bundled licenses'
 }.freeze
 
-# Sub-components bundled inside the media runtime aggregate.
-MEDIA_RUNTIME_SUBCOMPONENTS = %w[
+# Sub-components common to both media runtime bundles.
+MEDIA_RUNTIME_COMMON_SUBCOMPONENTS = %w[
   ffmpeg mpv libplacebo libass dav1d freetype fribidi harfbuzz
-  mbedtls libxml2 libpng uchardet lame libopus libogg libvorbis
-  libvpx libwebp
+  libxml2 libpng uchardet lame libopus libogg libvorbis libvpx libwebp
 ].freeze
+
+MEDIA_RUNTIME_PLATFORM_SUBCOMPONENTS = {
+  'macos' => [],
+  'windows' => %w[fontconfig expat lcms2 angle]
+}.freeze
 
 # Sub-components bundled inside the FFmpeg standalone binary.
 FFMPEG_SUBCOMPONENTS = %w[lame libogg libvorbis libvpx libwebp libopus].freeze
@@ -55,7 +62,9 @@ IMAGEMAGICK_MACOS_SUBCOMPONENTS = %w[mozjpeg libpng libwebp libtiff giflib].free
 def subcomponents_for(name, platform)
   case name
   when 'mediaRuntime'
-    MEDIA_RUNTIME_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
+    subcomponents = MEDIA_RUNTIME_COMMON_SUBCOMPONENTS +
+                    MEDIA_RUNTIME_PLATFORM_SUBCOMPONENTS.fetch(platform, [])
+    subcomponents.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
   when 'ffmpeg'
     FFMPEG_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
   when 'imagemagick'

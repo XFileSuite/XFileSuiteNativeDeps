@@ -10,7 +10,10 @@
 #
 # The output is packaged by package-windows-runtime.sh into a single tar.gz
 # with bin/, lib/, include/, licenses/, and metadata/ directories.
-set -euo pipefail
+set -Eeuo pipefail
+
+current_phase="initialization"
+trap 'status=$?; echo "ERROR: Windows media runtime failed during ${current_phase} at line ${LINENO} (exit ${status})" >&2; exit "$status"' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -34,6 +37,20 @@ need() {
   }
 }
 
+need_file() {
+  [[ -f "$1" ]] || {
+    echo "Missing required file: $1" >&2
+    return 1
+  }
+}
+
+need_dir() {
+  [[ -d "$1" ]] || {
+    echo "Missing required directory: $1" >&2
+    return 1
+  }
+}
+
 for tool in pacman curl tar make pkg-config meson ninja git python3; do
   need "$tool"
 done
@@ -42,6 +59,7 @@ mkdir -p "$WORK_DIR" "$DIST_DIR"
 
 # ── 1. Build shared FFmpeg DLLs + ffmpeg.exe ──────────────────────
 echo "==> Building the shared FFmpeg 8 runtime for Windows x64"
+current_phase="shared FFmpeg build"
 ffmpeg_builder_status=0
 FFMPEG_LINKAGE=shared \
 WORK_DIR="$WORK_DIR/ffmpeg" \
@@ -50,22 +68,9 @@ JOBS="$JOBS" \
   bash "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh" || ffmpeg_builder_status=$?
 
 ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
-# MSYS2's test -x is not reliable for PE executables on hosted Windows
-# runners. The builder has already executed this file as its smoke test.
-test -f "$ffmpeg_output/bin/ffmpeg.exe"
-for required_ffmpeg_file in \
-  "$ffmpeg_output/bin/"avcodec-*.dll \
-  "$ffmpeg_output/bin/"avdevice-*.dll \
-  "$ffmpeg_output/bin/"avfilter-*.dll \
-  "$ffmpeg_output/bin/"avformat-*.dll \
-  "$ffmpeg_output/bin/"avutil-*.dll \
-  "$ffmpeg_output/bin/"swresample-*.dll \
-  "$ffmpeg_output/bin/"swscale-*.dll \
-  "$ffmpeg_output/lib/libavcodec.dll.a" \
-  "$ffmpeg_output/lib/libavdevice.dll.a" \
-  "$ffmpeg_output/include/libavcodec/avcodec.h"; do
-  test -f "$required_ffmpeg_file"
-done
+# Execute the produced PE file as the intermediate smoke test. The final
+# package verifier checks every DLL, import library and public header after
+# staging, avoiding unreliable intermediate MSYS glob/file predicates.
 PATH="$ffmpeg_output/bin:$PATH" "$ffmpeg_output/bin/ffmpeg.exe" -version >/dev/null
 if [[ "$ffmpeg_builder_status" != 0 ]]; then
   echo "  Note: MSYS2 wrapper returned $ffmpeg_builder_status after a complete, smoke-tested FFmpeg build"
@@ -74,6 +79,7 @@ echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
 
 # ── 2. Install mpv native dependencies from MSYS2 ─────────────────
 echo "==> Installing mpv native dependencies from MSYS2"
+current_phase="MSYS2 dependency installation"
 MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-dav1d
   mingw-w64-x86_64-libass
@@ -98,6 +104,7 @@ echo "  ✓ mpv MSYS2 dependencies installed"
 
 # ── 3. Build libmpv with meson ────────────────────────────────────
 echo "==> Building libmpv ${MPV_VERSION} with meson"
+current_phase="mpv source preparation"
 
 mpv_src="$WORK_DIR/mpv-${MPV_VERSION}"
 mpv_archive="$WORK_DIR/mpv-${MPV_VERSION}.tar.gz"
@@ -108,7 +115,7 @@ fi
 echo "$MPV_SHA256  $mpv_archive" | sha256sum -c -
 rm -rf "$mpv_src"
 tar -xzf "$mpv_archive" -C "$WORK_DIR"
-test -d "$mpv_src"
+need_dir "$mpv_src"
 
 # libplacebo is a hard dependency of mpv 0.41. Build it as a subproject.
 libplacebo_dir="$mpv_src/subprojects/libplacebo"
@@ -117,7 +124,11 @@ if [[ ! -d "$libplacebo_dir" ]]; then
   git clone --depth 1 --branch "v${LIBPLACEBO_VERSION}" \
     --recurse-submodules --shallow-submodules \
     https://github.com/haasn/libplacebo.git "$libplacebo_dir"
-  test "$(git -C "$libplacebo_dir" rev-parse HEAD)" = "$LIBPLACEBO_COMMIT"
+  actual_libplacebo_commit="$(git -C "$libplacebo_dir" rev-parse HEAD)"
+  [[ "$actual_libplacebo_commit" == "$LIBPLACEBO_COMMIT" ]] || {
+    echo "Unexpected libplacebo commit: $actual_libplacebo_commit" >&2
+    exit 1
+  }
 fi
 
 # Point pkg-config at the shared FFmpeg import libs + MSYS2 packages.
@@ -130,6 +141,8 @@ mkdir -p "$mpv_prefix"
 
 (
   cd "$mpv_src"
+
+  current_phase="mpv Meson configuration"
 
   meson setup build \
     --prefix="$mpv_prefix" \
@@ -146,7 +159,12 @@ mkdir -p "$mpv_prefix"
     -Duchardet=enabled \
     -Dzlib=enabled \
     -Dgl=enabled \
-    -Degl-angle=enabled \
+    -Dplain-gl=enabled \
+    -Dgl-win32=disabled \
+    -Degl-angle=disabled \
+    -Degl-angle-lib=disabled \
+    -Degl-angle-win32=disabled \
+    -Dd3d-hwaccel=enabled \
     -Dvulkan=disabled \
     -Dhtml-build=disabled \
     -Dmanpage-build=disabled \
@@ -156,7 +174,7 @@ mkdir -p "$mpv_prefix"
     -Dlibplacebo:demos=false \
     -Dlibplacebo:tests=false \
     -Dlibplacebo:vulkan=disabled \
-    -Dlibplacebo:opengl=enabled \
+    -Dlibplacebo:opengl=disabled \
     -Dlibplacebo:d3d11=disabled \
     -Dlibplacebo:glslang=disabled \
     -Dlibplacebo:shaderc=disabled \
@@ -166,16 +184,19 @@ mkdir -p "$mpv_prefix"
     -Dlibplacebo:unwind=disabled \
     -Dlibplacebo:xxhash=disabled
 
+  current_phase="mpv compilation"
   meson compile -C build
+  current_phase="mpv installation"
   meson install -C build
 )
 
-test -f "$mpv_prefix/bin/libmpv-2.dll"
-test -f "$mpv_prefix/lib/libmpv.dll.a"
+need_file "$mpv_prefix/bin/libmpv-2.dll"
+need_file "$mpv_prefix/lib/libmpv.dll.a"
 echo "  ✓ libmpv ${MPV_VERSION} (shared, -Dgpl=false)"
 
 # ── 4. Download pre-built ANGLE ───────────────────────────────────
 echo "==> Downloading pre-built ANGLE (OpenGL ES → D3D11)"
+current_phase="ANGLE download and extraction"
 angle_archive="$WORK_DIR/ANGLE.7z"
 angle_dir="$WORK_DIR/ANGLE"
 if [[ ! -f "$angle_archive" ]] || [[ "$(md5sum "$angle_archive" | awk '{print $1}')" != "$ANGLE_MD5" ]]; then
@@ -191,12 +212,16 @@ else
   # p7zip may be named 7za on some systems.
   7za x "$angle_archive" -o"$angle_dir" -y
 fi
-test -f "$angle_dir/libEGL.dll"
-test -f "$angle_dir/libGLESv2.dll"
+need_file "$angle_dir/libEGL.dll"
+need_file "$angle_dir/libGLESv2.dll"
+need_file "$angle_dir/d3dcompiler_47.dll"
+need_file "$angle_dir/lib/libEGL.dll.lib"
+need_file "$angle_dir/lib/libGLESv2.dll.lib"
 echo "  ✓ ANGLE (libEGL.dll, libGLESv2.dll, d3dcompiler_47.dll)"
 
 # ── 5. Collect licenses ────────────────────────────────────────────
 echo "==> Collecting distributable license texts"
+current_phase="license collection"
 licenses="$WORK_DIR/licenses"
 rm -rf "$licenses"
 mkdir -p "$licenses"
@@ -209,27 +234,38 @@ cp "$mpv_src/Copyright" "$licenses/mpv-Copyright.txt"
 
 # libplacebo license
 cp "$libplacebo_dir/LICENSE" "$licenses/libplacebo-LICENSE.txt"
+cp "$SCRIPT_DIR/ANGLE-LICENSE.txt" "$licenses/ANGLE-BSD-3-Clause.txt"
 
-# MSYS2 package licenses are installed under /mingw64/share/licenses/
-for lic_src in /mingw64/share/licenses; do
-  if [[ -d "$lic_src" ]]; then
-    for pkg in dav1d libass freetype fontconfig fribidi harfbuzz libxml2 uchardet lcms2 expat; do
-      if [[ -d "$lic_src/$pkg" ]]; then
-        mkdir -p "$licenses/msys2-$pkg"
-        cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/"
-      elif [[ -f "$lic_src/$pkg/LICENSE" ]]; then
-        cp "$lic_src/$pkg/LICENSE" "$licenses/msys2-$pkg-LICENSE.txt" 2>/dev/null || true
-      fi
-    done
-  fi
-done
+collect_msys2_package_licenses() {
+  local package="$1"
+  local short_name="${package#mingw-w64-x86_64-}"
+  local destination="$licenses/msys2-$short_name"
+  local copied=0
+  while IFS= read -r license_file; do
+    [[ -f "$license_file" ]] || continue
+    mkdir -p "$destination"
+    cp "$license_file" "$destination/$(basename "$license_file")"
+    copied=1
+  done < <(pacman -Ql "$package" | awk '$2 ~ /\/share\/licenses\// { print $2 }')
+  [[ "$copied" == 1 ]] || {
+    echo "No installed license files found for $package" >&2
+    return 1
+  }
+}
 
-# FFmpeg codec libraries from MSYS2
-for pkg in lame libogg libvorbis libvpx libwebp opus; do
-  lic_dir="/mingw64/share/licenses/$pkg"
-  if [[ -d "$lic_dir" ]]; then
-    cp -R "$lic_dir/." "$licenses/msys2-$pkg/" 2>/dev/null || true
-  fi
+# Collect licenses for direct dependencies. Owners of recursively discovered
+# runtime DLLs are collected after the dependency closure is staged.
+DIRECT_LICENSE_PACKAGES=(
+  "${MPV_MSYS2_PACKAGES[@]}"
+  mingw-w64-x86_64-lame
+  mingw-w64-x86_64-libogg
+  mingw-w64-x86_64-libvorbis
+  mingw-w64-x86_64-libvpx
+  mingw-w64-x86_64-libwebp
+  mingw-w64-x86_64-opus
+)
+for package in "${DIRECT_LICENSE_PACKAGES[@]}"; do
+  collect_msys2_package_licenses "$package"
 done
 
 cat > "$licenses/NOTICE.md" <<'EOF'
@@ -259,6 +295,7 @@ This bundle contains the following third-party components:
 | libwebp | BSD-3-Clause |
 | Opus | BSD-3-Clause |
 | ANGLE (libEGL, libGLESv2, d3dcompiler) | BSD-3-Clause |
+| Additional MinGW runtime DLLs | See `msys2-*` license directories |
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
 Mbed TLS and HTTPS/TLS/RTMPS playback protocols are intentionally excluded so
@@ -271,6 +308,7 @@ echo "  ✓ license texts collected"
 
 # ── 6. Stage the runtime ───────────────────────────────────────────
 echo "==> Staging the Windows media runtime"
+current_phase="runtime staging"
 stage="$WORK_DIR/stage"
 rm -rf "$stage"
 mkdir -p "$stage/bin" "$stage/lib" "$stage/include/mpv" "$stage/licenses" "$stage/metadata"
@@ -329,7 +367,7 @@ while :; do
   copied=0
   while IFS= read -r imported_dll; do
     [[ -n "$imported_dll" ]] || continue
-    if find "$stage/bin" -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q .; then
+    if [[ -n "$(find "$stage/bin" -maxdepth 1 -type f -iname "$imported_dll" -print -quit)" ]]; then
       continue
     fi
     dependency="$(find /mingw64/bin -maxdepth 1 -type f -iname "$imported_dll" -print -quit)"
@@ -347,6 +385,18 @@ while :; do
   )
   [[ "$copied" == 1 ]] || break
 done
+
+# Include license texts for every MSYS2 package that owns a staged DLL. This
+# keeps the compliance bundle aligned with the recursively collected runtime.
+while IFS= read -r package; do
+  [[ -n "$package" ]] || continue
+  collect_msys2_package_licenses "$package"
+done < <(
+  while IFS= read -r -d '' dll; do
+    pacman -Qqo "$dll" 2>/dev/null || true
+  done < <(find "$stage/bin" -maxdepth 1 -type f -iname '*.dll' -print0)
+  sort -u
+)
 
 # Licenses
 cp -R "$licenses/." "$stage/licenses/"
@@ -377,6 +427,7 @@ echo "  ✓ runtime staged at $stage"
 
 # ── 7. Package ─────────────────────────────────────────────────────
 echo "==> Packaging the Windows media runtime"
+current_phase="runtime verification and packaging"
 FRAMEWORKS_SOURCE="$stage" \
 FFMPEG_BINARY="$stage/bin/ffmpeg.exe" \
 LICENSES_SOURCE="$licenses" \
