@@ -66,6 +66,7 @@ MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-libxml2
   mingw-w64-x86_64-uchardet
   mingw-w64-x86_64-lcms2
+  mingw-w64-x86_64-expat
   mingw-w64-x86_64-zlib
   mingw-w64-x86_64-iconv
 )
@@ -194,7 +195,7 @@ cp "$libplacebo_dir/LICENSE" "$licenses/libplacebo-LICENSE.txt"
 # MSYS2 package licenses are installed under /mingw64/share/licenses/
 for lic_src in /mingw64/share/licenses; do
   if [[ -d "$lic_src" ]]; then
-    for pkg in dav1d libass freetype fontconfig fribidi harfbuzz libxml2 uchardet lcms2; do
+    for pkg in dav1d libass freetype fontconfig fribidi harfbuzz libxml2 uchardet lcms2 expat; do
       if [[ -d "$lic_src/$pkg" ]]; then
         mkdir -p "$licenses/msys2-$pkg"
         cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/"
@@ -232,6 +233,7 @@ This bundle contains the following third-party components:
 | libxml2 | MIT |
 | uchardet | MPL-2.0 |
 | lcms2 | MIT |
+| Expat | MIT |
 | LAME | LGPL-2.0 |
 | libogg | BSD-3-Clause |
 | libvorbis | BSD-3-Clause |
@@ -300,6 +302,32 @@ for msys_dll in \
   libbz2-1.dll liblzma-5.dll libpng16-16.dll libzstd.dll libbrotlidec.dll \
   libbrotlicommon.dll libgcc_s_seh-1.dll libwinpthread-1.dll libstdc++-6.dll; do
   [[ -f "/mingw64/bin/$msys_dll" ]] && cp "/mingw64/bin/$msys_dll" "$stage/bin/"
+done
+
+# Complete the dependency closure instead of maintaining a fragile hand-written
+# DLL list. Only imports supplied by MinGW are copied; Windows system DLLs are
+# intentionally left to the operating system.
+while :; do
+  copied=0
+  while IFS= read -r imported_dll; do
+    [[ -n "$imported_dll" ]] || continue
+    if find "$stage/bin" -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q .; then
+      continue
+    fi
+    dependency="$(find /mingw64/bin -maxdepth 1 -type f -iname "$imported_dll" -print -quit)"
+    if [[ -n "$dependency" ]]; then
+      cp "$dependency" "$stage/bin/"
+      echo "  + runtime dependency: $(basename "$dependency")"
+      copied=1
+    fi
+  done < <(
+    find "$stage/bin" -maxdepth 1 -type f \( -iname '*.dll' -o -iname '*.exe' \) -print0 |
+      xargs -0 -r objdump -p 2>/dev/null |
+      awk '/DLL Name:/ { print $3 }' |
+      tr -d '\r' |
+      sort -fu
+  )
+  [[ "$copied" == 1 ]] || break
 done
 
 # Licenses

@@ -65,6 +65,19 @@ if command -v objdump >/dev/null 2>&1; then
       exit 1
     fi
   done
+
+  # Every non-system DLL import available from MinGW must be bundled. This
+  # catches transitive additions such as Fontconfig -> Expat before release.
+  while IFS= read -r binary; do
+    while IFS= read -r imported_dll; do
+      imported_dll="${imported_dll//$'\r'/}"
+      if find /mingw64/bin -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q . &&
+         ! find "$BIN_DIR" -maxdepth 1 -type f -iname "$imported_dll" -print -quit | grep -q .; then
+        echo "Missing MinGW runtime dependency: $imported_dll (imported by $(basename "$binary"))" >&2
+        exit 1
+      fi
+    done < <(objdump -p "$binary" 2>/dev/null | awk '/DLL Name:/ { print $3 }')
+  done < <(find "$BIN_DIR" -maxdepth 1 -type f \( -iname '*.dll' -o -iname '*.exe' \))
 fi
 
 # ── Required codecs ───────────────────────────────────────────────
