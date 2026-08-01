@@ -11,11 +11,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work-windows}"
 DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist-windows}"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
+FFMPEG_TARBALL_SHA256="${FFMPEG_TARBALL_SHA256:-464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c}"
 FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
 JOBS="${JOBS:-$(nproc)}"
 
 command -v pacman >/dev/null || { echo "Run this script inside MSYS2." >&2; exit 1; }
-for tool in curl tar make pkg-config; do command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 1; }; done
+for tool in curl tar make pkg-config sha256sum; do command -v "$tool" >/dev/null || { echo "Missing $tool" >&2; exit 1; }; done
 
 # The workflow installs these exact MSYS2 packages.  Keeping the dependency list
 # here makes a local rebuild use the same LGPL/BSD codec set as macOS.
@@ -33,7 +34,12 @@ esac
 mkdir -p "$WORK_DIR" "$DIST_DIR"
 archive="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 source_dir="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}"
-[ -f "$archive" ] || curl -fL --retry 3 -o "$archive" "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+if [[ ! -f "$archive" ]] || [[ "$(sha256sum "$archive" | awk '{print $1}')" != "$FFMPEG_TARBALL_SHA256" ]]; then
+  rm -f "$archive"
+  curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 --connect-timeout 30 \
+    --output "$archive" "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+fi
+test "$(sha256sum "$archive" | awk '{print $1}')" = "$FFMPEG_TARBALL_SHA256"
 rm -rf "$source_dir"
 tar -xf "$archive" -C "$WORK_DIR"
 
