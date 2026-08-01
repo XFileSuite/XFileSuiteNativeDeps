@@ -104,5 +104,11 @@ fi
 export PATH="$out/bin:$PATH"
 "$out/bin/ffmpeg.exe" -version
 sha256sum "$out/bin/ffmpeg.exe" > "$out/ffmpeg.exe.sha256"
-tar -czf "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" -C "$out" .
-sha256sum "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" > "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz.sha256"
+
+# The shared build is an intermediate of media_runtime/build-windows.sh; its
+# final runtime archive is created there. Avoid making an unused second archive
+# on MSYS2. Standalone FFmpeg releases retain their existing archive output.
+if [[ "$FFMPEG_LINKAGE" == "static" ]]; then
+  tar -czf "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" -C "$out" .
+  sha256sum "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" > "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz.sha256"
+fi
