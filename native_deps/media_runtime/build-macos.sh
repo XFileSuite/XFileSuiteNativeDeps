@@ -48,6 +48,7 @@ fi
 git -C "$upstream" fetch --tags --force
 git -C "$upstream" checkout --detach "$UPSTREAM_COMMIT"
 git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
+  Makefile \
   cmd/downloads/main.go \
   cross-files/macos-amd64.ini \
   cross-files/macos-arm64.ini \
@@ -105,8 +106,13 @@ ruby -ryaml -e '
 # Keep the distributed runtime under LGPL-2.1: do not build Mbed TLS
 # (Apache-2.0) and remove the TLS/HTTPS protocols that require it.  The
 # upstream make graph otherwise builds Mbed TLS even though this runtime
-# injects XFileSuite's own shared FFmpeg prefix.
-sed -i '' '/mbedtls_/d' "$upstream/Makefile"
+# injects XFileSuite's own shared FFmpeg prefix.  Remove both its full target
+# rule and its two references; deleting only matching lines would leave the
+# rule's continuation lines as invalid top-level make commands.
+sed -i '' \
+  -e '/^# mbedtls_/,/^# libxml2_/{ /^# libxml2_/!d; }' \
+  -e '/mbedtls_/d' \
+  "$upstream/Makefile"
 sed -i '' \
   -e "/--enable-mbedtls/d" \
   -e "/--enable-version3/d" \
