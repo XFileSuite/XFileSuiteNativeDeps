@@ -254,7 +254,7 @@ jobs:
           }
 
           async function main() {
-            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/media-runtime-']) {
+            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/media-runtime-', 'deps/sbom-']) {
               let cursor;
               do {
                 const query = new URLSearchParams({ prefix, per_page: '1000' });
@@ -287,24 +287,30 @@ jobs:
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "r2Key")')" --file "$(find native_deps/media_runtime/dist -name 'media-runtime-*.tar.gz' -maxdepth 1 -print -quit)" --remote
           fi
+      - name: Generate and upload macOS SBOM
+        run: |
+          ruby native_deps/generate-sbom.rb native_deps/manifests/macos.json native_deps/sbom-macos.json
+          npx wrangler r2 object put "xfilesuite-releases/deps/sbom-macos.json" --file native_deps/sbom-macos.json --remote
       - name: Commit the canonical public manifest
         run: |
           git config user.name "xfilesuite-release-bot"
           git config user.email "release-bot@xfilesuite.com"
-          git add native_deps/manifests/macos.json
+          git add native_deps/manifests/macos.json native_deps/sbom-macos.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: publish macOS native dependency manifest"
+            git commit -m "chore: publish macOS native dependency manifest and SBOM"
             git push origin HEAD:main
           fi
       - name: Mirror manifest to the private App source repository
         run: |
           git clone "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuiteSource.git" "$RUNNER_TEMP/XFileSuiteSource" --depth 1
           cp native_deps/manifests/macos.json "$RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/macos.json"
+          mkdir -p "$RUNNER_TEMP/XFileSuiteSource/native_deps/sbom"
+          cp native_deps/sbom-macos.json "$RUNNER_TEMP/XFileSuiteSource/native_deps/sbom/sbom-macos.json"
           git -C "$RUNNER_TEMP/XFileSuiteSource" config user.name "xfilesuite-release-bot"
           git -C "$RUNNER_TEMP/XFileSuiteSource" config user.email "release-bot@xfilesuite.com"
-          git -C "$RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/macos.json
+          git -C "$RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/macos.json native_deps/sbom/sbom-macos.json
           if ! git -C "$RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; then
-            git -C "$RUNNER_TEMP/XFileSuiteSource" commit -m "chore: publish macOS native dependency manifest"
+            git -C "$RUNNER_TEMP/XFileSuiteSource" commit -m "chore: publish macOS native dependency manifest and SBOM"
             git -C "$RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
           fi
       - name: Publish current manifest to the public repository
@@ -313,11 +319,12 @@ jobs:
           git -C "$RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuite.git"
           mkdir -p "$RUNNER_TEMP/XFileSuite/native-deps"
           cp native_deps/manifests/macos.json "$RUNNER_TEMP/XFileSuite/native-deps/macos.json"
+          cp native_deps/sbom-macos.json "$RUNNER_TEMP/XFileSuite/native-deps/sbom-macos.json"
           git -C "$RUNNER_TEMP/XFileSuite" config user.name "xfilesuite-release-bot"
           git -C "$RUNNER_TEMP/XFileSuite" config user.email "release-bot@xfilesuite.com"
-          git -C "$RUNNER_TEMP/XFileSuite" add native-deps/macos.json
+          git -C "$RUNNER_TEMP/XFileSuite" add native-deps/macos.json native-deps/sbom-macos.json
           if ! git -C "$RUNNER_TEMP/XFileSuite" diff --cached --quiet; then
-            git -C "$RUNNER_TEMP/XFileSuite" commit -m "chore: publish macOS native dependency manifest"
+            git -C "$RUNNER_TEMP/XFileSuite" commit -m "chore: publish macOS native dependency manifest and SBOM"
             git -C "$RUNNER_TEMP/XFileSuite" push origin HEAD:main
           fi
       - name: Remove superseded R2 dependency objects
@@ -470,24 +477,32 @@ jobs:
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
           if ($env:COMPONENT -in @('all', 'ffmpeg')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/ffmpeg.exe" --remote }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
+      - name: Generate and upload Windows SBOM
+        shell: pwsh
+        run: |
+          ruby native_deps/generate-sbom.rb native_deps/manifests/windows.json native_deps/sbom-windows.json
+          npx wrangler r2 object put "xfilesuite-releases/deps/sbom-windows.json" --file native_deps/sbom-windows.json --remote
       - name: Commit and mirror the Windows manifest
         shell: pwsh
         run: |
           git config user.name 'xfilesuite-release-bot'; git config user.email 'release-bot@xfilesuite.com'
-          git add native_deps/manifests/windows.json
-          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'chore: publish Windows native dependency manifest'; git push origin HEAD:main }
+          git add native_deps/manifests/windows.json native_deps/sbom-windows.json
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'chore: publish Windows native dependency manifest and SBOM'; git push origin HEAD:main }
           git clone "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuiteSource.git" "$env:RUNNER_TEMP/XFileSuiteSource" --depth 1
           Copy-Item native_deps/manifests/windows.json "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/windows.json"
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/sbom" | Out-Null
+          Copy-Item native_deps/sbom-windows.json "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/sbom/sbom-windows.json"
           git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.email 'release-bot@xfilesuite.com'
-          git -C "$env:RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/windows.json
-          git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main }
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/windows.json native_deps/sbom/sbom-windows.json
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest and SBOM'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main }
           gh repo clone XFileSuite/XFileSuite "$env:RUNNER_TEMP/XFileSuite" -- --depth 1
           git -C "$env:RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuite.git"
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/XFileSuite/native-deps" | Out-Null
           Copy-Item native_deps/manifests/windows.json "$env:RUNNER_TEMP/XFileSuite/native-deps/windows.json"
+          Copy-Item native_deps/sbom-windows.json "$env:RUNNER_TEMP/XFileSuite/native-deps/sbom-windows.json"
           git -C "$env:RUNNER_TEMP/XFileSuite" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuite" config user.email 'release-bot@xfilesuite.com'
-          git -C "$env:RUNNER_TEMP/XFileSuite" add native-deps/windows.json
-          git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest'; git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main }
+          git -C "$env:RUNNER_TEMP/XFileSuite" add native-deps/windows.json native-deps/sbom-windows.json
+          git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest and SBOM'; git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main }
       - name: Remove superseded Windows R2 dependency objects
         shell: pwsh
         run: |

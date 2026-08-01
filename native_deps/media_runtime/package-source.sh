@@ -58,12 +58,26 @@ test "$(shasum -a 256 "$STAGE/upstream/downloads/libpng-1.6.40.tar.gz" | awk '{p
 test "$(shasum -a 256 "$STAGE/upstream/downloads/libpng-1.6.40-wrap-patch.zip" | awk '{print $1}')" = \
   bad558070e0a82faa5c0ae553bcd12d49021fc4b628f232a8e58c3fbd281aae1
 
+# libplacebo is cloned directly by the mpv build script (not through
+# downloads.lock) and statically linked into libmpv. Archive its exact
+# source to satisfy LGPL-2.1 corresponding-source requirements.
+libplacebo_version="6.338.2"
+libplacebo_commit="64c1954570f1cd57f8570a57e51fb0249b57bb90"
+libplacebo_dir="$STAGE/upstream/libplacebo-${libplacebo_version}"
+git clone --depth 1 --branch "v${libplacebo_version}" \
+  --recurse-submodules --shallow-submodules \
+  https://github.com/haasn/libplacebo.git "$libplacebo_dir"
+test "$(git -C "$libplacebo_dir" rev-parse HEAD)" = "${libplacebo_commit}"
+cp "$libplacebo_dir/LICENSE" "$STAGE/upstream/LICENSE-libplacebo.txt"
+find "$libplacebo_dir" -type d -name '.git' -exec rm -rf {} + 2>/dev/null || true
+
 cat > "$STAGE/BUILDINFO.md" <<EOF
 # XFileSuite media runtime corresponding source
 
 - Release: $RELEASE_ID
 - FFmpeg: 8.0.1, configured without GPL or nonfree components
 - mpv: 0.41.0, configured with -Dgpl=false
+- libplacebo: 6.338.2 (statically linked into libmpv, source included in upstream/)
 - Build entry point: build-scripts/build-macos.sh
 - Exact upstream checksums are recorded by the vendored build scripts and downloads.lock.
 EOF

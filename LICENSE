@@ -17,10 +17,37 @@ use the XFileSuite Materials to build, distribute, or support another product.
 
 This license does not alter or restrict any rights granted by the licenses of
 third-party components referenced, downloaded, or included in generated release
-archives, including FFmpeg, LAME, libogg, libvorbis, libvpx, ImageMagick,
-MozJPEG, libpng, libwebp, libtiff, giflib, and resvg. Those components remain
-subject to their respective upstream licenses. Corresponding source archives
-published in this repository retain their included notices and license texts.
+archives. Those components remain subject to their respective upstream licenses.
+Corresponding source archives published in this repository retain their
+included notices and license texts.
+
+The bundled third-party components are:
+
+| Component | License | Platform |
+| --- | --- | --- |
+| FFmpeg | LGPL-2.1 | macOS, Windows |
+| LAME | LGPL-2.0 | macOS, Windows |
+| libogg | BSD-3-Clause | macOS, Windows |
+| libvorbis | BSD-3-Clause | macOS, Windows |
+| libvpx | BSD-3-Clause | macOS, Windows |
+| libwebp | BSD-3-Clause | macOS, Windows |
+| libopus | BSD-3-Clause | macOS, Windows |
+| mpv | LGPL-2.1 (built with `-Dgpl=false`) | macOS |
+| libplacebo | LGPL-2.1 | macOS |
+| libass | ISC | macOS |
+| dav1d | BSD-2-Clause | macOS |
+| FreeType | FTL (BSD-like) | macOS |
+| FriBidi | LGPL-2.1 | macOS |
+| HarfBuzz | MIT | macOS |
+| Mbed TLS | Apache-2.0 | macOS |
+| libxml2 | MIT | macOS |
+| libpng | BSD-2-Clause | macOS |
+| uchardet | MPL-2.0 | macOS |
+| ImageMagick | ImageMagick License (Apache-2.0 derivative) | macOS, Windows |
+| MozJPEG | BSD-3-Clause | macOS |
+| libtiff | MIT-like | macOS |
+| giflib | MIT-like | macOS |
+| resvg | Apache-2.0 OR MIT | macOS |
 
 THE XFILESUITE MATERIALS ARE PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,

@@ -174,6 +174,12 @@ extract_license "$downloads/mbedtls-3.4.1.tar.gz" '/LICENSE$' MbedTLS-LICENSE.tx
 extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyright.txt
 extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
 
+# libplacebo is cloned directly by the mpv build script (not through
+# downloads.lock); locate its source tree and extract the license.
+libplacebo_source="$(find "$upstream" -type d -name 'libplacebo' -path '*/subprojects/*' -print -quit)"
+test -n "$libplacebo_source"
+cp "$libplacebo_source/LICENSE" "$licenses/libplacebo-LICENSE.txt"
+
 # FreeType declares libpng as a checksum-pinned Meson wrap rather than in the
 # parent downloads.lock. Cache both wrap assets beside the other verified
 # sources so licenses and corresponding source never depend on cleaned tmp dirs.
@@ -201,9 +207,28 @@ extract_license "$libpng_archive" '/LICENSE$' libpng-LICENSE.txt
 cat > "$licenses/NOTICE.md" <<'EOF'
 # XFileSuite shared media runtime notices
 
-This bundle contains FFmpeg 8.0.1 shared libraries and CLI, mpv 0.41.0,
-libass, dav1d, FreeType, FriBidi, HarfBuzz, Mbed TLS, libxml2, libpng,
-uchardet, LAME, Opus, libogg, libvorbis, libvpx, and libwebp.
+This bundle contains the following third-party components:
+
+| Component | License |
+| --- | --- |
+| FFmpeg 8.0.1 (shared libs + CLI) | LGPL-2.1 |
+| mpv 0.41.0 | LGPL-2.1 (built with `-Dgpl=false`) |
+| libplacebo 6.338.2 | LGPL-2.1 |
+| LAME | LGPL-2.0 |
+| libass | ISC |
+| dav1d | BSD-2-Clause |
+| FreeType | FTL (BSD-like) |
+| FriBidi | LGPL-2.1 |
+| HarfBuzz | MIT |
+| Mbed TLS | Apache-2.0 |
+| libxml2 | MIT |
+| libpng | BSD-2-Clause |
+| uchardet | **MPL-2.0** (file-level weak copyleft; source included in corresponding-source archive) |
+| Opus | BSD-3-Clause |
+| libogg | BSD-3-Clause |
+| libvorbis | BSD-3-Clause |
+| libvpx | BSD-3-Clause |
+| libwebp | BSD-3-Clause |
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
