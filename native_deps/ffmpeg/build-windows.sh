@@ -112,3 +112,6 @@ if [[ "$FFMPEG_LINKAGE" == "static" ]]; then
   tar -czf "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" -C "$out" .
   sha256sum "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" > "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz.sha256"
 fi
+
+echo "Windows FFmpeg ${FFMPEG_LINKAGE} build complete"
+exit 0
