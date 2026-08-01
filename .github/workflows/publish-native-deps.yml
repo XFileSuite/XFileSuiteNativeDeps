@@ -357,7 +357,7 @@ jobs:
   publish-windows:
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ github.event_name == 'workflow_dispatch' && needs.publish.result == 'success' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'windows' || needs.publish.result == 'success') && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     needs: publish
     runs-on: windows-latest
     permissions:
