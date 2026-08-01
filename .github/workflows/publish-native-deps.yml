@@ -407,7 +407,7 @@ jobs:
             mingw-w64-x86_64-pkgconf mingw-w64-x86_64-meson mingw-w64-x86_64-ninja
             mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis
             mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
-            mingw-w64-x86_64-dav1d mingw-w64-x86_64-libass mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-dav1d mingw-w64-x86_64-libass mingw-w64-x86_64-freetype mingw-w64-x86_64-fontconfig
             mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
             mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2
             mingw-w64-x86_64-iconv p7zip

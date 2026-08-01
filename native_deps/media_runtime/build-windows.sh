@@ -60,6 +60,7 @@ MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-dav1d
   mingw-w64-x86_64-libass
   mingw-w64-x86_64-freetype
+  mingw-w64-x86_64-fontconfig
   mingw-w64-x86_64-fribidi
   mingw-w64-x86_64-harfbuzz
   mingw-w64-x86_64-libxml2
@@ -193,9 +194,10 @@ cp "$libplacebo_dir/LICENSE" "$licenses/libplacebo-LICENSE.txt"
 # MSYS2 package licenses are installed under /mingw64/share/licenses/
 for lic_src in /mingw64/share/licenses; do
   if [[ -d "$lic_src" ]]; then
-    for pkg in dav1d libass freetype fribidi harfbuzz libxml2 uchardet lcms2; do
+    for pkg in dav1d libass freetype fontconfig fribidi harfbuzz libxml2 uchardet lcms2; do
       if [[ -d "$lic_src/$pkg" ]]; then
-        cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/" 2>/dev/null || true
+        mkdir -p "$licenses/msys2-$pkg"
+        cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/"
       elif [[ -f "$lic_src/$pkg/LICENSE" ]]; then
         cp "$lic_src/$pkg/LICENSE" "$licenses/msys2-$pkg-LICENSE.txt" 2>/dev/null || true
       fi
@@ -224,6 +226,7 @@ This bundle contains the following third-party components:
 | dav1d | BSD-2-Clause |
 | libass | ISC |
 | FreeType | FTL (BSD-like) |
+| Fontconfig | MIT-style permissive license |
 | FriBidi | LGPL-2.1 |
 | HarfBuzz | MIT |
 | libxml2 | MIT |
@@ -292,7 +295,7 @@ cp -R "$angle_dir/include/KHR/." "$stage/include/KHR/"
 
 # MSYS2 runtime DLLs that mpv depends on
 for msys_dll in \
-  libdav1d.dll libass-9.dll libfreetype-6.dll libfribidi-0.dll \
+  libdav1d.dll libass-9.dll libfreetype-6.dll libfontconfig-1.dll libfribidi-0.dll \
   libharfbuzz-0.dll libxml2-2.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
   libbz2-1.dll liblzma-5.dll libpng16-16.dll libzstd.dll libbrotlidec.dll \
   libbrotlicommon.dll libgcc_s_seh-1.dll libwinpthread-1.dll libstdc++-6.dll; do

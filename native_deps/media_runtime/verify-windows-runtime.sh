@@ -28,6 +28,7 @@ need_file "$FFMPEG"
 need_file "$BIN_DIR/libmpv-2.dll"
 need_file "$BIN_DIR/libEGL.dll"
 need_file "$BIN_DIR/libGLESv2.dll"
+need_file "$BIN_DIR/libfontconfig-1.dll"
 need_file "$LIB_DIR/libmpv.dll.a"
 
 for dll in avcodec avdevice avformat avutil avfilter swresample swscale; do
@@ -35,6 +36,9 @@ for dll in avcodec avdevice avformat avutil avfilter swresample swscale; do
   test -n "$match" || { echo "Missing shared FFmpeg DLL: ${dll}-*.dll" >&2; exit 1; }
   need_file "$match"
 done
+need_file "$RUNTIME_DIR/licenses/msys2-libass"
+need_file "$RUNTIME_DIR/licenses/msys2-freetype"
+need_file "$RUNTIME_DIR/licenses/msys2-fontconfig"
 
 for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
   need_file "$LIB_DIR/$imp"
