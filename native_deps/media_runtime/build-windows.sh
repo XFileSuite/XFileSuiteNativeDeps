@@ -174,6 +174,7 @@ mkdir -p "$mpv_prefix"
     -Dzlib=enabled \
     -Dgl=enabled \
     -Dplain-gl=enabled \
+    -Dwin32-threads=enabled \
     -Dgl-win32=disabled \
     -Degl-angle=disabled \
     -Degl-angle-lib=disabled \
