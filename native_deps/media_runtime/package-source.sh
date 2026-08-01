@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
-VERSION="${VERSION:-8.0.1-mpv-0.41.0}"
+VERSION="${VERSION:-8.1.2-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 RELEASE_ID="media-runtime-macos-${VERSION}-xfilesuite.${RELEASE_REVISION}"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-media-source.XXXXXX")"
@@ -75,7 +75,7 @@ cat > "$STAGE/BUILDINFO.md" <<EOF
 # XFileSuite media runtime corresponding source
 
 - Release: $RELEASE_ID
-- FFmpeg: 8.0.1, configured without GPL or nonfree components
+- FFmpeg: 8.1.2, configured without GPL, nonfree, Mbed TLS, or version3 components
 - mpv: 0.41.0, configured with -Dgpl=false
 - libplacebo: 6.338.2 (statically linked into libmpv, source included in upstream/)
 - Build entry point: build-scripts/build-macos.sh

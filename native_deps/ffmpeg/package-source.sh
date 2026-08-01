@@ -6,9 +6,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work/source-package}"
 PLATFORM="${PLATFORM:-macos}"
-RELEASE_ID="${RELEASE_ID:-ffmpeg-${PLATFORM}-8.0.1-xfilesuite.2}"
+RELEASE_ID="${RELEASE_ID:-ffmpeg-${PLATFORM}-8.1.2-xfilesuite.1}"
 if [ "$PLATFORM" = windows ]; then
-  DEFAULT_FFMPEG_BINARY="$ROOT_DIR/dist-windows/ffmpeg-${FFMPEG_VERSION:-8.0.1}-windows-x64/ffmpeg.exe"
+  DEFAULT_FFMPEG_BINARY="$ROOT_DIR/dist-windows/ffmpeg-${FFMPEG_VERSION:-8.1.2}-windows-x64/ffmpeg.exe"
   BUILD_SCRIPT="$ROOT_DIR/build-windows.sh"
   ARCHITECTURES="x86_64"
 else
@@ -18,7 +18,7 @@ else
 fi
 FFMPEG_BINARY="${FFMPEG_BINARY:-$DEFAULT_FFMPEG_BINARY}"
 
-FFMPEG_VERSION="${FFMPEG_VERSION:-8.0.1}"
+FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 LAME_VERSION=3.100
 OGG_VERSION=1.3.5
 VORBIS_VERSION=1.3.7

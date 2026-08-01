@@ -33,10 +33,10 @@ MACOS_RESOURCES="$PROJECT_ROOT/macos/Runner/Resources"
 MIN_MACOS="${MIN_MACOS:-11.0}"
 FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
 
-FFMPEG_VERSION="${FFMPEG_VERSION:-8.0.1}"
+FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 FFMPEG_TARBALL_URL="${FFMPEG_TARBALL_URL:-https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz}"
 FFMPEG_TARBALL_PATH="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-FFMPEG_TARBALL_SHA256="${FFMPEG_TARBALL_SHA256:-05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41}"
+FFMPEG_TARBALL_SHA256="${FFMPEG_TARBALL_SHA256:-464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c}"
 FFMPEG_SRC_DIR="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}"
 
 LAME_VERSION="${LAME_VERSION:-3.100}"
@@ -739,7 +739,7 @@ Usage:
 Env vars:
   MIN_MACOS=11.0          Minimum target macOS (default: 11.0)
   FFMPEG_LINKAGE=static   static (legacy CLI) or shared (media runtime)
-  FFMPEG_VERSION=8.0.1    FFmpeg version (default: 8.0.1)
+  FFMPEG_VERSION=8.1.2    FFmpeg version (default: 8.1.2)
   LAME_VERSION=3.100      LAME version (default: 3.100)
   OGG_VERSION=1.3.5       libogg version (default: 1.3.5)
   VORBIS_VERSION=1.3.7    libvorbis version (default: 1.3.7)

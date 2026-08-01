@@ -43,7 +43,7 @@ need_file "$FFMPEG"
 for license in \
   NOTICE.md FFmpeg-LGPL-2.1.txt mpv-Copyright.txt libpng-LICENSE.txt \
   dav1d-COPYING.txt libass-COPYING.txt FreeType-FTL.txt \
-  FriBidi-COPYING.txt HarfBuzz-COPYING.txt MbedTLS-LICENSE.txt \
+  FriBidi-COPYING.txt HarfBuzz-COPYING.txt \
   libxml2-Copyright.txt uchardet-COPYING.txt libplacebo-LICENSE.txt; do
   need_file "$RUNTIME_DIR/licenses/$license"
 done
@@ -157,8 +157,14 @@ if [[ "${VERIFY_ALPHA_VIDEO:-0}" == "1" ]]; then
   fi
 fi
 
-if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree)'; then
-  echo "GPL or nonfree FFmpeg configuration detected" >&2
+if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree|version3|mbedtls)'; then
+  echo "GPL, nonfree, version3, or Mbed TLS FFmpeg configuration detected" >&2
+  exit 1
+fi
+
+protocols="$("$FFMPEG" -hide_banner -protocols 2>&1)"
+if grep -Eq '(^|[[:space:]])(https|tls|rtmps|rtmpts)($|[[:space:]])' <<<"$protocols"; then
+  echo "TLS protocol support is unexpectedly present" >&2
   exit 1
 fi
 

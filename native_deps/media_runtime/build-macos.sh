@@ -7,7 +7,7 @@ WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 UPSTREAM_TAG="${LIBMPV_DARWIN_BUILD_TAG:-v0.6.0}"
 UPSTREAM_COMMIT="${LIBMPV_DARWIN_BUILD_COMMIT:-4286f5557bdccc0747030e3c376ce5cd160a96a0}"
-RUNTIME_VERSION="${RUNTIME_VERSION:-8.0.1-mpv-0.41.0}"
+RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
@@ -90,7 +90,7 @@ sed -i '' \
 ruby -ryaml -e '
   path = ARGV.fetch(0)
   lock = YAML.load_file(path)
-  keep = %w[dav1d freetype fribidi harfbuzz libass libxml2 mbedtls mpv pkg-config uchardet]
+  keep = %w[dav1d freetype fribidi harfbuzz libass libxml2 mpv pkg-config uchardet]
   missing = keep - lock.keys
   abort "missing locked dependencies: #{missing.join(", ")}" unless missing.empty?
   lock.select! { |name, _| keep.include?(name) }
@@ -101,6 +101,20 @@ ruby -ryaml -e '
   )
   File.write(path, YAML.dump(lock))
 ' "$upstream/downloads.lock"
+
+# Keep the distributed runtime under LGPL-2.1: do not build Mbed TLS
+# (Apache-2.0) and remove the TLS/HTTPS protocols that require it.  The
+# upstream make graph otherwise builds Mbed TLS even though this runtime
+# injects XFileSuite's own shared FFmpeg prefix.
+sed -i '' '/mbedtls_/d' "$upstream/Makefile"
+sed -i '' \
+  -e "/--enable-mbedtls/d" \
+  -e "/--enable-version3/d" \
+  -e "/--enable-protocol=https/d" \
+  -e "/--enable-protocol=tls/d" \
+  -e "/--enable-protocol=rtmps/d" \
+  -e "/--enable-protocol=rtmpts/d" \
+  "$upstream/scripts/ffmpeg/meson.build"
 
 echo "==> Injecting the ABI-identical shared FFmpeg prefixes into the libmpv build"
 for mapping in "arm64:arm64" "amd64:x86_64"; do
@@ -145,8 +159,8 @@ echo "==> Collecting distributable license texts"
 licenses="$WORK_DIR/licenses"
 rm -rf "$licenses"
 mkdir -p "$licenses"
-cp "$ffmpeg_work/ffmpeg-8.0.1/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
-cp "$ffmpeg_work/ffmpeg-8.0.1/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
+cp "$ffmpeg_work/ffmpeg-8.1.2/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
+cp "$ffmpeg_work/ffmpeg-8.1.2/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
 cp "$ffmpeg_work/lame-3.100/COPYING" "$licenses/LAME-LGPL-2.0.txt"
 cp "$ffmpeg_work/opus-1.5.2/COPYING" "$licenses/Opus-COPYING.txt"
 cp "$ffmpeg_work/libogg-1.3.5/COPYING" "$licenses/libogg-COPYING.txt"
@@ -170,7 +184,6 @@ extract_license "$downloads/freetype-2.13.2.tar.xz" '/docs/FTL.TXT$' FreeType-FT
 extract_license "$downloads/fribidi-1.0.13.tar.xz" '/COPYING$' FriBidi-COPYING.txt
 extract_license "$downloads/harfbuzz-8.1.1.tar.gz" '/COPYING$' HarfBuzz-COPYING.txt
 extract_license "$downloads/libass-0.17.1.tar.xz" '/COPYING$' libass-COPYING.txt
-extract_license "$downloads/mbedtls-3.4.1.tar.gz" '/LICENSE$' MbedTLS-LICENSE.txt
 extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyright.txt
 extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
 
@@ -213,7 +226,7 @@ This bundle contains the following third-party components:
 
 | Component | License |
 | --- | --- |
-| FFmpeg 8.0.1 (shared libs + CLI) | LGPL-2.1 |
+| FFmpeg 8.1.2 (shared libs + CLI) | LGPL-2.1 |
 | mpv 0.41.0 | LGPL-2.1 (built with `-Dgpl=false`) |
 | libplacebo 6.338.2 | LGPL-2.1 |
 | LAME | LGPL-2.0 |
@@ -222,7 +235,6 @@ This bundle contains the following third-party components:
 | FreeType | FTL (BSD-like) |
 | FriBidi | LGPL-2.1 |
 | HarfBuzz | MIT |
-| Mbed TLS | Apache-2.0 |
 | libxml2 | MIT |
 | libpng | BSD-2-Clause |
 | uchardet | **MPL-2.0** (file-level weak copyleft; source included in corresponding-source archive) |
@@ -233,6 +245,8 @@ This bundle contains the following third-party components:
 | libwebp | BSD-3-Clause |
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+Mbed TLS and the HTTPS/TLS/RTMPS protocols are intentionally excluded so the
+runtime remains LGPL-2.1-compatible.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
 included. Exact source archives, patches, checksums, and build scripts are
 published in the corresponding-source GitHub Release named in the manifest.

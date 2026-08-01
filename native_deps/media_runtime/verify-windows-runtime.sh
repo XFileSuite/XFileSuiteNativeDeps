@@ -97,8 +97,14 @@ while IFS= read -r requirement; do
 done < "$SCRIPT_DIR/runtime-codecs.txt"
 
 # ── No GPL / nonfree ──────────────────────────────────────────────
-if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree)'; then
-  echo "GPL or nonfree FFmpeg configuration detected" >&2
+if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree|version3|mbedtls)'; then
+  echo "GPL, nonfree, version3, or Mbed TLS FFmpeg configuration detected" >&2
+  exit 1
+fi
+
+protocols="$("$FFMPEG" -hide_banner -protocols 2>&1)"
+if grep -Eq '(^|[[:space:]])(https|tls|rtmps|rtmpts)($|[[:space:]])' <<<"$protocols"; then
+  echo "TLS protocol support is unexpectedly present" >&2
   exit 1
 fi
 

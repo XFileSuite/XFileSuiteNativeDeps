@@ -20,12 +20,12 @@
       "sourceRelease": "resvg-macos-0.47.0-xfilesuite.1"
     },
     "mediaRuntime": {
-      "version": "8.0.1-mpv-0.41.0",
+      "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "universal",
       "bundleSha256": "a3d2d6f7374b1ca608d1436b79e10eb60d9a3ebb8c7f5f21d780bc433c75a6b4",
       "r2Key": "deps/media-runtime-macos-8.0.1-mpv-0.41.0-a3d2d6f7374b1ca608d1436b79e10eb60d9a3ebb8c7f5f21d780bc433c75a6b4",
-      "sourceRelease": "media-runtime-macos-8.0.1-mpv-0.41.0-xfilesuite.1"
+      "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.1"
     }
   }
 }

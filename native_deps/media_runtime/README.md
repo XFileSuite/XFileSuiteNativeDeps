@@ -37,6 +37,8 @@ The build remains LGPL-compatible:
 
 - mpv is configured with `-Dgpl=false`;
 - FFmpeg is built without `--enable-gpl` or `--enable-nonfree`;
+- Mbed TLS and HTTPS/TLS/RTMPS playback protocols are excluded, so the runtime
+  remains compatible with LGPL-2.1 rather than requiring LGPL-3;
 - GPL codec libraries such as x264 and x265 are not included;
 - the corresponding-source archive records exact upstream sources, patches,
   configuration and build scripts.
@@ -45,5 +47,5 @@ The build remains LGPL-compatible:
 
 The macOS manifest publishes only this shared runtime. It does not publish or
 download a second standalone FFmpeg bundle. `native_deps/ffmpeg/build.sh` is
-retained as the common FFmpeg 8.0.1 builder used by this runtime and by the
+retained as the common FFmpeg 8.1.2 builder used by this runtime and by the
 separate Windows dependency workflow.

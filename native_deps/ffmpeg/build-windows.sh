@@ -10,7 +10,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work-windows}"
 DIST_DIR="${DIST_DIR:-$ROOT_DIR/dist-windows}"
-FFMPEG_VERSION="${FFMPEG_VERSION:-8.0.1}"
+FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
 JOBS="${JOBS:-$(nproc)}"
 

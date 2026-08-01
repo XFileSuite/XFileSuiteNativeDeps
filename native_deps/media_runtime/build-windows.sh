@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
-RUNTIME_VERSION="${RUNTIME_VERSION:-8.0.1-mpv-0.41.0}"
+RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
 MPV_VERSION="${MPV_VERSION:-0.41.0}"
 MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
@@ -47,7 +47,7 @@ DIST_DIR="$WORK_DIR/ffmpeg-dist" \
 JOBS="$JOBS" \
   "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh"
 
-ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-8.0.1-windows-x64"
+ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-8.1.2-windows-x64"
 test -x "$ffmpeg_output/bin/ffmpeg.exe"
 echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
 
@@ -60,7 +60,6 @@ MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-fribidi
   mingw-w64-x86_64-harfbuzz
   mingw-w64-x86_64-libxml2
-  mingw-w64-x86_64-mbedtls
   mingw-w64-x86_64-uchardet
   mingw-w64-x86_64-lcms2
   mingw-w64-x86_64-zlib
@@ -179,8 +178,8 @@ licenses="$WORK_DIR/licenses"
 rm -rf "$licenses"
 mkdir -p "$licenses"
 
-cp "$WORK_DIR/ffmpeg/ffmpeg-8.0.1/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
-cp "$WORK_DIR/ffmpeg/ffmpeg-8.0.1/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
+cp "$WORK_DIR/ffmpeg/ffmpeg-8.1.2/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
+cp "$WORK_DIR/ffmpeg/ffmpeg-8.1.2/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
 
 # mpv license
 cp "$mpv_src/Copyright" "$licenses/mpv-Copyright.txt"
@@ -191,7 +190,7 @@ cp "$libplacebo_dir/LICENSE" "$licenses/libplacebo-LICENSE.txt"
 # MSYS2 package licenses are installed under /mingw64/share/licenses/
 for lic_src in /mingw64/share/licenses; do
   if [[ -d "$lic_src" ]]; then
-    for pkg in dav1d libass freetype fribidi harfbuzz libxml2 mbedtls uchardet lcms2; do
+    for pkg in dav1d libass freetype fribidi harfbuzz libxml2 uchardet lcms2; do
       if [[ -d "$lic_src/$pkg" ]]; then
         cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/" 2>/dev/null || true
       elif [[ -f "$lic_src/$pkg/LICENSE" ]]; then
@@ -216,7 +215,7 @@ This bundle contains the following third-party components:
 
 | Component | License |
 | --- | --- |
-| FFmpeg 8.0.1 (shared DLLs + CLI) | LGPL-2.1 |
+| FFmpeg 8.1.2 (shared DLLs + CLI) | LGPL-2.1 |
 | mpv 0.41.0 | LGPL-2.1 (built with `-Dgpl=false`) |
 | libplacebo 6.338.2 | LGPL-2.1 |
 | dav1d | BSD-2-Clause |
@@ -225,7 +224,6 @@ This bundle contains the following third-party components:
 | FriBidi | LGPL-2.1 |
 | HarfBuzz | MIT |
 | libxml2 | MIT |
-| Mbed TLS | Apache-2.0 |
 | uchardet | MPL-2.0 |
 | lcms2 | MIT |
 | LAME | LGPL-2.0 |
@@ -237,6 +235,8 @@ This bundle contains the following third-party components:
 | ANGLE (libEGL, libGLESv2, d3dcompiler) | BSD-3-Clause |
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+Mbed TLS and HTTPS/TLS/RTMPS playback protocols are intentionally excluded so
+the runtime remains LGPL-2.1-compatible.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
 included. Shared FFmpeg DLLs are used by both the ffmpeg CLI and libmpv.
 EOF
@@ -290,8 +290,7 @@ cp -R "$angle_dir/include/KHR/." "$stage/include/KHR/"
 # MSYS2 runtime DLLs that mpv depends on
 for msys_dll in \
   libdav1d.dll libass-9.dll libfreetype-6.dll libfribidi-0.dll \
-  libharfbuzz-0.dll libxml2-2.dll libmbedcrypto-16.dll libmbedtls-21.dll \
-  libmbedx509-7.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
+  libharfbuzz-0.dll libxml2-2.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
   libbz2-1.dll liblzma-5.dll libpng16-16.dll libzstd.dll libbrotlidec.dll \
   libbrotlicommon.dll libgcc_s_seh-1.dll libwinpthread-1.dll libstdc++-6.dll; do
   [[ -f "/mingw64/bin/$msys_dll" ]] && cp "/mingw64/bin/$msys_dll" "$stage/bin/"

@@ -20,12 +20,12 @@
       "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.1"
     },
     "mediaRuntime": {
-      "version": "8.0.1-mpv-0.41.0",
+      "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "x64",
       "r2Key": "",
       "bundleSha256": "",
-      "sourceRelease": "media-runtime-windows-8.0.1-mpv-0.41.0-xfilesuite.1"
+      "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.1"
     }
   }
 }
