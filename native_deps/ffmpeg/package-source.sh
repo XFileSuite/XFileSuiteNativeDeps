@@ -3,7 +3,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$ROOT_DIR/../.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$ROOT_DIR/work/source-package}"
 PLATFORM="${PLATFORM:-macos}"
@@ -25,6 +24,7 @@ OGG_VERSION=1.3.5
 VORBIS_VERSION=1.3.7
 VPX_VERSION=1.15.2
 WEBP_VERSION=1.6.0
+OPUS_VERSION=1.5.2
 
 ARCHIVE_NAME="xfilesuite-${RELEASE_ID}-source.tar.gz"
 STAGE_DIR="$WORK_DIR/$RELEASE_ID"
@@ -73,6 +73,7 @@ fetch "https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.xz" "li
 fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.xz" "libvorbis-${VORBIS_VERSION}.tar.xz"
 fetch "https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}" "libvpx-${VPX_VERSION}.tar.gz"
 fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" "libwebp-${WEBP_VERSION}.tar.gz"
+fetch "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v${OPUS_VERSION}" "opus-${OPUS_VERSION}.tar.gz"
 
 tar -xf "$DOWNLOAD_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 tar -xzf "$DOWNLOAD_DIR/lame-${LAME_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
@@ -81,6 +82,8 @@ tar -xf "$DOWNLOAD_DIR/libvorbis-${VORBIS_VERSION}.tar.xz" -C "$STAGE_DIR/source
 mkdir -p "$STAGE_DIR/sources/libvpx-${VPX_VERSION}"
 tar -xzf "$DOWNLOAD_DIR/libvpx-${VPX_VERSION}.tar.gz" --strip-components=1 -C "$STAGE_DIR/sources/libvpx-${VPX_VERSION}"
 tar -xzf "$DOWNLOAD_DIR/libwebp-${WEBP_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
+mkdir -p "$STAGE_DIR/sources/opus-${OPUS_VERSION}"
+tar -xzf "$DOWNLOAD_DIR/opus-${OPUS_VERSION}.tar.gz" --strip-components=1 -C "$STAGE_DIR/sources/opus-${OPUS_VERSION}"
 
 # This is the only source-tree adjustment made by build.sh. Record the exact
 # patch against the extracted upstream source in every compliance archive.
@@ -99,6 +102,7 @@ copy_license "$STAGE_DIR/sources/libogg-${OGG_VERSION}" "$STAGE_DIR/licenses/lib
 copy_license "$STAGE_DIR/sources/libvorbis-${VORBIS_VERSION}" "$STAGE_DIR/licenses/libvorbis-BSD.txt"
 copy_license "$STAGE_DIR/sources/libvpx-${VPX_VERSION}" "$STAGE_DIR/licenses/libvpx-BSD.txt"
 copy_license "$STAGE_DIR/sources/libwebp-${WEBP_VERSION}" "$STAGE_DIR/licenses/libwebp-BSD-3-Clause.txt"
+copy_license "$STAGE_DIR/sources/opus-${OPUS_VERSION}" "$STAGE_DIR/licenses/libopus-BSD-3-Clause.txt"
 
 cat > "$STAGE_DIR/SOURCE-URLS.txt" <<EOF
 FFmpeg ${FFMPEG_VERSION}
@@ -113,6 +117,8 @@ libvpx ${VPX_VERSION}
 https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}
 libwebp ${WEBP_VERSION}
 https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz
+libopus ${OPUS_VERSION}
+https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v${OPUS_VERSION}
 EOF
 
 if [[ -f "$FFMPEG_BINARY" ]]; then
@@ -139,6 +145,7 @@ cat > "$STAGE_DIR/BUILDINFO.md" <<EOF
 | libvorbis | ${VORBIS_VERSION} | BSD-style |
 | libvpx | ${VPX_VERSION} | BSD-style |
 | libwebp | ${WEBP_VERSION} | BSD-3-Clause |
+| libopus | ${OPUS_VERSION} | BSD-3-Clause |
 
 ## Build and modification information
 
@@ -165,9 +172,11 @@ EOF
 
 (
   cd "$STAGE_DIR"
+  # SHA256SUMS is explicitly excluded from find.
+  # shellcheck disable=SC2094
   while IFS= read -r -d '' file; do
     shasum -a 256 "$file"
-  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
+  done < <(find . -type f ! -name SHA256SUMS -print0 | sort -z) > SHA256SUMS
 )
 mkdir -p "$OUTPUT_DIR"
 tar -czf "$OUTPUT_DIR/$ARCHIVE_NAME" -C "$WORK_DIR" "$RELEASE_ID"

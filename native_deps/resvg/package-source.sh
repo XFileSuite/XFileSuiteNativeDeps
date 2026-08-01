@@ -3,7 +3,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VERSION="${RESVG_VERSION:-0.47.0}"
 RELEASE_ID="${RELEASE_ID:-resvg-macos-${VERSION}-xfilesuite.1}"
 BINARY="${RESVG_BINARY:-$SCRIPT_DIR/dist/resvg-macos-universal}"
@@ -45,9 +44,11 @@ not modified resvg source files.
 EOF
 (
   cd "$WORK_DIR"
+  # SHA256SUMS is explicitly excluded from find.
+  # shellcheck disable=SC2094
   while IFS= read -r -d '' file; do
     shasum -a 256 "$file"
-  done < <(find . -type f -print0 | sort -z) > SHA256SUMS
+  done < <(find . -type f ! -name SHA256SUMS -print0 | sort -z) > SHA256SUMS
 )
 archive="$OUT_DIR/xfilesuite-$RELEASE_ID-source.tar.gz"
 tar -czf "$archive" -C "$(dirname "$WORK_DIR")" "$(basename "$WORK_DIR")"

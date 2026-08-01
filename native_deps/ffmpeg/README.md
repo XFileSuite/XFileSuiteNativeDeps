@@ -1,6 +1,8 @@
 # FFmpeg LGPL Universal Binary Builder
 
-为 XFileSuite 构建 LGPL 合规的 macOS Universal FFmpeg 二进制文件。
+为 XFileSuite 构建 LGPL 合规的 FFmpeg。macOS shared media runtime 会以
+`FFMPEG_LINKAGE=shared` 调用本脚本；默认静态模式仅用于独立构建和 Windows
+工作流，不再作为 macOS App 的第二份 FFmpeg 产物发布。
 
 ## 许可证
 
@@ -22,6 +24,7 @@
 | **libvorbis** | BSD | Vorbis 音频编码 | 1.3.7 |
 | **libvpx** | BSD | VP8/VP9 视频编码 (WebM) | 1.15.2 |
 | **libwebp** | BSD-3-Clause | WebP / 动画 WebP 编码 | 1.6.0 |
+| **libopus** | BSD-3-Clause | Opus 音频编码 | 1.5.2 |
 | **VideoToolbox** | Apple | H.264/H.265/ProRes 硬件编解码 | 系统内置 |
 | **AudioToolbox** | Apple | AAC/ALAC 等音频编解码 | 系统内置 |
 | **SecureTransport** | Apple | HTTPS/TLS 支持 | 系统内置 |
