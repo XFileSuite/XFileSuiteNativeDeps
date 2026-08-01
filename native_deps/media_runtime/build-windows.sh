@@ -49,7 +49,9 @@ JOBS="$JOBS" \
   "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh"
 
 ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
-test -x "$ffmpeg_output/bin/ffmpeg.exe"
+# MSYS2's test -x is not reliable for PE executables on hosted Windows
+# runners. The builder has already executed this file as its smoke test.
+test -f "$ffmpeg_output/bin/ffmpeg.exe"
 echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
 
 # ── 2. Install mpv native dependencies from MSYS2 ─────────────────
