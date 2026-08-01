@@ -357,7 +357,7 @@ jobs:
   publish-windows:
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.component != 'media-runtime' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     needs: publish
     runs-on: windows-latest
     permissions:
@@ -396,19 +396,38 @@ jobs:
           key: windows-src-${{ inputs.component }}-${{ hashFiles('native_deps/manifests/windows.json') }}
           restore-keys: |
             windows-src-${{ inputs.component }}-
-      - name: Set up MSYS2 toolchain for LGPL FFmpeg
-        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
+      - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
+        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
           install: >-
-            make mingw-w64-x86_64-binutils mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
-            mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
+            make git mingw-w64-x86_64-binutils mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-pkgconf mingw-w64-x86_64-meson mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis
+            mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
+            mingw-w64-x86_64-dav1d mingw-w64-x86_64-libass mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
+            mingw-w64-x86_64-mbedtls2 mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2
+            mingw-w64-x86_64-iconv p7zip
       - name: Build LGPL FFmpeg for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
         shell: msys2 {0}
         run: native_deps/ffmpeg/build-windows.sh
+      - name: Build shared media runtime for Windows x64
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
+        shell: msys2 {0}
+        run: |
+          set -o pipefail
+          native_deps/media_runtime/build-windows.sh 2>&1 | tee media-runtime-windows-build.log
+      - name: Upload media runtime build log
+        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'media-runtime') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-runtime-windows-build-log-${{ github.run_attempt }}
+          path: media-runtime-windows-build.log
+          if-no-files-found: warn
       - name: Prepare the complete ImageMagick Windows runtime
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
         shell: pwsh
@@ -435,6 +454,9 @@ jobs:
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
           "PREVIOUS_WIN_FFMPEG_R2_KEY=$($manifest.components.ffmpeg.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "PREVIOUS_WIN_IMAGEMAGICK_R2_KEY=$($manifest.components.imagemagick.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          if ($manifest.components.mediaRuntime) {
+            "PREVIOUS_WIN_MEDIA_RUNTIME_R2_KEY=$($manifest.components.mediaRuntime.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          }
       - name: Update the Windows manifest with final hashes
         shell: pwsh
         run: |
@@ -451,6 +473,13 @@ jobs:
             $sha = (Get-FileHash -Algorithm SHA256 "native_deps/imagemagick/dist-windows/imagemagick-$($item.version)-windows-x64.zip").Hash.ToLowerInvariant()
             $item.bundleSha256 = $sha; $item.r2Key = "deps/imagemagick-windows-x64-$sha.zip"
             $item.sourceRelease = "imagemagick-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
+          }
+          if ($env:COMPONENT -in @('all', 'media-runtime')) {
+            $item = $data.components.mediaRuntime
+            $archive = Get-ChildItem "native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz" | Select-Object -First 1
+            $sha = (Get-FileHash -Algorithm SHA256 $archive.FullName).Hash.ToLowerInvariant()
+            $item.bundleSha256 = $sha; $item.r2Key = "deps/media-runtime-windows-$($item.version)-$sha"
+            $item.sourceRelease = "media-runtime-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
           }
           $data | ConvertTo-Json -Depth 8 | Set-Content $path
       - name: Publish Windows source, notices and build records on GitHub
@@ -477,6 +506,10 @@ jobs:
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
           if ($env:COMPONENT -in @('all', 'ffmpeg')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/ffmpeg.exe" --remote }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
+          if ($env:COMPONENT -in @('all', 'media-runtime')) {
+            $archive = Get-ChildItem "native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz" | Select-Object -First 1
+            npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.mediaRuntime.r2Key)" --file $archive.FullName --remote
+          }
       - name: Generate and upload Windows SBOM
         shell: pwsh
         run: |
@@ -518,4 +551,7 @@ jobs:
           }
           if ($env:COMPONENT -in @('all', 'imagemagick')) {
             Remove-Previous $env:PREVIOUS_WIN_IMAGEMAGICK_R2_KEY $manifest.components.imagemagick.r2Key
+          }
+          if ($env:COMPONENT -in @('all', 'media-runtime') -and $env:PREVIOUS_WIN_MEDIA_RUNTIME_R2_KEY) {
+            Remove-Previous $env:PREVIOUS_WIN_MEDIA_RUNTIME_R2_KEY $manifest.components.mediaRuntime.r2Key
           }

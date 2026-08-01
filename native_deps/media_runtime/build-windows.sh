@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+# Builds the shared FFmpeg + libmpv media runtime for Windows x64 under MSYS2.
+#
+# This mirrors the macOS build-macos.sh architecture:
+#   1. Build shared FFmpeg DLLs + ffmpeg.exe using ffmpeg/build-windows.sh
+#   2. Install mpv's native dependencies from MSYS2 packages
+#   3. Build libmpv with meson, linking against the shared FFmpeg import libs
+#   4. Download the pre-built ANGLE OpenGL ES → D3D11 translation layer
+#   5. Collect licenses and metadata
+#
+# The output is packaged by package-windows-runtime.sh into a single tar.gz
+# with bin/, lib/, include/, licenses/, and metadata/ directories.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
+DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
+RUNTIME_VERSION="${RUNTIME_VERSION:-8.0.1-mpv-0.41.0}"
+RELEASE_REVISION="${RELEASE_REVISION:-1}"
+MPV_VERSION="${MPV_VERSION:-0.41.0}"
+MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
+LIBPLACEBO_VERSION="${LIBPLACEBO_VERSION:-6.338.2}"
+LIBPLACEBO_COMMIT="${LIBPLACEBO_COMMIT:-64c1954570f1cd57f8570a57e51fb0249b57bb90}"
+ANGLE_URL="${ANGLE_URL:-https://github.com/alexmercerind/flutter-windows-ANGLE-OpenGL-ES/releases/download/v1.0.1/ANGLE.7z}"
+ANGLE_MD5="${ANGLE_MD5:-e866f13e8d552348058afaafe869b1ed}"
+JOBS="${JOBS:-$(nproc)}"
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Missing required tool: $1" >&2
+    exit 1
+  }
+}
+
+for tool in pacman curl tar make pkg-config meson ninja git python3; do
+  need "$tool"
+done
+
+mkdir -p "$WORK_DIR" "$DIST_DIR"
+
+# ── 1. Build shared FFmpeg DLLs + ffmpeg.exe ──────────────────────
+echo "==> Building the shared FFmpeg 8 runtime for Windows x64"
+FFMPEG_LINKAGE=shared \
+WORK_DIR="$WORK_DIR/ffmpeg" \
+DIST_DIR="$WORK_DIR/ffmpeg-dist" \
+JOBS="$JOBS" \
+  "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh"
+
+ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-8.0.1-windows-x64"
+test -x "$ffmpeg_output/bin/ffmpeg.exe"
+echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
+
+# ── 2. Install mpv native dependencies from MSYS2 ─────────────────
+echo "==> Installing mpv native dependencies from MSYS2"
+MPV_MSYS2_PACKAGES=(
+  mingw-w64-x86_64-dav1d
+  mingw-w64-x86_64-libass
+  mingw-w64-x86_64-freetype
+  mingw-w64-x86_64-fribidi
+  mingw-w64-x86_64-harfbuzz
+  mingw-w64-x86_64-libxml2
+  mingw-w64-x86_64-mbedtls2
+  mingw-w64-x86_64-uchardet
+  mingw-w64-x86_64-lcms2
+  mingw-w64-x86_64-zlib
+  mingw-w64-x86_64-iconv
+)
+for pkg in "${MPV_MSYS2_PACKAGES[@]}"; do
+  pacman -Q "$pkg" >/dev/null 2>&1 || {
+    echo "  Installing $pkg..."
+    pacman -S --noconfirm "$pkg"
+  }
+done
+echo "  ✓ mpv MSYS2 dependencies installed"
+
+# ── 3. Build libmpv with meson ────────────────────────────────────
+echo "==> Building libmpv ${MPV_VERSION} with meson"
+
+mpv_src="$WORK_DIR/mpv-${MPV_VERSION}"
+mpv_archive="$WORK_DIR/mpv-${MPV_VERSION}.tar.gz"
+if [[ ! -f "$mpv_archive" ]]; then
+  curl -fL --retry 3 -o "$mpv_archive" \
+    "https://github.com/mpv-player/mpv/archive/refs/tags/v${MPV_VERSION}.tar.gz"
+fi
+echo "$MPV_SHA256  $mpv_archive" | sha256sum -c -
+rm -rf "$mpv_src"
+tar -xzf "$mpv_archive" -C "$WORK_DIR"
+test -d "$mpv_src"
+
+# libplacebo is a hard dependency of mpv 0.41. Build it as a subproject.
+libplacebo_dir="$mpv_src/subprojects/libplacebo"
+mkdir -p "$mpv_src/subprojects"
+if [[ ! -d "$libplacebo_dir" ]]; then
+  git clone --depth 1 --branch "v${LIBPLACEBO_VERSION}" \
+    --recurse-submodules --shallow-submodules \
+    https://github.com/haasn/libplacebo.git "$libplacebo_dir"
+  test "$(git -C "$libplacebo_dir" rev-parse HEAD)" = "$LIBPLACEBO_COMMIT"
+fi
+
+# Point pkg-config at the shared FFmpeg import libs + MSYS2 packages.
+export PKG_CONFIG_PATH="$ffmpeg_output/lib:${PKG_CONFIG_PATH:-}"
+export PKG_CONFIG=/mingw64/bin/pkg-config
+
+mpv_prefix="$WORK_DIR/mpv-prefix"
+rm -rf "$mpv_prefix" "$mpv_src/build"
+mkdir -p "$mpv_prefix"
+
+(
+  cd "$mpv_src"
+
+  meson setup build \
+    --prefix="$mpv_prefix" \
+    --libdir="$mpv_prefix/lib" \
+    --default-library=shared \
+    --buildtype=release \
+    -Dauto_features=disabled \
+    -Dgpl=false \
+    -Dcplayer=false \
+    -Dlibmpv=true \
+    -Dbuild-date=false \
+    -Dtests=false \
+    -Diconv=enabled \
+    -Duchardet=enabled \
+    -Dzlib=enabled \
+    -Dgl=enabled \
+    -Degl-angle=enabled \
+    -Dvulkan=disabled \
+    -Dhtml-build=disabled \
+    -Dmanpage-build=disabled \
+    -Dpdf-build=disabled \
+    -Dlua=disabled \
+    -Djavascript=disabled \
+    -Dlibplacebo:demos=false \
+    -Dlibplacebo:tests=false \
+    -Dlibplacebo:vulkan=disabled \
+    -Dlibplacebo:opengl=enabled \
+    -Dlibplacebo:d3d11=disabled \
+    -Dlibplacebo:glslang=disabled \
+    -Dlibplacebo:shaderc=disabled \
+    -Dlibplacebo:lcms=disabled \
+    -Dlibplacebo:dovi=disabled \
+    -Dlibplacebo:libdovi=disabled \
+    -Dlibplacebo:unwind=disabled \
+    -Dlibplacebo:xxhash=disabled
+
+  meson compile -C build
+  meson install -C build
+)
+
+test -f "$mpv_prefix/bin/libmpv-2.dll"
+test -f "$mpv_prefix/lib/libmpv.dll.a"
+echo "  ✓ libmpv ${MPV_VERSION} (shared, -Dgpl=false)"
+
+# ── 4. Download pre-built ANGLE ───────────────────────────────────
+echo "==> Downloading pre-built ANGLE (OpenGL ES → D3D11)"
+angle_archive="$WORK_DIR/ANGLE.7z"
+angle_dir="$WORK_DIR/ANGLE"
+if [[ ! -f "$angle_archive" ]] || [[ "$(md5sum "$angle_archive" | awk '{print $1}')" != "$ANGLE_MD5" ]]; then
+  curl -fL --retry 3 -o "$angle_archive" "$ANGLE_URL"
+fi
+echo "$ANGLE_MD5  $angle_archive" | md5sum -c -
+rm -rf "$angle_dir"
+mkdir -p "$angle_dir"
+# 7z is available in MSYS2 as part of the base installation.
+if command -v 7z >/dev/null 2>&1; then
+  7z x "$angle_archive" -o"$angle_dir" -y
+else
+  # p7zip may be named 7za on some systems.
+  7za x "$angle_archive" -o"$angle_dir" -y
+fi
+test -f "$angle_dir/libEGL.dll"
+test -f "$angle_dir/libGLESv2.dll"
+echo "  ✓ ANGLE (libEGL.dll, libGLESv2.dll, d3dcompiler_47.dll)"
+
+# ── 5. Collect licenses ────────────────────────────────────────────
+echo "==> Collecting distributable license texts"
+licenses="$WORK_DIR/licenses"
+rm -rf "$licenses"
+mkdir -p "$licenses"
+
+cp "$WORK_DIR/ffmpeg/ffmpeg-8.0.1/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
+cp "$WORK_DIR/ffmpeg/ffmpeg-8.0.1/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
+
+# mpv license
+cp "$mpv_src/Copyright" "$licenses/mpv-Copyright.txt"
+
+# libplacebo license
+cp "$libplacebo_dir/LICENSE" "$licenses/libplacebo-LICENSE.txt"
+
+# MSYS2 package licenses are installed under /mingw64/share/licenses/
+for lic_src in /mingw64/share/licenses; do
+  if [[ -d "$lic_src" ]]; then
+    for pkg in dav1d libass freetype fribidi harfbuzz libxml2 mbedtls uchardet lcms2; do
+      if [[ -d "$lic_src/$pkg" ]]; then
+        cp -R "$lic_src/$pkg/." "$licenses/msys2-$pkg/" 2>/dev/null || true
+      elif [[ -f "$lic_src/$pkg/LICENSE" ]]; then
+        cp "$lic_src/$pkg/LICENSE" "$licenses/msys2-$pkg-LICENSE.txt" 2>/dev/null || true
+      fi
+    done
+  fi
+done
+
+# FFmpeg codec libraries from MSYS2
+for pkg in lame libogg libvorbis libvpx libwebp opus; do
+  lic_dir="/mingw64/share/licenses/$pkg"
+  if [[ -d "$lic_dir" ]]; then
+    cp -R "$lic_dir/." "$licenses/msys2-$pkg/" 2>/dev/null || true
+  fi
+done
+
+cat > "$licenses/NOTICE.md" <<'EOF'
+# XFileSuite shared media runtime notices (Windows)
+
+This bundle contains the following third-party components:
+
+| Component | License |
+| --- | --- |
+| FFmpeg 8.0.1 (shared DLLs + CLI) | LGPL-2.1 |
+| mpv 0.41.0 | LGPL-2.1 (built with `-Dgpl=false`) |
+| libplacebo 6.338.2 | LGPL-2.1 |
+| dav1d | BSD-2-Clause |
+| libass | ISC |
+| FreeType | FTL (BSD-like) |
+| FriBidi | LGPL-2.1 |
+| HarfBuzz | MIT |
+| libxml2 | MIT |
+| Mbed TLS | Apache-2.0 |
+| uchardet | MPL-2.0 |
+| lcms2 | MIT |
+| LAME | LGPL-2.0 |
+| libogg | BSD-3-Clause |
+| libvorbis | BSD-3-Clause |
+| libvpx | BSD-3-Clause |
+| libwebp | BSD-3-Clause |
+| Opus | BSD-3-Clause |
+| ANGLE (libEGL, libGLESv2, d3dcompiler) | BSD-3-Clause |
+
+FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
+included. Shared FFmpeg DLLs are used by both the ffmpeg CLI and libmpv.
+EOF
+
+echo "  ✓ license texts collected"
+
+# ── 6. Stage the runtime ───────────────────────────────────────────
+echo "==> Staging the Windows media runtime"
+stage="$WORK_DIR/stage"
+rm -rf "$stage"
+mkdir -p "$stage/bin" "$stage/lib" "$stage/include/mpv" "$stage/licenses" "$stage/metadata"
+
+# Shared FFmpeg DLLs + ffmpeg.exe
+cp "$ffmpeg_output/bin/"avcodec-*.dll "$ffmpeg_output/bin/"avformat-*.dll \
+   "$ffmpeg_output/bin/"avutil-*.dll "$ffmpeg_output/bin/"avfilter-*.dll \
+   "$ffmpeg_output/bin/"swresample-*.dll "$ffmpeg_output/bin/"swscale-*.dll \
+   "$stage/bin/"
+cp "$ffmpeg_output/bin/ffmpeg.exe" "$stage/bin/"
+# FFmpeg import libraries
+cp "$ffmpeg_output/lib/"libavcodec.dll.a "$ffmpeg_output/lib/"libavformat.dll.a \
+   "$ffmpeg_output/lib/"libavutil.dll.a "$ffmpeg_output/lib/"libavfilter.dll.a \
+   "$ffmpeg_output/lib/"libswresample.dll.a "$ffmpeg_output/lib/"libswscale.dll.a \
+   "$stage/lib/"
+# FFmpeg headers
+cp -R "$ffmpeg_output/include/"libavcodec "$ffmpeg_output/include/"libavformat \
+      "$ffmpeg_output/include/"libavutil "$ffmpeg_output/include/"libavfilter \
+      "$ffmpeg_output/include/"libswresample "$ffmpeg_output/include/"libswscale \
+      "$stage/include/"
+
+# libmpv
+cp "$mpv_prefix/bin/libmpv-2.dll" "$stage/bin/"
+cp "$mpv_prefix/lib/libmpv.dll.a" "$stage/lib/"
+cp "$mpv_src/libmpv/client.h" "$mpv_src/libmpv/stream_cb.h" \
+   "$mpv_src/libmpv/render.h" "$mpv_src/libmpv/render_gl.h" \
+   "$stage/include/mpv/"
+
+# ANGLE DLLs
+cp "$angle_dir/libEGL.dll" "$angle_dir/libGLESv2.dll" \
+   "$angle_dir/d3dcompiler_47.dll" "$stage/bin/"
+# Copy any additional ANGLE DLLs that may be present.
+for extra_dll in vk_swiftshader.dll vulkan-1.dll zlib.dll libc++.dll; do
+  [[ -f "$angle_dir/$extra_dll" ]] && cp "$angle_dir/$extra_dll" "$stage/bin/"
+done
+# ANGLE import libraries and headers (needed by media_kit_video at compile time)
+mkdir -p "$stage/lib" "$stage/include/EGL" "$stage/include/GLES2" "$stage/include/KHR"
+cp "$angle_dir/lib/libEGL.dll.lib" "$angle_dir/lib/libGLESv2.dll.lib" "$stage/lib/"
+cp -R "$angle_dir/include/EGL/." "$stage/include/EGL/"
+cp -R "$angle_dir/include/GLES2/." "$stage/include/GLES2/"
+cp -R "$angle_dir/include/KHR/." "$stage/include/KHR/"
+
+# MSYS2 runtime DLLs that mpv depends on
+for msys_dll in \
+  libdav1d.dll libass-9.dll libfreetype-6.dll libfribidi-0.dll \
+  libharfbuzz-0.dll libxml2-2.dll libmbedcrypto.dll libmbedtls.dll \
+  libmbedx509.dll libuchardet.dll liblcms2-2.dll libiconv-2.dll \
+  libbz2-1.dll liblzma-5.dll libpng16-16.dll libzstd.dll libbrotlidec.dll \
+  libbrotlicommon.dll libgcc_s_seh-1.dll libwinpthread-1.dll libstdc++-6.dll; do
+  [[ -f "/mingw64/bin/$msys_dll" ]] && cp "/mingw64/bin/$msys_dll" "$stage/bin/"
+done
+
+# Licenses
+cp -R "$licenses/." "$stage/licenses/"
+
+# Metadata
+cat > "$stage/metadata/BUILDINFO.md" <<EOF
+# XFileSuite Windows media runtime
+
+- Runtime version: $RUNTIME_VERSION
+- Release revision: $RELEASE_REVISION
+- Architecture: Windows x64
+- FFmpeg CLI and libmpv use the same shared FFmpeg DLLs.
+- FFmpeg is built without GPL and nonfree components.
+- mpv is built with \`-Dgpl=false\`.
+- ANGLE provides OpenGL ES → D3D11 translation for libmpv rendering.
+EOF
+
+(
+  cd "$stage"
+  find bin lib include licenses metadata -type f ! -path 'metadata/SHA256SUMS' -print0 |
+    sort -z |
+    while IFS= read -r -d '' file; do
+      sha256sum "$file"
+    done > metadata/SHA256SUMS
+)
+
+echo "  ✓ runtime staged at $stage"
+
+# ── 7. Package ─────────────────────────────────────────────────────
+echo "==> Packaging the Windows media runtime"
+FRAMEWORKS_SOURCE="$stage" \
+FFMPEG_BINARY="$stage/bin/ffmpeg.exe" \
+LICENSES_SOURCE="$licenses" \
+VERSION="$RUNTIME_VERSION" \
+RELEASE_REVISION="$RELEASE_REVISION" \
+DIST_DIR="$DIST_DIR" \
+WORK_DIR="$WORK_DIR/package" \
+  "$SCRIPT_DIR/package-windows-runtime.sh"
+
+echo ""
+echo "✅ Windows media runtime build complete"
+echo "   Output: $DIST_DIR/media-runtime-windows-${RUNTIME_VERSION}-xfilesuite.${RELEASE_REVISION}.tar.gz"

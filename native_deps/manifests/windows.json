@@ -18,6 +18,14 @@
       "r2Key": "deps/imagemagick-windows-x64-04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c.zip",
       "bundleSha256": "04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c",
       "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.1"
+    },
+    "mediaRuntime": {
+      "version": "8.0.1-mpv-0.41.0",
+      "releaseRevision": 1,
+      "architecture": "x64",
+      "r2Key": "",
+      "bundleSha256": "",
+      "sourceRelease": "media-runtime-windows-8.0.1-mpv-0.41.0-xfilesuite.1"
     }
   }
 }
