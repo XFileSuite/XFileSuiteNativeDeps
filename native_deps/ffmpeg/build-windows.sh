@@ -66,22 +66,32 @@ strip "$out/bin/ffmpeg.exe" "$out/bin/ffprobe.exe" || true
 
 if [[ "$FFMPEG_LINKAGE" == "shared" ]]; then
   # Collect shared DLLs, import libraries, and headers for the media runtime.
+  # FFmpeg on MinGW installs DLLs as avcodec-62.dll (no lib prefix) and
+  # import libs as libavcodec.dll.a under lib/, not bin/.
+  echo "  Shared FFmpeg install layout:"
+  ls -la "$prefix/bin/" | grep -iE '\.(dll|exe)$' || true
+  ls -la "$prefix/lib/" | grep -iE '\.(dll\.a|a)$' || true
   cp "$prefix/bin/"avcodec-*.dll "$prefix/bin/"avformat-*.dll "$prefix/bin/"avutil-*.dll \
      "$prefix/bin/"avfilter-*.dll "$prefix/bin/"swresample-*.dll "$prefix/bin/"swscale-*.dll \
      "$out/bin/" 2>/dev/null || true
-  cp "$prefix/bin/"libavcodec.dll.a "$prefix/bin/"libavformat.dll.a "$prefix/bin/"libavutil.dll.a \
-     "$prefix/bin/"libavfilter.dll.a "$prefix/bin/"libswresample.dll.a "$prefix/bin/"libswscale.dll.a \
-     "$out/lib/" 2>/dev/null || true
-  # MSYS2 may install import libs under lib/ instead of bin/.
-  for dll_a in "$prefix/lib/"libavcodec.dll.a "$prefix/lib/"libavformat.dll.a \
-               "$prefix/lib/"libavutil.dll.a "$prefix/lib/"libavfilter.dll.a \
-               "$prefix/lib/"libswresample.dll.a "$prefix/lib/"libswscale.dll.a; do
-    [[ -f "$dll_a" ]] && cp "$dll_a" "$out/lib/"
+  # Also try libav*.dll naming (some FFmpeg versions use lib prefix).
+  cp "$prefix/bin/"libavcodec-*.dll "$prefix/bin/"libavformat-*.dll "$prefix/bin/"libavutil-*.dll \
+     "$prefix/bin/"libavfilter-*.dll "$prefix/bin/"libswresample-*.dll "$prefix/bin/"libswscale-*.dll \
+     "$out/bin/" 2>/dev/null || true
+  # Import libraries may be in bin/ or lib/.
+  for imp_dir in "$prefix/bin" "$prefix/lib"; do
+    for imp in libavcodec.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
+      [[ -f "$imp_dir/$imp" ]] && cp "$imp_dir/$imp" "$out/lib/"
+    done
   done
   cp -R "$prefix/include/libavcodec" "$prefix/include/libavformat" "$prefix/include/libavutil" \
         "$prefix/include/libavfilter" "$prefix/include/libswresample" "$prefix/include/libswscale" \
         "$out/include/" 2>/dev/null || true
   cp "$prefix/lib/pkgconfig/"*.pc "$out/lib/" 2>/dev/null || true
+  echo "  Collected DLLs in $out/bin/:"
+  ls -la "$out/bin/" || true
+  echo "  Collected import libs in $out/lib/:"
+  ls -la "$out/lib/" || true
 fi
 
 # Put the shared DLLs in PATH so ffmpeg.exe can find them at runtime.
