@@ -77,16 +77,16 @@ if [[ "$FFMPEG_LINKAGE" == "shared" ]]; then
   echo "  Shared FFmpeg install layout:"
   ls -la "$prefix/bin/" | grep -iE '\.(dll|exe)$' || true
   ls -la "$prefix/lib/" | grep -iE '\.(dll\.a|a)$' || true
-  cp "$prefix/bin/"avcodec-*.dll "$prefix/bin/"avformat-*.dll "$prefix/bin/"avutil-*.dll \
+  cp "$prefix/bin/"avcodec-*.dll "$prefix/bin/"avdevice-*.dll "$prefix/bin/"avformat-*.dll "$prefix/bin/"avutil-*.dll \
      "$prefix/bin/"avfilter-*.dll "$prefix/bin/"swresample-*.dll "$prefix/bin/"swscale-*.dll \
      "$out/bin/" 2>/dev/null || true
   # Also try libav*.dll naming (some FFmpeg versions use lib prefix).
-  cp "$prefix/bin/"libavcodec-*.dll "$prefix/bin/"libavformat-*.dll "$prefix/bin/"libavutil-*.dll \
+  cp "$prefix/bin/"libavcodec-*.dll "$prefix/bin/"libavdevice-*.dll "$prefix/bin/"libavformat-*.dll "$prefix/bin/"libavutil-*.dll \
      "$prefix/bin/"libavfilter-*.dll "$prefix/bin/"libswresample-*.dll "$prefix/bin/"libswscale-*.dll \
      "$out/bin/" 2>/dev/null || true
   # Import libraries may be in bin/ or lib/.
   for imp_dir in "$prefix/bin" "$prefix/lib"; do
-    for imp in libavcodec.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
+    for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
       [[ -f "$imp_dir/$imp" ]] && cp "$imp_dir/$imp" "$out/lib/"
     done
   done

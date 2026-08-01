@@ -251,13 +251,13 @@ rm -rf "$stage"
 mkdir -p "$stage/bin" "$stage/lib" "$stage/include/mpv" "$stage/licenses" "$stage/metadata"
 
 # Shared FFmpeg DLLs + ffmpeg.exe
-cp "$ffmpeg_output/bin/"avcodec-*.dll "$ffmpeg_output/bin/"avformat-*.dll \
+cp "$ffmpeg_output/bin/"avcodec-*.dll "$ffmpeg_output/bin/"avdevice-*.dll "$ffmpeg_output/bin/"avformat-*.dll \
    "$ffmpeg_output/bin/"avutil-*.dll "$ffmpeg_output/bin/"avfilter-*.dll \
    "$ffmpeg_output/bin/"swresample-*.dll "$ffmpeg_output/bin/"swscale-*.dll \
    "$stage/bin/"
 cp "$ffmpeg_output/bin/ffmpeg.exe" "$stage/bin/"
 # FFmpeg import libraries
-cp "$ffmpeg_output/lib/"libavcodec.dll.a "$ffmpeg_output/lib/"libavformat.dll.a \
+cp "$ffmpeg_output/lib/"libavcodec.dll.a "$ffmpeg_output/lib/"libavdevice.dll.a "$ffmpeg_output/lib/"libavformat.dll.a \
    "$ffmpeg_output/lib/"libavutil.dll.a "$ffmpeg_output/lib/"libavfilter.dll.a \
    "$ffmpeg_output/lib/"libswresample.dll.a "$ffmpeg_output/lib/"libswscale.dll.a \
    "$stage/lib/"

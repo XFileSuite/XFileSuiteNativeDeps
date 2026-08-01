@@ -30,13 +30,13 @@ need_file "$BIN_DIR/libEGL.dll"
 need_file "$BIN_DIR/libGLESv2.dll"
 need_file "$LIB_DIR/libmpv.dll.a"
 
-for dll in avcodec avformat avutil avfilter swresample swscale; do
+for dll in avcodec avdevice avformat avutil avfilter swresample swscale; do
   match="$(find "$BIN_DIR" -maxdepth 1 -name "${dll}-*.dll" -print -quit)"
   test -n "$match" || { echo "Missing shared FFmpeg DLL: ${dll}-*.dll" >&2; exit 1; }
   need_file "$match"
 done
 
-for imp in libavcodec.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
+for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
   need_file "$LIB_DIR/$imp"
 done
 
