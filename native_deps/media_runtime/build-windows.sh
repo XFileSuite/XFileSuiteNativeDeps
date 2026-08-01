@@ -42,16 +42,34 @@ mkdir -p "$WORK_DIR" "$DIST_DIR"
 
 # ── 1. Build shared FFmpeg DLLs + ffmpeg.exe ──────────────────────
 echo "==> Building the shared FFmpeg 8 runtime for Windows x64"
+ffmpeg_builder_status=0
 FFMPEG_LINKAGE=shared \
 WORK_DIR="$WORK_DIR/ffmpeg" \
 DIST_DIR="$WORK_DIR/ffmpeg-dist" \
 JOBS="$JOBS" \
-  "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh"
+  bash "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh" || ffmpeg_builder_status=$?
 
 ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
 # MSYS2's test -x is not reliable for PE executables on hosted Windows
 # runners. The builder has already executed this file as its smoke test.
 test -f "$ffmpeg_output/bin/ffmpeg.exe"
+for required_ffmpeg_file in \
+  "$ffmpeg_output/bin/"avcodec-*.dll \
+  "$ffmpeg_output/bin/"avdevice-*.dll \
+  "$ffmpeg_output/bin/"avfilter-*.dll \
+  "$ffmpeg_output/bin/"avformat-*.dll \
+  "$ffmpeg_output/bin/"avutil-*.dll \
+  "$ffmpeg_output/bin/"swresample-*.dll \
+  "$ffmpeg_output/bin/"swscale-*.dll \
+  "$ffmpeg_output/lib/libavcodec.dll.a" \
+  "$ffmpeg_output/lib/libavdevice.dll.a" \
+  "$ffmpeg_output/include/libavcodec/avcodec.h"; do
+  test -f "$required_ffmpeg_file"
+done
+PATH="$ffmpeg_output/bin:$PATH" "$ffmpeg_output/bin/ffmpeg.exe" -version >/dev/null
+if [[ "$ffmpeg_builder_status" != 0 ]]; then
+  echo "  Note: MSYS2 wrapper returned $ffmpeg_builder_status after a complete, smoke-tested FFmpeg build"
+fi
 echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
 
 # ── 2. Install mpv native dependencies from MSYS2 ─────────────────
