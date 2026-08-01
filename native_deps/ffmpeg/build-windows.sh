@@ -84,6 +84,8 @@ if [[ "$FFMPEG_LINKAGE" == "shared" ]]; then
   cp "$prefix/lib/pkgconfig/"*.pc "$out/lib/" 2>/dev/null || true
 fi
 
+# Put the shared DLLs in PATH so ffmpeg.exe can find them at runtime.
+export PATH="$out/bin:$PATH"
 "$out/bin/ffmpeg.exe" -version
 sha256sum "$out/bin/ffmpeg.exe" > "$out/ffmpeg.exe.sha256"
 tar -czf "$DIST_DIR/ffmpeg-${FFMPEG_VERSION}-windows-x64.tar.gz" -C "$out" .
