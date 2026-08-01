@@ -175,10 +175,12 @@ extract_license "$downloads/libxml2-2.11.5.tar.xz" '/Copyright$' libxml2-Copyrig
 extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.txt
 
 # libplacebo is cloned directly by the mpv build script (not through
-# downloads.lock); locate its source tree and extract the license.
-libplacebo_source="$(find "$upstream" -type d -name 'libplacebo' -path '*/subprojects/*' -print -quit)"
-test -n "$libplacebo_source"
-cp "$libplacebo_source/LICENSE" "$licenses/libplacebo-LICENSE.txt"
+# downloads.lock) and its source tree is cleaned up after the build.
+# Fetch the LICENSE from the pinned tag to avoid depending on tmp dirs.
+libplacebo_version="6.338.2"
+curl --fail --location --retry 3 \
+  "https://raw.githubusercontent.com/haasn/libplacebo/v${libplacebo_version}/LICENSE" \
+  --output "$licenses/libplacebo-LICENSE.txt"
 
 # FreeType declares libpng as a checksum-pinned Meson wrap rather than in the
 # parent downloads.lock. Cache both wrap assets beside the other verified
