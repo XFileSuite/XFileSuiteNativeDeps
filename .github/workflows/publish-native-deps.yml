@@ -448,6 +448,9 @@ jobs:
             $env:OUT_DIR = 'native_deps/imagemagick/dist-windows'
             bash native_deps/imagemagick/package-source.sh
           }
+          if ($env:COMPONENT -in @('all', 'media-runtime')) {
+            bash native_deps/media_runtime/package-windows-source.sh
+          }
       - name: Record previous Windows R2 dependency keys
         shell: pwsh
         run: |
@@ -500,6 +503,7 @@ jobs:
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
           if ($env:COMPONENT -in @('all', 'ffmpeg')) { Publish-Source $manifest.components.ffmpeg.sourceRelease (Get-ChildItem native_deps/ffmpeg/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { Publish-Source $manifest.components.imagemagick.sourceRelease (Get-ChildItem native_deps/imagemagick/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
+          if ($env:COMPONENT -in @('all', 'media-runtime')) { Publish-Source $manifest.components.mediaRuntime.sourceRelease (Get-ChildItem native_deps/media_runtime/dist/xfilesuite-media-runtime-windows-*-source.tar.gz | Select-Object -First 1).FullName }
       - name: Upload Windows runtime dependencies to R2
         shell: pwsh
         run: |
