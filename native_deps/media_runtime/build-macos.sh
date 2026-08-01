@@ -116,6 +116,7 @@ sed -i '' \
 sed -i '' \
   -e "/--enable-mbedtls/d" \
   -e "/--enable-version3/d" \
+  -e "s/--enable-network/--disable-network/g" \
   -e "/--enable-protocol=https/d" \
   -e "/--enable-protocol=tls/d" \
   -e "/--enable-protocol=rtmps/d" \

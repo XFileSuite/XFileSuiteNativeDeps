@@ -18,7 +18,7 @@
 
 | 库 | 许可证 | 功能 | 版本 |
 |---|---|---|---|
-| **FFmpeg** | LGPL 2.1 | 多媒体核心 | 8.0.1 |
+| **FFmpeg** | LGPL 2.1 | 多媒体核心 | 8.1.2 |
 | **libmp3lame** | LGPL 2.1 | MP3 编码 | 3.100 |
 | **libogg** | BSD | OGG 容器格式 | 1.3.5 |
 | **libvorbis** | BSD | Vorbis 音频编码 | 1.3.7 |
@@ -75,7 +75,7 @@ MIN_MACOS=12.0 FFMPEG_VERSION=7.0 ./build.sh
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `MIN_MACOS` | `11.0` | 最低支持的 macOS 版本 |
-| `FFMPEG_VERSION` | `8.0.1` | FFmpeg 版本 |
+| `FFMPEG_VERSION` | `8.1.2` | FFmpeg 版本 |
 | `LAME_VERSION` | `3.100` | LAME 版本 |
 | `OGG_VERSION` | `1.3.5` | libogg 版本 |
 | `VORBIS_VERSION` | `1.3.7` | libvorbis 版本 |
@@ -130,7 +130,7 @@ native_deps/ffmpeg/
 ├── build.sh          # 构建脚本
 ├── README.md         # 本文档
 ├── work/             # 构建中间产物 (gitignored)
-│   ├── ffmpeg-8.0.1/     # FFmpeg 源码
+│   ├── ffmpeg-8.1.2/     # FFmpeg 源码
 │   ├── lame-3.100/       # LAME 源码
 │   ├── libogg-1.3.5/     # libogg 源码
 │   ├── libvorbis-1.3.7/  # libvorbis 源码
@@ -140,7 +140,7 @@ native_deps/ffmpeg/
 │   ├── prefix-x86_64/    # x86_64 安装前缀
 │   └── build-*/          # 各架构构建目录
 └── dist/             # 最终产物 (gitignored)
-    └── ffmpeg-8.0.1-<stamp>-macos-universal/
+    └── ffmpeg-8.1.2-<stamp>-macos-universal/
         ├── bin/ffmpeg
         ├── bin/ffprobe
         └── BUILDINFO.txt
@@ -163,7 +163,7 @@ native_deps/ffmpeg/
 ./package-source.sh
 ```
 
-默认生成 `dist/xfilesuite-ffmpeg-macos-8.0.1-xfilesuite.2-source.tar.gz` 及其 SHA-256 文件。
+默认生成 `dist/xfilesuite-ffmpeg-macos-8.1.2-xfilesuite.2-source.tar.gz` 及其 SHA-256 文件。
 构建并发布后，源码包中的 `BUILDINFO.md` 会记录该次内置 macOS `ffmpeg` 的 SHA-256。
 只有 FFmpeg、静态链接库或构建参数改变时，才需要创建新的合规源码包和新的 GitHub Release。
 

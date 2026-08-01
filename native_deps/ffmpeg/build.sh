@@ -579,7 +579,6 @@ build_one_arch() {
     \
     --enable-videotoolbox \
     --enable-audiotoolbox \
-    --enable-securetransport \
     \
     --enable-zlib \
     \
@@ -587,7 +586,7 @@ build_one_arch() {
     --enable-ffprobe \
     --disable-ffplay \
     \
-    --enable-network \
+    --disable-network \
     ${EXTRA_CONFIG[@]+"${EXTRA_CONFIG[@]}"}
 
   echo ""

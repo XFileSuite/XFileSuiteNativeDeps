@@ -18,6 +18,7 @@ WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
 RELEASE_REVISION="${RELEASE_REVISION:-1}"
+FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 MPV_VERSION="${MPV_VERSION:-0.41.0}"
 MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
 LIBPLACEBO_VERSION="${LIBPLACEBO_VERSION:-6.338.2}"
@@ -47,7 +48,7 @@ DIST_DIR="$WORK_DIR/ffmpeg-dist" \
 JOBS="$JOBS" \
   "$NATIVE_DEPS_DIR/ffmpeg/build-windows.sh"
 
-ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-8.1.2-windows-x64"
+ffmpeg_output="$WORK_DIR/ffmpeg-dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
 test -x "$ffmpeg_output/bin/ffmpeg.exe"
 echo "  ✓ shared FFmpeg DLLs + ffmpeg.exe"
 
@@ -178,8 +179,8 @@ licenses="$WORK_DIR/licenses"
 rm -rf "$licenses"
 mkdir -p "$licenses"
 
-cp "$WORK_DIR/ffmpeg/ffmpeg-8.1.2/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
-cp "$WORK_DIR/ffmpeg/ffmpeg-8.1.2/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
+cp "$WORK_DIR/ffmpeg/ffmpeg-${FFMPEG_VERSION}/COPYING.LGPLv2.1" "$licenses/FFmpeg-LGPL-2.1.txt"
+cp "$WORK_DIR/ffmpeg/ffmpeg-${FFMPEG_VERSION}/LICENSE.md" "$licenses/FFmpeg-LICENSE.md"
 
 # mpv license
 cp "$mpv_src/Copyright" "$licenses/mpv-Copyright.txt"
