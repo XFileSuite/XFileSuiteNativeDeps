@@ -23,8 +23,8 @@
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "bundleSha256": "458db4390c1e52383735d4365def0b2d799830408b197240c7367e91b3b4cfe5",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-458db4390c1e52383735d4365def0b2d799830408b197240c7367e91b3b4cfe5",
+      "bundleSha256": "e3dcee463dcb07b48d2ee72879b8efb7f96a8937e525bc551af324eae9b20b6c",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e3dcee463dcb07b48d2ee72879b8efb7f96a8937e525bc551af324eae9b20b6c",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.1"
     }
   }
