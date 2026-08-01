@@ -90,7 +90,7 @@ if [[ "$FFMPEG_LINKAGE" == "shared" ]]; then
       [[ -f "$imp_dir/$imp" ]] && cp "$imp_dir/$imp" "$out/lib/"
     done
   done
-  cp -R "$prefix/include/libavcodec" "$prefix/include/libavformat" "$prefix/include/libavutil" \
+  cp -R "$prefix/include/libavcodec" "$prefix/include/libavdevice" "$prefix/include/libavformat" "$prefix/include/libavutil" \
         "$prefix/include/libavfilter" "$prefix/include/libswresample" "$prefix/include/libswscale" \
         "$out/include/" 2>/dev/null || true
   cp "$prefix/lib/pkgconfig/"*.pc "$out/lib/" 2>/dev/null || true

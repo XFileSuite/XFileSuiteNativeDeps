@@ -15,6 +15,7 @@ encoder:flac
 encoder:libvorbis
 encoder:libopus
 encoder:libwebp
+encoder:prores_ks
 filter:palettegen
 filter:paletteuse
 filter:scale

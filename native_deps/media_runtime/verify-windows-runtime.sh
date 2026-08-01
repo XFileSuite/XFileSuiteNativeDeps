@@ -46,6 +46,13 @@ for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a 
   need_file "$LIB_DIR/$imp"
 done
 
+for ffmpeg_header in \
+  libavcodec/avcodec.h libavdevice/avdevice.h libavformat/avformat.h \
+  libavutil/avutil.h libavfilter/avfilter.h libswresample/swresample.h \
+  libswscale/swscale.h; do
+  need_file "$INCLUDE_DIR/$ffmpeg_header"
+done
+
 for hdr in client.h render.h render_gl.h stream_cb.h; do
   need_file "$INCLUDE_DIR/mpv/$hdr"
 done

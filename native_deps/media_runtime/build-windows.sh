@@ -359,15 +359,15 @@ cp "$ffmpeg_output/lib/"libavcodec.dll.a "$ffmpeg_output/lib/"libavdevice.dll.a 
    "$stage/lib/"
 # FFmpeg headers
 cp -R "$ffmpeg_output/include/"libavcodec "$ffmpeg_output/include/"libavformat \
-      "$ffmpeg_output/include/"libavutil "$ffmpeg_output/include/"libavfilter \
+      "$ffmpeg_output/include/"libavdevice "$ffmpeg_output/include/"libavutil "$ffmpeg_output/include/"libavfilter \
       "$ffmpeg_output/include/"libswresample "$ffmpeg_output/include/"libswscale \
       "$stage/include/"
 
 # libmpv
 cp "$mpv_prefix/bin/libmpv-2.dll" "$stage/bin/"
 cp "$mpv_prefix/lib/libmpv.dll.a" "$stage/lib/"
-cp "$mpv_src/libmpv/client.h" "$mpv_src/libmpv/stream_cb.h" \
-   "$mpv_src/libmpv/render.h" "$mpv_src/libmpv/render_gl.h" \
+cp "$mpv_src/include/mpv/client.h" "$mpv_src/include/mpv/stream_cb.h" \
+   "$mpv_src/include/mpv/render.h" "$mpv_src/include/mpv/render_gl.h" \
    "$stage/include/mpv/"
 
 # ANGLE DLLs
@@ -426,7 +426,8 @@ while IFS= read -r package; do
   collect_msys2_package_licenses "$package"
 done < <(
   while IFS= read -r -d '' dll; do
-    pacman -Qqo "$dll" 2>/dev/null || true
+    installed_dll="/mingw64/bin/$(basename "$dll")"
+    [[ -f "$installed_dll" ]] && pacman -Qqo "$installed_dll" 2>/dev/null || true
   done < <(find "$stage/bin" -maxdepth 1 -type f -iname '*.dll' -print0)
   sort -u
 )
@@ -469,6 +470,16 @@ RELEASE_REVISION="$RELEASE_REVISION" \
 DIST_DIR="$DIST_DIR" \
 WORK_DIR="$WORK_DIR/package" \
   "$SCRIPT_DIR/package-windows-runtime.sh"
+
+# Verify the serialized archive as well as the staging tree. This catches root
+# layout and archive corruption before the workflow updates manifests or R2.
+archive="$DIST_DIR/media-runtime-windows-${RUNTIME_VERSION}-xfilesuite.${RELEASE_REVISION}.tar.gz"
+archive_check="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-media-win-archive.XXXXXX")"
+trap 'rm -rf "$archive_check"' EXIT
+tar -xzf "$archive" -C "$archive_check"
+unpacked_runtime="$archive_check/$(basename "$stage")"
+VERIFY_ALPHA_VIDEO=1 "$SCRIPT_DIR/verify-windows-runtime.sh" "$unpacked_runtime"
+sha256sum -c "$archive.sha256"
 
 echo ""
 echo "✅ Windows media runtime build complete"
