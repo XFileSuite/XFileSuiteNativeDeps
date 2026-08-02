@@ -1,0 +1,48 @@
+diff --git a/video/decode/vd_lavc.c b/video/decode/vd_lavc.c
+index 5fdcf2b18b..f6a1cc8f5d 100644
+--- a/video/decode/vd_lavc.c
++++ b/video/decode/vd_lavc.c
+@@ -62,6 +62,8 @@ static void uninit_avctx(struct mp_filter *vd);
+ static int get_buffer2_direct(AVCodecContext *avctx, AVFrame *pic, int flags);
+ static enum AVPixelFormat get_format_hwdec(struct AVCodecContext *avctx,
+                                            const enum AVPixelFormat *pix_fmt);
++static enum AVPixelFormat get_format_hevc_alpha(struct AVCodecContext *avctx,
++                                                const enum AVPixelFormat *pix_fmt);
+ static int hwdec_opt_help(struct mp_log *log, const m_option_t *opt,
+                           struct bstr name);
+ 
+@@ -788,6 +790,9 @@ static void init_avctx(struct mp_filter *vd)
+ #endif
+     }
+ 
++    if (!ctx->use_hwdec && lavc_codec->id == AV_CODEC_ID_HEVC)
++        avctx->get_format = get_format_hevc_alpha;
++
+     mp_set_avcodec_threads(vd->log, avctx, threads);
+ 
+     if (!ctx->use_hwdec && ctx->vo && lavc_param->dr) {
+@@ -996,6 +1001,24 @@ error:
+     return -1;
+ }
+ 
++// FFmpeg's HEVC Alpha decoder offers both yuva* and yuv* output formats.
++// The former is not merely a conversion preference: selecting it tells the
++// decoder to decode and merge the auxiliary alpha layer. Prefer it for the
++// software HEVC path so that libmpv does not silently retain base-layer-only
++// yuv420p frames.
++static enum AVPixelFormat get_format_hevc_alpha(struct AVCodecContext *avctx,
++                                                const enum AVPixelFormat *fmt)
++{
++    for (int i = 0; fmt[i] != AV_PIX_FMT_NONE; i++) {
++        const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(fmt[i]);
++        if (desc && (desc->flags & AV_PIX_FMT_FLAG_ALPHA)) {
++            return fmt[i];
++        }
++    }
++
++    return avcodec_default_get_format(avctx, fmt);
++}
++
+ static enum AVPixelFormat get_format_hwdec(struct AVCodecContext *avctx,
+                                            const enum AVPixelFormat *fmt)
+ {

@@ -87,8 +87,8 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  publish:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform != 'windows' }}
+  publish-macos:
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos') }}
     runs-on: macos-14
     permissions:
       contents: write
@@ -359,8 +359,7 @@ jobs:
   publish-windows:
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && (inputs.platform == 'windows' || needs.publish.result == 'success') && (inputs.platform == 'all' || inputs.platform == 'windows') }}
-    needs: publish
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     runs-on: windows-latest
     permissions:
       contents: write

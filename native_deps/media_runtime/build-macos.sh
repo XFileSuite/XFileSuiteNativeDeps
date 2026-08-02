@@ -8,7 +8,7 @@ DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 UPSTREAM_TAG="${LIBMPV_DARWIN_BUILD_TAG:-v0.6.0}"
 UPSTREAM_COMMIT="${LIBMPV_DARWIN_BUILD_COMMIT:-4286f5557bdccc0747030e3c376ce5cd160a96a0}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-1}"
+RELEASE_REVISION="${RELEASE_REVISION:-2}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
 need() {
@@ -62,6 +62,8 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
+cp "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch" \
+  "$upstream/patches/libmpv-hevc-alpha-output.patch"
 # The injected FFmpeg prefix lives outside libmpv-darwin-build. Teach its
 # per-architecture relinker to normalize those paths before lipo/frameworks.
 # The replacement must preserve upstream shell variables.

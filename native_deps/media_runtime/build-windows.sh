@@ -20,7 +20,7 @@ NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-1}"
+RELEASE_REVISION="${RELEASE_REVISION:-2}"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 MPV_VERSION="${MPV_VERSION:-0.41.0}"
 MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
@@ -51,7 +51,7 @@ need_dir() {
   }
 }
 
-for tool in pacman curl tar make pkg-config meson ninja git python3; do
+for tool in pacman curl tar make pkg-config meson ninja git patch python3; do
   need "$tool"
 done
 
@@ -130,6 +130,7 @@ echo "$MPV_SHA256  $mpv_archive" | sha256sum -c -
 rm -rf "$mpv_src"
 tar -xzf "$mpv_archive" -C "$WORK_DIR"
 need_dir "$mpv_src"
+patch -p1 -d "$mpv_src" < "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch"
 
 # libplacebo is a hard dependency of mpv 0.41. Build it as a subproject.
 libplacebo_dir="$mpv_src/subprojects/libplacebo"

@@ -4,6 +4,10 @@ set -euo pipefail
 
 cd "${SRC_DIR}"
 
+# FFmpeg offers a base-only yuv* and alpha-preserving yuva* format for Apple
+# HEVC Alpha. Make libmpv select the latter on the software decode path.
+patch -p1 < "${PROJECT_DIR}/patches/libmpv-hevc-alpha-output.patch"
+
 # mpv 0.41 requires libplacebo. Keep it as a static implementation detail of
 # libmpv: the public runtime remains libmpv + the shared FFmpeg frameworks.
 libplacebo_version="6.338.2"
