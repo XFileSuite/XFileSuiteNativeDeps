@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-02T03:18:50Z",
+  "generatedAt": "2026-08-02T04:06:37Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -23,7 +23,7 @@
       "releaseRevision": 1,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-332a63c75c6f3c752780c655409bbf4b5d8e4f3064ae50bd3a2f39cf517a48fc",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-062c741b393c50bd71f2061c8e48e1a2b1b7c7db71e6c13168e6aec6586d521c",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.1",
       "subComponents": [
         {
@@ -111,7 +111,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "332a63c75c6f3c752780c655409bbf4b5d8e4f3064ae50bd3a2f39cf517a48fc"
+      "bundleSha256": "062c741b393c50bd71f2061c8e48e1a2b1b7c7db71e6c13168e6aec6586d521c"
     }
   ]
 }
