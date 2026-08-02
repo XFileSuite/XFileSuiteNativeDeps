@@ -15,8 +15,8 @@
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "x64",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-062c741b393c50bd71f2061c8e48e1a2b1b7c7db71e6c13168e6aec6586d521c",
-      "bundleSha256": "062c741b393c50bd71f2061c8e48e1a2b1b7c7db71e6c13168e6aec6586d521c",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-e8fb2fad9310e11d1df6345c28ab6c841410d30aaa96cc8682193ba5108e25c2",
+      "bundleSha256": "e8fb2fad9310e11d1df6345c28ab6c841410d30aaa96cc8682193ba5108e25c2",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.1"
     }
   }
