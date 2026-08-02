@@ -7,8 +7,8 @@
       "version": "7.1.2-27",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-eac19634c9adbc9a29e2649c2273de30e7371a3ade7f4f502f40936c380e7389",
-      "binarySha256": "eac19634c9adbc9a29e2649c2273de30e7371a3ade7f4f502f40936c380e7389",
+      "r2Key": "deps/imagemagick-macos-universal-336e61b6264fb1afabbd26ee21a866a43abbbc60797bbe98e50298bdb6001712",
+      "binarySha256": "336e61b6264fb1afabbd26ee21a866a43abbbc60797bbe98e50298bdb6001712",
       "sourceRelease": "imagemagick-macos-7.1.2-27-xfilesuite.1"
     },
     "resvg": {
@@ -23,8 +23,8 @@
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "bundleSha256": "25df0bf8efe513e2a8f83e2b433c5cdb95d0dc466b933c891e33ac7aeaf0a964",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-25df0bf8efe513e2a8f83e2b433c5cdb95d0dc466b933c891e33ac7aeaf0a964",
+      "bundleSha256": "8ebdb16139ce57f098e7593698e91ac7a70fdee64b6d6030e49541c16d2c83f1",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-8ebdb16139ce57f098e7593698e91ac7a70fdee64b6d6030e49541c16d2c83f1",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.1"
     }
   }
