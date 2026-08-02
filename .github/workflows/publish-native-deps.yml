@@ -16,7 +16,7 @@ on:
       component:
         description: Component to rebuild and publish
         type: choice
-        options: [all, media-runtime, ffmpeg, imagemagick, resvg]
+        options: [all, media-runtime, imagemagick, resvg]
         default: all
       platform:
         description: Platform to rebuild and publish
@@ -88,7 +88,7 @@ jobs:
           compression-level: 0
 
   publish:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform != 'windows' && inputs.component != 'ffmpeg' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform != 'windows' }}
     runs-on: macos-14
     permissions:
       contents: write
@@ -387,7 +387,8 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          "FFMPEG_VERSION=$($manifest.components.ffmpeg.version)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $ffmpegVersion = $manifest.components.mediaRuntime.version -replace '-mpv-.*$', ''
+          "FFMPEG_VERSION=$ffmpegVersion" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "IMAGEMAGICK_VERSION=$($manifest.components.imagemagick.version)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Restore source tarballs cache
         uses: actions/cache@v4
@@ -404,7 +405,7 @@ jobs:
             windows-src-v2-
       - name: Restore Windows compiler cache
         id: windows-compiler-cache
-        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         uses: actions/cache@v4
         with:
           path: .cache/ccache/windows
@@ -412,7 +413,7 @@ jobs:
           restore-keys: |
             windows-ccache-v1-
       - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
-        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime' }}
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -427,14 +428,6 @@ jobs:
             mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
             mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2 mingw-w64-x86_64-expat
             mingw-w64-x86_64-iconv p7zip
-      - name: Build LGPL FFmpeg for Windows x64
-        if: ${{ inputs.component == 'all' || inputs.component == 'ffmpeg' }}
-        shell: msys2 {0}
-        env:
-          CCACHE_DIR: ${{ github.workspace }}/.cache/ccache/windows
-          CC: ccache gcc
-          CXX: ccache g++
-        run: native_deps/ffmpeg/build-windows.sh
       - name: Build shared media runtime for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         shell: msys2 {0}
@@ -463,7 +456,7 @@ jobs:
             native_deps/imagemagick/work-windows
           key: windows-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.ps1') }}
       - name: Save Windows compiler cache after diagnostics
-        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'ffmpeg' || inputs.component == 'media-runtime') && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'media-runtime') && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .cache/ccache/windows
@@ -476,12 +469,6 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
-            $env:PLATFORM = 'windows'
-            $env:RELEASE_ID = "ffmpeg-windows-$($manifest.components.ffmpeg.version)-xfilesuite.$($manifest.components.ffmpeg.releaseRevision)"
-            $env:OUTPUT_DIR = 'native_deps/ffmpeg/dist-windows'
-            bash native_deps/ffmpeg/package-source.sh
-          }
           if ($env:COMPONENT -in @('all', 'imagemagick')) {
             $env:PLATFORM = 'windows'
             $env:RELEASE_ID = "imagemagick-windows-$($manifest.components.imagemagick.version)-xfilesuite.$($manifest.components.imagemagick.releaseRevision)"
@@ -495,7 +482,6 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          "PREVIOUS_WIN_FFMPEG_R2_KEY=$($manifest.components.ffmpeg.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "PREVIOUS_WIN_IMAGEMAGICK_R2_KEY=$($manifest.components.imagemagick.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           if ($manifest.components.mediaRuntime) {
             "PREVIOUS_WIN_MEDIA_RUNTIME_R2_KEY=$($manifest.components.mediaRuntime.r2Key)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
@@ -505,14 +491,6 @@ jobs:
         run: |
           $path = 'native_deps/manifests/windows.json'
           $data = Get-Content $path -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
-            $item = $data.components.ffmpeg
-            $ffmpegBinary = "native_deps/ffmpeg/dist-windows/ffmpeg-$($item.version)-windows-x64/bin/ffmpeg.exe"
-            if (-not (Test-Path -LiteralPath $ffmpegBinary -PathType Leaf)) { throw "Missing Windows FFmpeg binary: $ffmpegBinary" }
-            $sha = (Get-FileHash -Algorithm SHA256 $ffmpegBinary).Hash.ToLowerInvariant()
-            $item.binarySha256 = $sha; $item.r2Key = "deps/ffmpeg-windows-x64-$sha"
-            $item.sourceRelease = "ffmpeg-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
-          }
           if ($env:COMPONENT -in @('all', 'imagemagick')) {
             $item = $data.components.imagemagick
             $sha = (Get-FileHash -Algorithm SHA256 "native_deps/imagemagick/dist-windows/imagemagick-$($item.version)-windows-x64.zip").Hash.ToLowerInvariant()
@@ -543,18 +521,12 @@ jobs:
           }
           }
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) { Publish-Source $manifest.components.ffmpeg.sourceRelease (Get-ChildItem native_deps/ffmpeg/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { Publish-Source $manifest.components.imagemagick.sourceRelease (Get-ChildItem native_deps/imagemagick/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
           if ($env:COMPONENT -in @('all', 'media-runtime')) { Publish-Source $manifest.components.mediaRuntime.sourceRelease (Get-ChildItem native_deps/media_runtime/dist/xfilesuite-media-runtime-windows-*-source.tar.gz | Select-Object -First 1).FullName }
       - name: Upload Windows runtime dependencies to R2
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
-            $ffmpegBinary = "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/bin/ffmpeg.exe"
-            if (-not (Test-Path -LiteralPath $ffmpegBinary -PathType Leaf)) { throw "Missing Windows FFmpeg binary: $ffmpegBinary" }
-            npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file $ffmpegBinary --remote
-          }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
           if ($env:COMPONENT -in @('all', 'media-runtime')) {
             $archive = Get-ChildItem "native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz" | Select-Object -First 1
@@ -594,10 +566,6 @@ jobs:
             if ($previous -and $previous -ne $current) {
               npx wrangler r2 object delete "xfilesuite-releases/$previous" --remote 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host "  (object not found or already deleted: $previous)" }
             }
-          }
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
-            Remove-Previous $env:PREVIOUS_WIN_FFMPEG_R2_KEY $manifest.components.ffmpeg.r2Key
-            npx wrangler r2 object delete "xfilesuite-releases/deps/ffmpeg-windows-x64.exe" --remote 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host '  (legacy key not found: deps/ffmpeg-windows-x64.exe)' }
           }
           if ($env:COMPONENT -in @('all', 'imagemagick')) {
             Remove-Previous $env:PREVIOUS_WIN_IMAGEMAGICK_R2_KEY $manifest.components.imagemagick.r2Key

@@ -3,14 +3,6 @@
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": {
-    "ffmpeg": {
-      "version": "8.1.2",
-      "releaseRevision": 2,
-      "architecture": "x64",
-      "r2Key": "deps/ffmpeg-windows-x64-507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9",
-      "binarySha256": "507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9",
-      "sourceRelease": "ffmpeg-windows-8.1.2-xfilesuite.2"
-    },
     "imagemagick": {
       "version": "7.1.2-27",
       "releaseRevision": 1,

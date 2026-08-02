@@ -1,45 +1,9 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-02T03:05:04Z",
+  "generatedAt": "2026-08-02T03:18:50Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
-    {
-      "name": "ffmpeg",
-      "version": "8.1.2",
-      "releaseRevision": 2,
-      "architecture": "x64",
-      "license": "LGPL-2.1",
-      "r2Key": "deps/ffmpeg-windows-x64-507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9",
-      "sourceRelease": "ffmpeg-windows-8.1.2-xfilesuite.2",
-      "subComponents": [
-        {
-          "name": "lame",
-          "license": "LGPL-2.0"
-        },
-        {
-          "name": "libogg",
-          "license": "BSD-3-Clause"
-        },
-        {
-          "name": "libvorbis",
-          "license": "BSD-3-Clause"
-        },
-        {
-          "name": "libvpx",
-          "license": "BSD-3-Clause"
-        },
-        {
-          "name": "libwebp",
-          "license": "BSD-3-Clause"
-        },
-        {
-          "name": "libopus",
-          "license": "BSD-3-Clause"
-        }
-      ],
-      "binarySha256": "507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9"
-    },
     {
       "name": "imagemagick",
       "version": "7.1.2-27",
