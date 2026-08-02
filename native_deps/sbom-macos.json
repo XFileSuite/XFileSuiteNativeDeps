@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-02T14:56:22Z",
+  "generatedAt": "2026-08-02T16:48:16Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -55,7 +55,7 @@
       "releaseRevision": 1,
       "architecture": "universal",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-1a392d40ff63d50e792b5548dd22c510514d7abe37ba9520a9cad79c19146ca2",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-534fef8642023b7c1f87aaca0851c7e74f50988308f941707361c1428c34a44f",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.1",
       "subComponents": [
         {
@@ -127,7 +127,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "1a392d40ff63d50e792b5548dd22c510514d7abe37ba9520a9cad79c19146ca2"
+      "bundleSha256": "534fef8642023b7c1f87aaca0851c7e74f50988308f941707361c1428c34a44f"
     }
   ]
 }
