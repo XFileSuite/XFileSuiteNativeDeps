@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-01T19:05:11Z",
+  "generatedAt": "2026-08-02T03:05:04Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "LGPL-2.1",
-      "r2Key": "deps/ffmpeg-windows-x64-1d5ff7104608b1fa9dfdf0a02c49f0094f35674ae6ce52c01b65b4cd587c9b21",
+      "r2Key": "deps/ffmpeg-windows-x64-507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9",
       "sourceRelease": "ffmpeg-windows-8.1.2-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "binarySha256": "1d5ff7104608b1fa9dfdf0a02c49f0094f35674ae6ce52c01b65b4cd587c9b21"
+      "binarySha256": "507c1346ec8595861eb871ffcc9152e1ce843f1e80a32ced0da0c252fe78d8a9"
     },
     {
       "name": "imagemagick",
@@ -59,7 +59,7 @@
       "releaseRevision": 1,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-72c65f4c2d2f3fc631d4459782517e36b5ea409639e8f0e94f3de46fd029e13c",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-332a63c75c6f3c752780c655409bbf4b5d8e4f3064ae50bd3a2f39cf517a48fc",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.1",
       "subComponents": [
         {
@@ -147,7 +147,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "72c65f4c2d2f3fc631d4459782517e36b5ea409639e8f0e94f3de46fd029e13c"
+      "bundleSha256": "332a63c75c6f3c752780c655409bbf4b5d8e4f3064ae50bd3a2f39cf517a48fc"
     }
   ]
 }
