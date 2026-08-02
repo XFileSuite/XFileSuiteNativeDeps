@@ -8,7 +8,7 @@ WORK_DIR="${WORK_DIR:-$ROOT_DIR/work/source-package}"
 PLATFORM="${PLATFORM:-macos}"
 RELEASE_ID="${RELEASE_ID:-ffmpeg-${PLATFORM}-8.1.2-xfilesuite.1}"
 if [ "$PLATFORM" = windows ]; then
-  DEFAULT_FFMPEG_BINARY="$ROOT_DIR/dist-windows/ffmpeg-${FFMPEG_VERSION:-8.1.2}-windows-x64/ffmpeg.exe"
+  DEFAULT_FFMPEG_BINARY="$ROOT_DIR/dist-windows/ffmpeg-${FFMPEG_VERSION:-8.1.2}-windows-x64/bin/ffmpeg.exe"
   BUILD_SCRIPT="$ROOT_DIR/build-windows.sh"
   ARCHITECTURES="x86_64"
 else

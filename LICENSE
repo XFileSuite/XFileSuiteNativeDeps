@@ -32,17 +32,20 @@ The bundled third-party components are:
 | libvpx | BSD-3-Clause | macOS, Windows |
 | libwebp | BSD-3-Clause | macOS, Windows |
 | libopus | BSD-3-Clause | macOS, Windows |
-| mpv | LGPL-2.1 (built with `-Dgpl=false`) | macOS |
-| libplacebo | LGPL-2.1 | macOS |
-| libass | ISC | macOS |
-| dav1d | BSD-2-Clause | macOS |
-| FreeType | FTL (BSD-like) | macOS |
-| FriBidi | LGPL-2.1 | macOS |
-| HarfBuzz | MIT | macOS |
-| Mbed TLS | Apache-2.0 | macOS |
-| libxml2 | MIT | macOS |
-| libpng | BSD-2-Clause | macOS |
-| uchardet | MPL-2.0 | macOS |
+| mpv | LGPL-2.1 (built with `-Dgpl=false`) | macOS, Windows |
+| libplacebo | LGPL-2.1 | macOS, Windows |
+| libass | ISC | macOS, Windows |
+| dav1d | BSD-2-Clause | macOS, Windows |
+| FreeType | FTL (BSD-like) | macOS, Windows |
+| FriBidi | LGPL-2.1 | macOS, Windows |
+| HarfBuzz | MIT | macOS, Windows |
+| libxml2 | MIT | macOS, Windows |
+| libpng | BSD-2-Clause | macOS, Windows |
+| uchardet | MPL-2.0 | macOS, Windows |
+| Fontconfig | MIT-style | Windows |
+| Expat | MIT | Windows |
+| Little CMS | MIT | Windows |
+| ANGLE | BSD-3-Clause | Windows |
 | ImageMagick | ImageMagick License (Apache-2.0 derivative) | macOS, Windows |
 | MozJPEG | BSD-3-Clause | macOS |
 | libtiff | MIT-like | macOS |

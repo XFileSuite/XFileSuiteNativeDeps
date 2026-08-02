@@ -507,7 +507,9 @@ jobs:
           $data = Get-Content $path -Raw | ConvertFrom-Json
           if ($env:COMPONENT -in @('all', 'ffmpeg')) {
             $item = $data.components.ffmpeg
-            $sha = (Get-FileHash -Algorithm SHA256 "native_deps/ffmpeg/dist-windows/ffmpeg-$($item.version)-windows-x64/ffmpeg.exe").Hash.ToLowerInvariant()
+            $ffmpegBinary = "native_deps/ffmpeg/dist-windows/ffmpeg-$($item.version)-windows-x64/bin/ffmpeg.exe"
+            if (-not (Test-Path -LiteralPath $ffmpegBinary -PathType Leaf)) { throw "Missing Windows FFmpeg binary: $ffmpegBinary" }
+            $sha = (Get-FileHash -Algorithm SHA256 $ffmpegBinary).Hash.ToLowerInvariant()
             $item.binarySha256 = $sha; $item.r2Key = "deps/ffmpeg-windows-x64-$sha"
             $item.sourceRelease = "ffmpeg-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
           }
@@ -548,7 +550,11 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'ffmpeg')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/ffmpeg.exe" --remote }
+          if ($env:COMPONENT -in @('all', 'ffmpeg')) {
+            $ffmpegBinary = "native_deps/ffmpeg/dist-windows/ffmpeg-$($manifest.components.ffmpeg.version)-windows-x64/bin/ffmpeg.exe"
+            if (-not (Test-Path -LiteralPath $ffmpegBinary -PathType Leaf)) { throw "Missing Windows FFmpeg binary: $ffmpegBinary" }
+            npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.ffmpeg.r2Key)" --file $ffmpegBinary --remote
+          }
           if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
           if ($env:COMPONENT -in @('all', 'media-runtime')) {
             $archive = Get-ChildItem "native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz" | Select-Object -First 1
