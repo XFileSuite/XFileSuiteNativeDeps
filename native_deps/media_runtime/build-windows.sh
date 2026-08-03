@@ -332,6 +332,7 @@ package version, declared license, upstream URL and the MSYS2 page that links
 the matching source-only archive.
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+Its `subtitles` and `ass` filters are enabled through libass (ISC).
 Mbed TLS and HTTPS/TLS/RTMPS playback protocols are intentionally excluded so
 the runtime remains LGPL-2.1-compatible.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is

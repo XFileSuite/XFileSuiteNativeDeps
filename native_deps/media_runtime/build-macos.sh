@@ -105,6 +105,39 @@ ruby -ryaml -e '
   File.write(path, YAML.dump(lock))
 ' "$upstream/downloads.lock"
 
+# Build the exact libass dependency closure that the pinned libmpv build uses,
+# then expose a merged, per-architecture prefix to FFmpeg.  The initial FFmpeg
+# build above is deliberately repeated: libmpv's dependency graph is prepared
+# here, after its lock file and cross-build fixes have been made deterministic.
+# This keeps FFmpeg and libmpv on one source-of-truth for libass/FreeType/
+# HarfBuzz/FriBidi instead of consulting Homebrew or the host SDK.
+subtitle_prefix_root="$WORK_DIR/libass-prefix"
+rm -rf "$subtitle_prefix_root"
+for mapping in "arm64:arm64" "amd64:x86_64"; do
+  mpv_arch="${mapping%%:*}"
+  ffmpeg_arch="${mapping##*:}"
+  # The upstream Makefile derives PROJECT_DIR from $PWD, so use a subshell
+  # instead of make -C (which leaves the caller's PWD in the environment).
+  (cd "$upstream" && make "build/intermediate/libass_macos-${mpv_arch}")
+  mkdir -p "$subtitle_prefix_root/$ffmpeg_arch"
+  for dependency in harfbuzz fribidi freetype libass; do
+    dependency_prefix="$upstream/build/intermediate/${dependency}_macos-${mpv_arch}"
+    test -d "$dependency_prefix"
+    cp -R "$dependency_prefix/." "$subtitle_prefix_root/$ffmpeg_arch/"
+  done
+done
+
+echo "==> Rebuilding shared FFmpeg with the pinned libass subtitle renderer"
+FFMPEG_LINKAGE=shared \
+LIBASS_PREFIX_ROOT="$subtitle_prefix_root" \
+WORK_DIR="$ffmpeg_work" \
+DIST_DIR="$ffmpeg_dist" \
+JOBS="$JOBS" \
+  "$NATIVE_DEPS_DIR/ffmpeg/build.sh" "${ffmpeg_build_args[@]}"
+ffmpeg_output="$(find "$ffmpeg_dist" -mindepth 1 -maxdepth 1 -type d -name 'ffmpeg-*-macos-universal' -print | sort | tail -n 1)"
+test -n "$ffmpeg_output"
+test -x "$ffmpeg_output/bin/ffmpeg"
+
 # Keep the distributed runtime under LGPL-2.1: do not build Mbed TLS
 # (Apache-2.0) and remove the TLS/HTTPS protocols that require it.  The
 # upstream make graph otherwise builds Mbed TLS even though this runtime
@@ -254,6 +287,8 @@ This bundle contains the following third-party components:
 | libwebp | BSD-3-Clause |
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
+Its `subtitles` and `ass` filters are enabled through libass (ISC), using the
+bundled FreeType, FriBidi, and HarfBuzz dependencies listed above.
 Mbed TLS and the HTTPS/TLS/RTMPS protocols are intentionally excluded so the
 runtime remains LGPL-2.1-compatible.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is

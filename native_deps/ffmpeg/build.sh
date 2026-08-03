@@ -32,6 +32,11 @@ MACOS_RESOURCES="$PROJECT_ROOT/macos/Runner/Resources"
 
 MIN_MACOS="${MIN_MACOS:-11.0}"
 FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
+# Optional per-architecture prefixes containing libass, FreeType, HarfBuzz
+# and FriBidi.  The media-runtime builder supplies these from its pinned mpv
+# dependency build.  Keep this explicit: --disable-autodetect must never pull
+# a developer-machine copy of libass into a release binary.
+LIBASS_PREFIX_ROOT="${LIBASS_PREFIX_ROOT:-}"
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 FFMPEG_TARBALL_URL="${FFMPEG_TARBALL_URL:-https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz}"
@@ -501,6 +506,17 @@ build_one_arch() {
   build_webp_arch "$ARCH"
   build_opus_arch "$ARCH"
 
+  if [[ -n "$LIBASS_PREFIX_ROOT" ]]; then
+    local LIBASS_PREFIX="$LIBASS_PREFIX_ROOT/$ARCH"
+    [[ -d "$LIBASS_PREFIX" ]] || {
+      echo "Missing libass prefix for $ARCH: $LIBASS_PREFIX" >&2
+      exit 1
+    }
+    # Merge the pinned subtitle-rendering dependency prefix after the codec
+    # dependencies. Its pkg-config files are then visible to FFmpeg below.
+    cp -R "$LIBASS_PREFIX/." "$PREFIX/"
+  fi
+
   export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
   export CC CXX SDKROOT="$SDK"
   export HOSTCC="$CC"
@@ -576,6 +592,9 @@ build_one_arch() {
     --enable-libvpx \
     --enable-libwebp \
     --enable-libopus \
+    ${LIBASS_PREFIX_ROOT:+--enable-libass} \
+    ${LIBASS_PREFIX_ROOT:+--enable-filter=subtitles} \
+    ${LIBASS_PREFIX_ROOT:+--enable-filter=ass} \
     \
     --enable-videotoolbox \
     --enable-audiotoolbox \

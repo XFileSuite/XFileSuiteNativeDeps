@@ -21,7 +21,7 @@
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "universal",
       "bundleSha256": "4d1047310cc6af8122b5cb3d426c4aa189ff643a0e26d82ab9b677adc02a7132",
       "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-4d1047310cc6af8122b5cb3d426c4aa189ff643a0e26d82ab9b677adc02a7132",

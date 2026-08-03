@@ -21,3 +21,5 @@ filter:paletteuse
 filter:scale
 filter:trim
 filter:concat
+filter:subtitles
+filter:ass
