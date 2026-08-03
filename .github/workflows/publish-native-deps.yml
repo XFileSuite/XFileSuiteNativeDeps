@@ -300,7 +300,20 @@ jobs:
           git add native_deps/manifests/macos.json native_deps/sbom-macos.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: publish macOS native dependency manifest and SBOM"
-            git push origin HEAD:main
+            # macOS and Windows publish jobs update different manifest files
+            # concurrently. Rebase our manifest-only commit if the sibling
+            # job reached main first, then retry the push.
+            for attempt in 1 2 3; do
+              if git push origin HEAD:main; then
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "Unable to publish the macOS manifest after retries" >&2
+                exit 1
+              fi
+              git fetch origin main
+              git rebase origin/main
+            done
           fi
       - name: Mirror manifest to the private App source repository
         run: |
@@ -541,7 +554,20 @@ jobs:
         run: |
           git config user.name 'xfilesuite-release-bot'; git config user.email 'release-bot@xfilesuite.com'
           git add native_deps/manifests/windows.json native_deps/sbom-windows.json
-          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'chore: publish Windows native dependency manifest and SBOM'; git push origin HEAD:main }
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) {
+            git commit -m 'chore: publish Windows native dependency manifest and SBOM'
+            $pushed = $false
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              git push origin HEAD:main
+              if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+              if ($attempt -eq 3) { throw 'Unable to publish the Windows manifest after retries' }
+              git fetch origin main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch main before retrying the Windows manifest push' }
+              git rebase origin/main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to rebase the Windows manifest commit onto main' }
+            }
+            if (-not $pushed) { throw 'Unable to publish the Windows manifest' }
+          }
           git clone "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuiteSource.git" "$env:RUNNER_TEMP/XFileSuiteSource" --depth 1
           Copy-Item native_deps/manifests/windows.json "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/windows.json"
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/sbom" | Out-Null
