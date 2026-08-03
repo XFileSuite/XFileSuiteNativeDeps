@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-02T17:26:35Z",
+  "generatedAt": "2026-08-03T05:31:48Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -20,11 +20,11 @@
     {
       "name": "mediaRuntime",
       "version": "8.1.2-mpv-0.41.0",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-81e9f9503a52bf81a6e84afed64481eb5dcb25215063a45560e79f36dba6e0e3",
-      "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.1",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-1e332ec8e9bddd44eb45d64930542e4a52cfa0226f57951da999ac5d0ea4750d",
+      "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.2",
       "subComponents": [
         {
           "name": "ffmpeg",
@@ -111,7 +111,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "81e9f9503a52bf81a6e84afed64481eb5dcb25215063a45560e79f36dba6e0e3"
+      "bundleSha256": "1e332ec8e9bddd44eb45d64930542e4a52cfa0226f57951da999ac5d0ea4750d"
     }
   ]
 }
