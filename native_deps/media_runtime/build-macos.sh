@@ -191,6 +191,20 @@ shared_ffmpeg="$WORK_DIR/ffmpeg-shared"
 cp "$ffmpeg_output/bin/ffmpeg" "$shared_ffmpeg"
 chmod +x "$shared_ffmpeg"
 
+# FFmpeg's libass-enabled Avfilter links to the architecture-specific prefix
+# produced by libmpv-darwin-build.  That install name is valid only on the
+# build machine.  The framework conversion above packages the same library as
+# Ass.framework, so make the CLI use the relocatable runtime path before it is
+# signed and archived.
+while IFS= read -r libass_dependency; do
+  install_name_tool -change "$libass_dependency" \
+    '@rpath/Ass.framework/Versions/A/Ass' "$shared_ffmpeg"
+done < <(
+  otool -L "$shared_ffmpeg" |
+    awk '/^[[:space:]]/ {print $1}' |
+    grep -E '/libass([.][0-9]+)*[.]dylib$' || true
+)
+
 echo "==> Ad-hoc signing the relocatable runtime"
 while IFS= read -r framework; do
   codesign --force --sign - --timestamp=none "$framework"

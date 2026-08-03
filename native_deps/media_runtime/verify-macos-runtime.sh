@@ -71,6 +71,11 @@ if ! otool -L "$FFMPEG" | grep -q '@rpath/libavformat'; then
   otool -L "$FFMPEG" >&2
   exit 1
 fi
+if ! otool -L "$FFMPEG" | grep -q '@rpath/Ass.framework/'; then
+  echo "ffmpeg does not use the shared Ass.framework subtitle runtime" >&2
+  otool -L "$FFMPEG" >&2
+  exit 1
+fi
 if otool -L "$FFMPEG" | grep -Eq '(/opt/homebrew/|/usr/local/|/opt/local/)'; then
   echo "ffmpeg links against a developer-machine dependency" >&2
   otool -L "$FFMPEG" >&2
