@@ -171,7 +171,7 @@ fi
 # Online playback now uses system TLS on macOS (SecureTransport) and Windows
 # (SChannel) so the runtime intentionally exposes HTTP/HTTPS/TLS protocols.
 protocols="$("$FFMPEG" -hide_banner -protocols 2>&1)"
-for proto in http https tls tcp rtmp rtmps rtsp rtp; do
+for proto in http https tls tcp rtmp rtmps rtp; do
   if ! grep -Eq "(^|[[:space:]])${proto}($|[[:space:]])" <<<"$protocols"; then
     echo "Missing required network protocol: $proto" >&2
     exit 1
@@ -179,7 +179,7 @@ for proto in http https tls tcp rtmp rtmps rtsp rtp; do
 done
 
 demuxers="$("$FFMPEG" -hide_banner -demuxers 2>&1)"
-for demuxer in hls dash; do
+for demuxer in hls dash rtsp; do
   if ! grep -Eq "(^|[[:space:]])${demuxer}($|[[:space:]])" <<<"$demuxers"; then
     echo "Missing required network demuxer: $demuxer" >&2
     exit 1
