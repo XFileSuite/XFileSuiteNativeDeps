@@ -19,7 +19,7 @@ ARCHITECTURES=(arm64 x86_64)
 BUNDLE_NAME="imagemagick-macos-universal"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
-for tool in cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
+for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
 download() { [ -f "$2" ] || curl -fL --retry 3 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
@@ -73,6 +73,8 @@ for arch in "${ARCHITECTURES[@]}"; do
   )
   (
     cd "$WORK_DIR/sources/libraw"
+    # GitHub tag archives do not ship the generated Autotools configure script.
+    autoreconf -fi
     make distclean >/dev/null 2>&1 || true
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
       CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \

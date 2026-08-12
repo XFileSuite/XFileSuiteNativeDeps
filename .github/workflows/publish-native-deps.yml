@@ -391,10 +391,10 @@ jobs:
             native_deps/media_runtime/work/*.7z
             native_deps/media_runtime/work/ffmpeg/*.tar.xz
             native_deps/imagemagick/work-windows
-          key: windows-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.ps1') }}
+          key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
           restore-keys: |
-            windows-src-v2-${{ inputs.component }}-
-            windows-src-v2-
+            windows-src-v3-${{ inputs.component }}-
+            windows-src-v3-
       - name: Restore Windows compiler cache
         id: windows-compiler-cache
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
@@ -420,6 +420,9 @@ jobs:
             mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
             mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2 mingw-w64-x86_64-expat
             mingw-w64-x86_64-iconv p7zip
+            autoconf automake libtool
+            mingw-w64-x86_64-zlib mingw-w64-x86_64-bzip2 mingw-w64-x86_64-libjpeg-turbo
+            mingw-w64-x86_64-libpng mingw-w64-x86_64-libwebp mingw-w64-x86_64-libtiff
       - name: Build shared media runtime for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         shell: msys2 {0}
@@ -446,17 +449,17 @@ jobs:
             native_deps/media_runtime/work/*.7z
             native_deps/media_runtime/work/ffmpeg/*.tar.xz
             native_deps/imagemagick/work-windows
-          key: windows-src-v2-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.ps1') }}
+          key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
       - name: Save Windows compiler cache after diagnostics
         if: ${{ always() && (inputs.component == 'all' || inputs.component == 'media-runtime') && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .cache/ccache/windows
           key: windows-ccache-v1-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh') }}
-      - name: Prepare the complete ImageMagick Windows runtime
+      - name: Build the complete ImageMagick Windows runtime with LibRaw
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
-        shell: pwsh
-        run: native_deps/imagemagick/build-windows.ps1
+        shell: msys2 {0}
+        run: native_deps/imagemagick/build-windows.sh
       - name: Create Windows corresponding-source archives
         shell: pwsh
         run: |
@@ -465,6 +468,7 @@ jobs:
             $env:PLATFORM = 'windows'
             $env:RELEASE_ID = "imagemagick-windows-$($manifest.components.imagemagick.version)-xfilesuite.$($manifest.components.imagemagick.releaseRevision)"
             $env:OUT_DIR = 'native_deps/imagemagick/dist-windows'
+            $env:IMAGEMAGICK_BUILT_SOURCES_DIR = 'native_deps/imagemagick/work-windows/sources'
             bash native_deps/imagemagick/package-source.sh
           }
           if ($env:COMPONENT -in @('all', 'media-runtime')) {

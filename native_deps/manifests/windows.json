@@ -5,11 +5,11 @@
   "components": {
     "imagemagick": {
       "version": "7.1.2-27",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "x64",
       "r2Key": "deps/imagemagick-windows-x64-04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c.zip",
       "bundleSha256": "04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c",
-      "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.1"
+      "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.2"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",

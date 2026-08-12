@@ -40,11 +40,15 @@ if [ -f "$SOURCE_DIR/NOTICE" ]; then
   cp "$SOURCE_DIR/NOTICE" "$WORK_DIR/licenses/IMAGEMAGICK-NOTICE.txt"
 fi
 
-# The macOS runtime dynamically ships these delegate libraries. The normal
+# The macOS and Windows runtimes dynamically ship these delegate libraries. The normal
 # publish flow runs build-macos.sh first, so include their exact source and
 # licenses in the public archive.
-if [ "$PLATFORM" = macos ]; then
-  for component in libraw mozjpeg libpng libwebp libtiff giflib; do
+if [ "$PLATFORM" = macos ] || [ "$PLATFORM" = windows ]; then
+  components=(libraw)
+  if [ "$PLATFORM" = macos ]; then
+    components+=(mozjpeg libpng libwebp libtiff giflib)
+  fi
+  for component in "${components[@]}"; do
     test -d "$BUILT_SOURCES_DIR/$component" || {
       echo "Missing built dependency source: $BUILT_SOURCES_DIR/$component" >&2
       echo "Run build-macos.sh before package-source.sh." >&2
@@ -54,14 +58,16 @@ if [ "$PLATFORM" = macos ]; then
   done
   find "$BUILT_SOURCES_DIR/libraw" -maxdepth 1 -type f \( -iname 'license*' -o -iname 'copying*' \) -print0 | \
     while IFS= read -r -d '' license; do cp "$license" "$WORK_DIR/licenses/LIBRAW-$(basename "$license")"; done
-  cp "$BUILT_SOURCES_DIR/mozjpeg/LICENSE.md" "$WORK_DIR/licenses/MOZJPEG-LICENSE.md"
-  cp "$BUILT_SOURCES_DIR/libpng/LICENSE" "$WORK_DIR/licenses/LIBPNG-LICENSE.txt"
-  cp "$BUILT_SOURCES_DIR/libwebp/COPYING" "$WORK_DIR/licenses/LIBWEBP-LICENSE.txt"
-  cp "$BUILT_SOURCES_DIR/libtiff/LICENSE.md" "$WORK_DIR/licenses/LIBTIFF-LICENSE.md"
-  cp "$BUILT_SOURCES_DIR/giflib/COPYING" "$WORK_DIR/licenses/GIFLIB-LICENSE.txt"
+  if [ "$PLATFORM" = macos ]; then
+    cp "$BUILT_SOURCES_DIR/mozjpeg/LICENSE.md" "$WORK_DIR/licenses/MOZJPEG-LICENSE.md"
+    cp "$BUILT_SOURCES_DIR/libpng/LICENSE" "$WORK_DIR/licenses/LIBPNG-LICENSE.txt"
+    cp "$BUILT_SOURCES_DIR/libwebp/COPYING" "$WORK_DIR/licenses/LIBWEBP-LICENSE.txt"
+    cp "$BUILT_SOURCES_DIR/libtiff/LICENSE.md" "$WORK_DIR/licenses/LIBTIFF-LICENSE.md"
+    cp "$BUILT_SOURCES_DIR/giflib/COPYING" "$WORK_DIR/licenses/GIFLIB-LICENSE.txt"
+  fi
 fi
 if [ "$PLATFORM" = windows ]; then
-  cp "$SCRIPT_DIR/build-windows.ps1" "$WORK_DIR/build-windows.ps1"
+  cp "$SCRIPT_DIR/build-windows.sh" "$WORK_DIR/build-windows.sh"
 else
   cp "$SCRIPT_DIR/build-macos.sh" "$WORK_DIR/build-macos.sh"
 fi
@@ -82,16 +88,17 @@ cat > "$WORK_DIR/BUILDINFO.md" <<EOF
 - Source commit: $source_commit
 
 The distributed runtime's magick -version output is recorded in MAGICK-VERSION.txt.
-For Windows, the release artifact is the complete official portable runtime directory,
-including the DLLs and configuration files next to magick.exe.
+For Windows, the release artifact is a source-built runtime directory, including
+magick.exe, all DLLs and configuration files next to it.
 
 ImageMagick is distributed under the ImageMagick License. The license and upstream
 NOTICE are in licenses/. For macOS, the release artifact is a relocatable tar.gz
 runtime directory containing magick, its dylibs and configuration files as
 direct macOS Resources children, including ThirdPartyLicenses/ImageMagick. This
-archive also includes the exact dynamic dependency source trees and licenses for
-LibRaw, MozJPEG, libpng, libwebp, libtiff and giflib. XFileSuite is proprietary
-software and does not claim ownership of any of these components.
+archive also includes the exact LibRaw source tree and license. The macOS
+archive additionally includes MozJPEG, libpng, libwebp, libtiff and giflib.
+XFileSuite is proprietary software and does not claim ownership of any of these
+components.
 EOF
 
 cat > "$WORK_DIR/README.md" <<EOF

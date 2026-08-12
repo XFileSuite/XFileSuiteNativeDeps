@@ -71,6 +71,8 @@ def subcomponents_for(name, platform)
   when 'imagemagick'
     if platform == 'macos'
       IMAGEMAGICK_MACOS_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
+    elsif platform == 'windows'
+      [{ 'name' => 'libraw', 'license' => LICENSES.fetch('libraw') }]
     else
       []
     end
