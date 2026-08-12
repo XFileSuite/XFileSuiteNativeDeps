@@ -3,6 +3,7 @@
 # The resulting directory mirrors macos/Runner/Resources: magick, all dylibs,
 # and ImageMagick configuration files are direct Resources children.
 set -euo pipefail
+trap 'status=$?; echo "ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.1.2-29}"
@@ -178,6 +179,7 @@ EOF
 done
 
 bundle="$OUTPUT_DIR/$BUNDLE_NAME"; mkdir -p "$bundle"
+echo "Assembling universal ImageMagick runtime..."
 # Merge the shared ImageMagick runtime. JPEG, PNG, WebP, TIFF and GIF are
 # already incorporated into libMagickCore from static archives.
 while IFS= read -r -d '' arm_file; do
@@ -214,6 +216,7 @@ cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
 # Remove build-machine absolute paths. The app stages this directory directly
 # into Contents/Resources, so both executable and dylibs resolve there.
+echo "Rewriting bundled Mach-O install names..."
 find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print0 | while IFS= read -r -d '' file; do
   if [[ "$file" == *.dylib ]]; then install_name_tool -id "@rpath/$(basename "$file")" "$file"; fi
   while IFS= read -r dependency; do
@@ -228,6 +231,7 @@ find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print0
 done
 
 chmod +x "$bundle/magick"
+echo "Verifying universal runtime formats and delegates..."
 for arch in "${ARCHITECTURES[@]}"; do
   lipo "$bundle/magick" -verify_arch "$arch"
   formats="$(arch -"$arch" "$bundle/magick" -list format)"
@@ -272,6 +276,7 @@ test -n "$(find "$license_dir" -maxdepth 1 -type f -name 'LIBRAW-*' -print -quit
 
 # Publish only an archive that behaves identically after extraction. This also
 # catches missing compatibility names and tar layout mistakes before R2 upload.
+echo "Verifying the final archive after extraction..."
 archive="$OUTPUT_DIR/$BUNDLE_NAME.tar.gz"
 tar -czf "$archive" -C "$OUTPUT_DIR" "$BUNDLE_NAME"
 verify_dir="$(mktemp -d "$WORK_DIR/archive-verify.XXXXXX")"
