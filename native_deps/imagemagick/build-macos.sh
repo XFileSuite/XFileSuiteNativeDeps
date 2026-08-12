@@ -23,12 +23,12 @@ for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need
 download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
-build_cmake() {
+build_cmake_static() {
   local arch="$1" prefix="$2" source="$3"; shift 3
   cmake -S "$source" -B "$source/build-$arch" -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_OSX_ARCHITECTURES="$arch" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DBUILD_SHARED_LIBS=ON "$@"
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF "$@"
   cmake --build "$source/build-$arch" --parallel "$JOBS"
   cmake --install "$source/build-$arch"
 }
@@ -81,25 +81,29 @@ Description: macOS SDK zlib
 Version: 1.2.12
 Libs: -lz
 EOF
-  build_cmake "$arch" "$prefix" "$WORK_DIR/sources/mozjpeg" \
-    -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/mozjpeg" \
+    -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
   (
     cd "$WORK_DIR/sources/libpng"
     make distclean >/dev/null 2>&1 || true
-    CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
-      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --enable-shared --disable-static
+    CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -fPIC" \
+      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --disable-shared --enable-static
     make -j"$JOBS" && make install
   )
-  build_cmake "$arch" "$prefix" "$WORK_DIR/sources/libwebp" \
+  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/libwebp" \
     -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF \
     -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF -DWEBP_BUILD_VWEBP=OFF \
     -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF
-  build_cmake "$arch" "$prefix" "$WORK_DIR/sources/libtiff" \
+  # ImageMagick asks for libwebp without pkg-config's --static flag. Promote
+  # SharpYUV from Libs.private so the static archive is linked into MagickCore
+  # without contaminating Autoconf's global LIBS compiler probes.
+  sed -i '' '/^Libs:/ s/$/ -lsharpyuv/' "$prefix/lib/pkgconfig/libwebp.pc"
+  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/libtiff" \
     -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
   (
     cd "$WORK_DIR/sources/giflib"
     make clean >/dev/null 2>&1 || true
-    make -j"$JOBS" CC="clang -arch $arch -mmacosx-version-min=11.0" libgif.a
+    make -j"$JOBS" CC="clang -arch $arch -mmacosx-version-min=11.0 -fPIC" libgif.a
     mkdir -p "$prefix/lib" "$prefix/include"; cp libgif.a "$prefix/lib/"; cp gif_lib.h "$prefix/include/"
   )
   (
@@ -141,7 +145,7 @@ EOF
     # can link for the current target before running ImageMagick configure.
     printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
     "$CC" $CFLAGS .xfilesuite-delegate-smoke.c \
-      $(pkg-config --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+      $(pkg-config --static --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
       $LDFLAGS -o .xfilesuite-delegate-smoke
     rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke
     printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
@@ -170,9 +174,8 @@ EOF
 done
 
 bundle="$OUTPUT_DIR/$BUNDLE_NAME"; mkdir -p "$bundle"
-# Merge each dynamic library and executable into one universal runtime. Keep
-# every installed dylib name, including ABI compatibility symlinks such as
-# libjpeg.62.dylib: Mach-O load commands refer to those names verbatim.
+# Merge the shared ImageMagick runtime. JPEG, PNG, WebP, TIFF and GIF are
+# already incorporated into libMagickCore from static archives.
 while IFS= read -r -d '' arm_file; do
   relative="${arm_file#"$WORK_DIR/prefix-arm64/imagemagick/"}"
   x86_file="$WORK_DIR/prefix-x86_64/imagemagick/$relative"
@@ -188,7 +191,7 @@ while IFS= read -r -d '' arm_file; do
   name="$(basename "$arm_file")"; x86_file="$WORK_DIR/prefix-x86_64/lib/$name"
   test -e "$x86_file" || continue
   lipo -create "$arm_file" "$x86_file" -output "$bundle/$name"
-done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 \( -type f -o -type l \) -name '*.dylib' -print0)
+done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 \( -type f -o -type l \) \( -name 'libraw*.dylib' -o -name 'libraw_r*.dylib' \) -print0)
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
 # MAGICK_CONFIGURE_PATH points at ImageMagick-7 in the App Resources folder.
@@ -234,6 +237,12 @@ test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw.*.dylib' -print -qui
 }
 test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)" || {
   echo "Missing versioned thread-safe LibRaw runtime library." >&2
+  exit 1
+}
+unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libjpeg*.dylib' -o -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
+test -z "$unexpected_delegates" || {
+  echo "Delegates that must be static were packaged as dylibs:" >&2
+  echo "$unexpected_delegates" >&2
   exit 1
 }
 while IFS= read -r binary; do
