@@ -36,16 +36,24 @@ build_cmake() {
 # Rebuild sources/prefixes, but retain downloads to make CI retries inexpensive.
 rm -rf "$WORK_DIR/sources" "$WORK_DIR"/prefix-* "$WORK_DIR"/build-imagemagick-* "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
-download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick.tar.gz"
-download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw.tar.gz"
-download "https://github.com/mozilla/mozjpeg/archive/refs/tags/v${MOZJPEG_VERSION}.tar.gz" "$WORK_DIR/downloads/mozjpeg.tar.gz"
-download "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/downloads/libpng.tar.gz"
-download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/downloads/libwebp.tar.gz"
-download "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/downloads/libtiff.tar.gz"
-download "https://sourceforge.net/projects/giflib/files/giflib-${GIFLIB_VERSION}.tar.gz/download" "$WORK_DIR/downloads/giflib.tar.gz"
-for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
-  extract "$WORK_DIR/downloads/$component.tar.gz" "$WORK_DIR/sources/$component"
-done
+download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz"
+download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz"
+download "https://github.com/mozilla/mozjpeg/archive/refs/tags/v${MOZJPEG_VERSION}.tar.gz" "$WORK_DIR/downloads/mozjpeg-${MOZJPEG_VERSION}.tar.gz"
+download "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz"
+download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz"
+download "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz"
+download "https://sourceforge.net/projects/giflib/files/giflib-${GIFLIB_VERSION}.tar.gz/download" "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz"
+extract "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz" "$WORK_DIR/sources/imagemagick"
+extract "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz" "$WORK_DIR/sources/libraw"
+extract "$WORK_DIR/downloads/mozjpeg-${MOZJPEG_VERSION}.tar.gz" "$WORK_DIR/sources/mozjpeg"
+extract "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/sources/libpng"
+extract "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/sources/libwebp"
+extract "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/sources/libtiff"
+extract "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz" "$WORK_DIR/sources/giflib"
+grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure" || {
+  echo "Downloaded ImageMagick source does not match ${IMAGEMAGICK_VERSION}." >&2
+  exit 1
+}
 
 for arch in "${ARCHITECTURES[@]}"; do
   # macos-14 is Apple Silicon.  The x86_64 half of this universal build must
@@ -135,7 +143,7 @@ while IFS= read -r -d '' arm_file; do
   test -f "$x86_file" || continue
   case "$relative" in
     bin/magick) destination="$bundle/magick" ;;
-    lib/*) destination="$bundle/$(basename "$relative")" ;;
+    lib/*.dylib) destination="$bundle/$(basename "$relative")" ;;
     *) continue ;;
   esac
   lipo -create "$arm_file" "$x86_file" -output "$destination"

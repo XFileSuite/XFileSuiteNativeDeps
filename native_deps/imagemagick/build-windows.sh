@@ -20,10 +20,14 @@ extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
 rm -rf "$WORK_DIR/sources" "$PREFIX" "$BUNDLE"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
-download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick.tar.gz"
-download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw.tar.gz"
-extract "$WORK_DIR/downloads/imagemagick.tar.gz" "$WORK_DIR/sources/imagemagick"
-extract "$WORK_DIR/downloads/libraw.tar.gz" "$WORK_DIR/sources/libraw"
+download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz"
+download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz"
+extract "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz" "$WORK_DIR/sources/imagemagick"
+extract "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz" "$WORK_DIR/sources/libraw"
+grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure" || {
+  echo "Downloaded ImageMagick source does not match ${IMAGEMAGICK_VERSION}." >&2
+  exit 1
+}
 
 (
   cd "$WORK_DIR/sources/libraw"
