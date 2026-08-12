@@ -194,9 +194,10 @@ jobs:
             macos-src-v2-${{ inputs.component }}-
             macos-src-v2-
       - name: Install native build tools
-        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' || inputs.component == 'imagemagick' }}
         run: |
-          brew install cmake ninja nasm pkg-config
+          brew install autoconf automake libtool cmake ninja nasm pkg-config
+          if [ "$COMPONENT" = imagemagick ]; then exit 0; fi
           python3 -m venv "$RUNNER_TEMP/media-build-tools"
           "$RUNNER_TEMP/media-build-tools/bin/pip" install "meson==1.3.2"
           echo "$RUNNER_TEMP/media-build-tools/bin" >> "$GITHUB_PATH"
@@ -405,7 +406,7 @@ jobs:
           restore-keys: |
             windows-ccache-v1-
       - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
-        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
+        if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' || inputs.component == 'imagemagick' }}
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -422,7 +423,7 @@ jobs:
             mingw-w64-x86_64-iconv p7zip
             autoconf automake libtool
             mingw-w64-x86_64-zlib mingw-w64-x86_64-bzip2 mingw-w64-x86_64-libjpeg-turbo
-            mingw-w64-x86_64-libpng mingw-w64-x86_64-libwebp mingw-w64-x86_64-libtiff
+            mingw-w64-x86_64-libpng mingw-w64-x86_64-libwebp mingw-w64-x86_64-libtiff zip
       - name: Build shared media runtime for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         shell: msys2 {0}
