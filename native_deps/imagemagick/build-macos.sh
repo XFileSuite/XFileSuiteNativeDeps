@@ -163,8 +163,12 @@ EOF
       --without-djvu --without-fftw --without-pango --without-gvc \
       --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
     trap - EXIT
-    for delegate in JPEG PNG RAW TIFF WEBP ZLIB; do
-      grep -Eq "^#define MAGICKCORE_${delegate}_DELEGATE 1$" config/config.h || {
+    # These are the actual symbols emitted by ImageMagick's config.h.  RAW
+    # intentionally has no RAW_DELEGATE symbol in 7.1.2; its availability is
+    # proved by the libraw_r link test above and by the installed RAW coders
+    # exercised below after the universal runtime has been assembled.
+    for delegate in JPEG PNG TIFF WEBP ZLIB; do
+      grep -Eq "^#define ${delegate}_DELEGATE 1$" config/config.h || {
         echo "ImageMagick did not enable required $delegate delegate for $arch." >&2
         exit 1
       }
