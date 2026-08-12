@@ -268,7 +268,7 @@ while IFS= read -r binary; do
     esac
   done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
 done < <(find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print)
-for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.txt GIFLIB-LICENSE.txt; do
+for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
   test -f "$license_dir/$license"
 done
 test -n "$(find "$license_dir" -maxdepth 1 -type f -name 'LIBRAW-*' -print -quit)"
