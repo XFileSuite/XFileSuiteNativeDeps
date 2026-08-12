@@ -541,6 +541,7 @@ build_libxml2_arch() {
     --enable-static \
     --without-python \
     --without-lzma \
+    --without-icu \
     --disable-dependency-tracking
 
   make -j"$JOBS"
