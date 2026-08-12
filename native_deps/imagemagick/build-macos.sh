@@ -48,6 +48,15 @@ for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
 done
 
 for arch in "${ARCHITECTURES[@]}"; do
+  # macos-14 is Apple Silicon.  The x86_64 half of this universal build must
+  # run Autoconf test programs through Rosetta; fail explicitly if it is not
+  # available instead of reporting a misleading compiler failure later.
+  if [ "$arch" = x86_64 ]; then
+    arch -x86_64 /usr/bin/true >/dev/null 2>&1 || {
+      echo "Rosetta is required to configure the x86_64 ImageMagick slice." >&2
+      exit 1
+    }
+  fi
   prefix="$WORK_DIR/prefix-$arch"
   mkdir -p "$prefix"
   build_cmake "$arch" "$prefix" "$WORK_DIR/sources/mozjpeg" \
@@ -90,12 +99,27 @@ for arch in "${ARCHITECTURES[@]}"; do
     export CC=clang CXX=clang++ CPP=clang-cpp
     export CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -I$prefix/include"
     export CXXFLAGS="$CFLAGS" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib"
-    export LIBS="-lsharpyuv" PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+    # Keep Autoconf's compiler probes independent from runtime delegates.
+    # Delegate libraries are discovered by pkg-config during their individual
+    # feature checks; adding a delegate to LIBS globally also affects the
+    # AC_EXEEXT executable probe.
+    unset LIBS
+    export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
+    printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
+    "$CC" $CFLAGS $LDFLAGS .xfilesuite-compiler-smoke.c -o .xfilesuite-compiler-smoke
+    if [ "$arch" = x86_64 ]; then
+      arch -x86_64 ./.xfilesuite-compiler-smoke
+    else
+      ./.xfilesuite-compiler-smoke
+    fi
+    rm -f .xfilesuite-compiler-smoke.c .xfilesuite-compiler-smoke
+    trap 'status=$?; if [ $status -ne 0 ] && [ -f config.log ]; then cat config.log >&2; fi; exit $status' EXIT
     ./configure --prefix="$prefix/imagemagick" --enable-shared --disable-static --without-modules \
-      --without-perl --without-x --without-fontconfig --without-freetype --without-heic --without-jp2 \
+      --without-perl --without-x --without-fontconfig --without-freetype --without-heic \
       --without-xml --without-openexr --without-lcms --without-lqr --with-raw --without-rsvg --without-gslib \
-      --without-djvu --without-fftw --without-openmp --without-pango --without-cairo --without-gvc \
+      --without-djvu --without-fftw --without-pango --without-gvc \
       --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
+    trap - EXIT
     make -j"$JOBS" && make install
   )
 done
