@@ -27,7 +27,8 @@
 | **libopus** | BSD-3-Clause | Opus 音频编码 | 1.5.2 |
 | **VideoToolbox** | Apple | H.264/H.265/ProRes 硬件编解码 | 系统内置 |
 | **AudioToolbox** | Apple | AAC/ALAC 等音频编解码 | 系统内置 |
-| **SecureTransport** | Apple | HTTPS/TLS 支持 | 系统内置 |
+| **libxml2** | MIT | DASH 清单解析 | 2.11.5 |
+| **SecureTransport** | Apple | HTTPS/TLS 与 RTMPS 支持 | 系统内置 |
 | **zlib** | zlib | 压缩支持 | 系统内置 |
 
 ## 构建产物
@@ -92,6 +93,14 @@ MIN_MACOS=12.0 FFMPEG_VERSION=7.0 ./build.sh
 ```bash
 rm -rf work/
 ```
+
+## 在线播放与商店分发
+
+macOS 运行时启用 HTTP/HTTPS、HLS、DASH、RTMP/RTMPS 与 RTSP/RTP。TLS 使用
+系统 SecureTransport，而非 Mbed TLS、OpenSSL 或 GnuTLS，因此保持
+`--disable-version3`。FFmpeg 上游 SecureTransport 代码中的私有
+`SecIdentityCreate` 调用由 `patches/ffmpeg-tls-securetransport-no-private-api.patch`
+移除；普通服务端证书 TLS 不受影响，客户端证书认证不支持。
 
 ## 如何添加新的 LGPL 库
 

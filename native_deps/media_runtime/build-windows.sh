@@ -20,7 +20,7 @@ NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-2}"
+RELEASE_REVISION="${RELEASE_REVISION:-3}"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 MPV_VERSION="${MPV_VERSION:-0.41.0}"
 MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
@@ -333,8 +333,10 @@ the matching source-only archive.
 
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
 Its `subtitles` and `ass` filters are enabled through libass (ISC).
-Mbed TLS and HTTPS/TLS/RTMPS playback protocols are intentionally excluded so
-the runtime remains LGPL-2.1-compatible.
+Network playback is enabled via the Windows SChannel TLS backend; HTTPS/TLS/RTMPS
+and other network protocols are therefore included. Mbed TLS, OpenSSL, GnuTLS
+and other non-system TLS libraries are intentionally not used so the runtime
+remains LGPL-2.1-compatible.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
 included. Shared FFmpeg DLLs are used by both the ffmpeg CLI and libmpv.
 EOF
@@ -446,6 +448,8 @@ cat > "$stage/metadata/BUILDINFO.md" <<EOF
 - Architecture: Windows x64
 - FFmpeg CLI and libmpv use the same shared FFmpeg DLLs.
 - FFmpeg is built without GPL and nonfree components.
+- Network playback (HTTP/HTTPS/HLS/DASH/RTMP/RTMPS/RTSP/RTP) is enabled via the
+  Windows SChannel TLS backend.
 - mpv is built with \`-Dgpl=false\`.
 - ANGLE provides OpenGL ES → D3D11 translation for libmpv rendering.
 EOF

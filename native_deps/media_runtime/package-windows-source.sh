@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 VERSION="${VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-2}"
+RELEASE_REVISION="${RELEASE_REVISION:-3}"
 RELEASE_ID="media-runtime-windows-${VERSION}-xfilesuite.${RELEASE_REVISION}"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-media-win-source.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
@@ -32,7 +32,7 @@ cat > "$STAGE/BUILDINFO.md" <<EOF
 # XFileSuite Windows media runtime corresponding source
 
 - Release: $RELEASE_ID
-- FFmpeg: 8.1.2, configured with libass subtitle rendering and without GPL, nonfree, version3, Mbed TLS, or network protocols
+- FFmpeg: 8.1.2, configured with libass subtitle rendering and network playback (HTTP/HTTPS/HLS/DASH/RTMP/RTMPS/RTSP/RTP) via Windows SChannel. Built without GPL, nonfree, version3, Mbed TLS, or non-system TLS libraries.
 - mpv: 0.41.0, configured with -Dgpl=false
 - libplacebo: 6.338.2 (source included in upstream/)
 - Build entry point: build-scripts/build-windows.sh

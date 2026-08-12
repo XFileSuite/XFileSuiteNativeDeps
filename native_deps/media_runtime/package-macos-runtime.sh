@@ -6,7 +6,7 @@ FRAMEWORKS_SOURCE="${FRAMEWORKS_SOURCE:?set FRAMEWORKS_SOURCE to the directory c
 FFMPEG_BINARY="${FFMPEG_BINARY:?set FFMPEG_BINARY to the shared-runtime ffmpeg executable}"
 LICENSES_SOURCE="${LICENSES_SOURCE:?set LICENSES_SOURCE to the collected runtime licenses}"
 VERSION="${VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-2}"
+RELEASE_REVISION="${RELEASE_REVISION:-3}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 RELEASE_ID="media-runtime-macos-${VERSION}-xfilesuite.${RELEASE_REVISION}"
@@ -41,6 +41,9 @@ cat > "$STAGE_DIR/metadata/BUILDINFO.md" <<EOF
 - Architecture: macOS universal (arm64 and x86_64)
 - FFmpeg CLI and libmpv use the same FFmpeg shared frameworks.
 - FFmpeg is built without GPL and nonfree components.
+- Network playback (HTTP/HTTPS/HLS/DASH/RTMP/RTMPS/RTSP/RTP) is enabled via the
+  macOS SecureTransport framework. The private API SecIdentityCreate is patched
+  out so the runtime can be submitted to the Mac App Store.
 - mpv is built with \`-Dgpl=false\`.
 EOF
 

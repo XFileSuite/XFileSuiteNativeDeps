@@ -13,7 +13,7 @@
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
-      "releaseRevision": 2,
+      "releaseRevision": 3,
       "architecture": "x64",
       "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-acaeef5399dd171671efb4f477887a5a0e95c1b3795b73cd1e764cd2f701f69c",
       "bundleSha256": "acaeef5399dd171671efb4f477887a5a0e95c1b3795b73cd1e764cd2f701f69c",

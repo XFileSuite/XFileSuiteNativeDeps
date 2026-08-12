@@ -8,7 +8,7 @@ DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 UPSTREAM_TAG="${LIBMPV_DARWIN_BUILD_TAG:-v0.6.0}"
 UPSTREAM_COMMIT="${LIBMPV_DARWIN_BUILD_COMMIT:-4286f5557bdccc0747030e3c376ce5cd160a96a0}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-2}"
+RELEASE_REVISION="${RELEASE_REVISION:-3}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
 need() {
@@ -151,12 +151,12 @@ sed -i '' \
 sed -i '' \
   -e "/--enable-mbedtls/d" \
   -e "/--enable-version3/d" \
-  -e "s/--enable-network/--disable-network/g" \
-  -e "/--enable-protocol=https/d" \
-  -e "/--enable-protocol=tls/d" \
-  -e "/--enable-protocol=rtmps/d" \
-  -e "/--enable-protocol=rtmpts/d" \
   "$upstream/scripts/ffmpeg/meson.build"
+# If the upstream ffmpeg target is ever rebuilt despite the injected prefix,
+# make it use the same LGPL-2.1-safe system TLS backend rather than Mbed TLS.
+if ! grep -q "'--enable-securetransport'" "$upstream/scripts/ffmpeg/meson.build"; then
+  sed -i '' "s/'--enable-network',/'--enable-network',\\n    '--enable-securetransport',/" "$upstream/scripts/ffmpeg/meson.build"
+fi
 
 echo "==> Injecting the ABI-identical shared FFmpeg prefixes into the libmpv build"
 for mapping in "arm64:arm64" "amd64:x86_64"; do
@@ -303,8 +303,11 @@ This bundle contains the following third-party components:
 FFmpeg was built with `--disable-gpl --disable-nonfree --disable-version3`.
 Its `subtitles` and `ass` filters are enabled through libass (ISC), using the
 bundled FreeType, FriBidi, and HarfBuzz dependencies listed above.
-Mbed TLS and the HTTPS/TLS/RTMPS protocols are intentionally excluded so the
-runtime remains LGPL-2.1-compatible.
+Network playback is enabled via the macOS SecureTransport framework. The
+private API `SecIdentityCreate` has been patched out of FFmpeg's SecureTransport
+backend so the runtime can be submitted to the Mac App Store while remaining
+LGPL-2.1-compatible. Mbed TLS, OpenSSL, GnuTLS and other non-system TLS
+libraries are intentionally not used.
 mpv was built with `-Dgpl=false`. No x264/x265 or encoders-GPL flavor is
 included. Exact source archives, patches, checksums, and build scripts are
 published in the corresponding-source GitHub Release named in the manifest.

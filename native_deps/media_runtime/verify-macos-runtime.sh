@@ -168,10 +168,32 @@ if "$FFMPEG" -buildconf 2>&1 | grep -Eq -- '--enable-(gpl|nonfree|version3|mbedt
   exit 1
 fi
 
+# Online playback now uses system TLS on macOS (SecureTransport) and Windows
+# (SChannel) so the runtime intentionally exposes HTTP/HTTPS/TLS protocols.
 protocols="$("$FFMPEG" -hide_banner -protocols 2>&1)"
-if grep -Eq '(^|[[:space:]])(https|tls|rtmps|rtmpts)($|[[:space:]])' <<<"$protocols"; then
-  echo "TLS protocol support is unexpectedly present" >&2
-  exit 1
-fi
+for proto in http https tls tcp rtmp rtmps rtp; do
+  if ! grep -Eq "(^|[[:space:]])${proto}($|[[:space:]])" <<<"$protocols"; then
+    echo "Missing required network protocol: $proto" >&2
+    exit 1
+  fi
+done
+
+demuxers="$("$FFMPEG" -hide_banner -demuxers 2>&1)"
+for demuxer in hls dash rtsp; do
+  if ! grep -Eq "(^|[[:space:]])${demuxer}($|[[:space:]])" <<<"$demuxers"; then
+    echo "Missing required network demuxer: $demuxer" >&2
+    exit 1
+  fi
+done
+
+# App Store safety: the private API SecIdentityCreate must not be referenced in
+# any shipped binary, even through Security.framework's dynamic linker path.
+for framework in Mpv Avcodec Avformat Avutil Avfilter Swresample Swscale; do
+  binary="$(framework_binary "$framework")"
+  if nm -u "$binary" 2>/dev/null | grep -Eq '_SecIdentityCreate$'; then
+    echo "Private API SecIdentityCreate is still referenced in $framework" >&2
+    exit 1
+  fi
+done
 
 echo "macOS media runtime verified"
