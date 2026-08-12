@@ -547,6 +547,13 @@ build_libxml2_arch() {
   make -j"$JOBS"
   make install
 
+  # FFmpeg's pkg-config probe runs without --static, so the static libxml2.a's
+  # system dependencies must be advertised in Libs rather than Libs.private.
+  sed -i '' \
+    -e 's/^Libs: -L${libdir} -lxml2/Libs: -L${libdir} -lxml2 -lz -liconv -lm/' \
+    -e '/^Libs.private:/d' \
+    "$PREFIX/lib/pkgconfig/libxml-2.0.pc"
+
   popd >/dev/null
   echo "libxml2 built for $ARCH -> $PREFIX"
 }
