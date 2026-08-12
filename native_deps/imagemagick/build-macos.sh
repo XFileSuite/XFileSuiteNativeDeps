@@ -136,7 +136,9 @@ for arch in "${ARCHITECTURES[@]}"; do
 done
 
 bundle="$OUTPUT_DIR/$BUNDLE_NAME"; mkdir -p "$bundle"
-# Merge each dynamic library and executable into one universal runtime.
+# Merge each dynamic library and executable into one universal runtime. Keep
+# every installed dylib name, including ABI compatibility symlinks such as
+# libjpeg.62.dylib: Mach-O load commands refer to those names verbatim.
 while IFS= read -r -d '' arm_file; do
   relative="${arm_file#"$WORK_DIR/prefix-arm64/imagemagick/"}"
   x86_file="$WORK_DIR/prefix-x86_64/imagemagick/$relative"
@@ -147,12 +149,12 @@ while IFS= read -r -d '' arm_file; do
     *) continue ;;
   esac
   lipo -create "$arm_file" "$x86_file" -output "$destination"
-done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/imagemagick/lib" -type f -print0)
+done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/imagemagick/lib" \( -type f -o -type l \) -print0)
 while IFS= read -r -d '' arm_file; do
   name="$(basename "$arm_file")"; x86_file="$WORK_DIR/prefix-x86_64/lib/$name"
-  test -f "$x86_file" || continue
+  test -e "$x86_file" || continue
   lipo -create "$arm_file" "$x86_file" -output "$bundle/$name"
-done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type f -name '*.dylib' -print0)
+done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 \( -type f -o -type l \) -name '*.dylib' -print0)
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
 # MAGICK_CONFIGURE_PATH points at ImageMagick-7 in the App Resources folder.
@@ -198,6 +200,17 @@ test -f "$bundle/libraw"*.dylib
 while IFS= read -r binary; do
   absolute_dependencies="$(otool -L "$binary" | awk '/^[[:space:]]/ {print $1}' | grep -E '^/' | grep -Ev '^(/usr/lib/|/System/Library/)' || true)"
   test -z "$absolute_dependencies" || { echo "$binary contains non-system absolute dependencies:" >&2; echo "$absolute_dependencies" >&2; exit 1; }
+  while IFS= read -r dependency; do
+    case "$dependency" in
+      @rpath/*)
+        dependency_name="${dependency#@rpath/}"
+        test -f "$bundle/$dependency_name" || {
+          echo "$binary references missing bundled library $dependency_name" >&2
+          exit 1
+        }
+        ;;
+    esac
+  done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
 done < <(find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print)
 for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.txt GIFLIB-LICENSE.txt; do
   test -f "$license_dir/$license"
