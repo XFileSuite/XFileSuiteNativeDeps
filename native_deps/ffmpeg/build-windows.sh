@@ -22,7 +22,7 @@ for tool in curl tar make pkg-config sha256sum; do command -v "$tool" >/dev/null
 # here makes a local rebuild use the same LGPL/BSD codec set as macOS.
 for package in mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf \
   mingw-w64-x86_64-lame mingw-w64-x86_64-libogg mingw-w64-x86_64-libvorbis mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp \
-  mingw-w64-x86_64-libass; do
+  mingw-w64-x86_64-libass mingw-w64-x86_64-libxml2; do
   pacman -Q "$package" >/dev/null || { echo "Missing MSYS2 package: $package" >&2; exit 1; }
 done
 
@@ -56,10 +56,11 @@ mkdir -p "$build_dir"
     --prefix="$prefix" \
     --target-os=mingw32 --arch=x86_64 \
     --pkg-config=/mingw64/bin/pkg-config --pkg-config-flags=--static \
-    "${LINKAGE_CONFIG[@]}" --disable-debug --disable-doc --disable-network \
+    "${LINKAGE_CONFIG[@]}" --disable-debug --disable-doc --enable-network \
     --disable-gpl --disable-nonfree --disable-version3 \
-    --enable-libmp3lame --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libopus --enable-libass \
+    --enable-libmp3lame --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libopus --enable-libass --enable-libxml2 \
     --enable-filter=subtitles --enable-filter=ass \
+    --enable-schannel \
     --extra-libs='-lstdc++ -lws2_32 -lbcrypt -lz'
   make -j"$JOBS"
   make install

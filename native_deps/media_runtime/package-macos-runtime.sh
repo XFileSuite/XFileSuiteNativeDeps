@@ -41,6 +41,9 @@ cat > "$STAGE_DIR/metadata/BUILDINFO.md" <<EOF
 - Architecture: macOS universal (arm64 and x86_64)
 - FFmpeg CLI and libmpv use the same FFmpeg shared frameworks.
 - FFmpeg is built without GPL and nonfree components.
+- Network playback (HTTP/HTTPS/HLS/DASH/RTMP/RTMPS/RTSP/RTP) is enabled via the
+  macOS SecureTransport framework. The private API `SecIdentityCreate` is patched
+  out so the runtime can be submitted to the Mac App Store.
 - mpv is built with \`-Dgpl=false\`.
 EOF
 
