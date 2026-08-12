@@ -10,7 +10,7 @@ RELEASE_ID="${RELEASE_ID:-imagemagick-${PLATFORM}-${VERSION}-xfilesuite.1}"
 if [ "$PLATFORM" = windows ]; then
   DEFAULT_BINARY="$ROOT/native_deps/imagemagick/dist-windows/imagemagick-windows-x64/magick.exe"
 else
-  DEFAULT_BINARY="$SCRIPT_DIR/dist/imagemagick-macos-universal"
+  DEFAULT_BINARY="$SCRIPT_DIR/dist/imagemagick-macos-universal/magick"
 fi
 BINARY="${IMAGEMAGICK_BINARY:-$DEFAULT_BINARY}"
 OUT_DIR="${OUT_DIR:-$ROOT/native_deps/imagemagick/dist}"
@@ -40,11 +40,11 @@ if [ -f "$SOURCE_DIR/NOTICE" ]; then
   cp "$SOURCE_DIR/NOTICE" "$WORK_DIR/licenses/IMAGEMAGICK-NOTICE.txt"
 fi
 
-# The macOS binary statically links these libraries. The normal publish flow
-# runs build-macos.sh first, so its exact downloaded source trees are available
-# here. Include both their source and their license text in the public archive.
+# The macOS runtime dynamically ships these delegate libraries. The normal
+# publish flow runs build-macos.sh first, so include their exact source and
+# licenses in the public archive.
 if [ "$PLATFORM" = macos ]; then
-  for component in mozjpeg libpng libwebp libtiff giflib; do
+  for component in libraw mozjpeg libpng libwebp libtiff giflib; do
     test -d "$BUILT_SOURCES_DIR/$component" || {
       echo "Missing built dependency source: $BUILT_SOURCES_DIR/$component" >&2
       echo "Run build-macos.sh before package-source.sh." >&2
@@ -52,6 +52,8 @@ if [ "$PLATFORM" = macos ]; then
     }
     cp -R "$BUILT_SOURCES_DIR/$component" "$WORK_DIR/sources/$component"
   done
+  find "$BUILT_SOURCES_DIR/libraw" -maxdepth 1 -type f \( -iname 'license*' -o -iname 'copying*' \) -print0 | \
+    while IFS= read -r -d '' license; do cp "$license" "$WORK_DIR/licenses/LIBRAW-$(basename "$license")"; done
   cp "$BUILT_SOURCES_DIR/mozjpeg/LICENSE.md" "$WORK_DIR/licenses/MOZJPEG-LICENSE.md"
   cp "$BUILT_SOURCES_DIR/libpng/LICENSE" "$WORK_DIR/licenses/LIBPNG-LICENSE.txt"
   cp "$BUILT_SOURCES_DIR/libwebp/COPYING" "$WORK_DIR/licenses/LIBWEBP-LICENSE.txt"
@@ -74,6 +76,7 @@ cat > "$WORK_DIR/BUILDINFO.md" <<EOF
 - Release identifier: $RELEASE_ID
 - Shipped binary: $BINARY
 - Binary SHA-256: $binary_sha
+- Runtime archive: $SCRIPT_DIR/dist/imagemagick-macos-universal.tar.gz
 - Source repository: $SOURCE_REPOSITORY
 - Source tag: $VERSION
 - Source commit: $source_commit
@@ -83,10 +86,12 @@ For Windows, the release artifact is the complete official portable runtime dire
 including the DLLs and configuration files next to magick.exe.
 
 ImageMagick is distributed under the ImageMagick License. The license and upstream
-NOTICE are in licenses/. For macOS, this archive also includes the exact static
-dependency source trees and licenses for MozJPEG, libpng, libwebp, libtiff and
-giflib. XFileSuite is proprietary software and does not claim ownership of any
-of these components.
+NOTICE are in licenses/. For macOS, the release artifact is a relocatable tar.gz
+runtime directory containing magick, its dylibs and configuration files as
+direct macOS Resources children, including ThirdPartyLicenses/ImageMagick. This
+archive also includes the exact dynamic dependency source trees and licenses for
+LibRaw, MozJPEG, libpng, libwebp, libtiff and giflib. XFileSuite is proprietary
+software and does not claim ownership of any of these components.
 EOF
 
 cat > "$WORK_DIR/README.md" <<EOF

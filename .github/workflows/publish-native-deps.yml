@@ -235,9 +235,10 @@ jobs:
             if ["all", "imagemagick"].include?(component)
               item = data["components"]["imagemagick"]
               item["architecture"] = "universal"
-              sha = `shasum -a 256 native_deps/imagemagick/dist/imagemagick-macos-universal`.split.first
-              item["binarySha256"] = sha
-              item["r2Key"] = "deps/imagemagick-macos-universal-#{sha}"
+              item.delete("binarySha256")
+              sha = `shasum -a 256 native_deps/imagemagick/dist/imagemagick-macos-universal.tar.gz`.split.first
+              item["bundleSha256"] = sha
+              item["r2Key"] = "deps/imagemagick-macos-universal-#{sha}.tar.gz"
               item["sourceRelease"] = "imagemagick-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
             end
             if ["all", "resvg"].include?(component)
@@ -286,7 +287,7 @@ jobs:
       - name: Upload only selected runtime binaries to R2
         run: |
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
-            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "r2Key")')" --file native_deps/imagemagick/dist/imagemagick-macos-universal --remote
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "r2Key")')" --file native_deps/imagemagick/dist/imagemagick-macos-universal.tar.gz --remote
           fi
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "resvg", "r2Key")')" --file native_deps/resvg/dist/resvg-macos-universal --remote

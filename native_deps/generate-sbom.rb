@@ -38,6 +38,7 @@ LICENSES = {
   'mozjpeg'       => 'BSD-3-Clause',
   'libtiff'       => 'MIT',
   'giflib'        => 'MIT',
+  'libraw'        => 'LGPL-2.1 OR CDDL-1.0',
   'resvg'         => 'Apache-2.0 OR MIT',
   'mediaRuntime'  => 'LGPL-2.1 aggregate; see subComponents for bundled licenses'
 }.freeze
@@ -56,8 +57,8 @@ MEDIA_RUNTIME_PLATFORM_SUBCOMPONENTS = {
 # Sub-components bundled inside the FFmpeg standalone binary.
 FFMPEG_SUBCOMPONENTS = %w[lame libogg libvorbis libvpx libwebp libopus].freeze
 
-# Sub-components bundled inside the ImageMagick macOS binary.
-IMAGEMAGICK_MACOS_SUBCOMPONENTS = %w[mozjpeg libpng libwebp libtiff giflib].freeze
+# Sub-components bundled inside the ImageMagick macOS runtime.
+IMAGEMAGICK_MACOS_SUBCOMPONENTS = %w[libraw mozjpeg libpng libwebp libtiff giflib].freeze
 
 def subcomponents_for(name, platform)
   case name

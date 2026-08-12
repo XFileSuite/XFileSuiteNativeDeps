@@ -5,11 +5,11 @@
   "components": {
     "imagemagick": {
       "version": "7.1.2-27",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-8a6c33f2ec35a553a984913f14e5a41a1a359d751e4e734c0e99eac8dccc916f",
-      "binarySha256": "8a6c33f2ec35a553a984913f14e5a41a1a359d751e4e734c0e99eac8dccc916f",
-      "sourceRelease": "imagemagick-macos-7.1.2-27-xfilesuite.1"
+      "r2Key": "",
+      "bundleSha256": "",
+      "sourceRelease": "imagemagick-macos-7.1.2-27-xfilesuite.2"
     },
     "resvg": {
       "version": "0.47.0",
