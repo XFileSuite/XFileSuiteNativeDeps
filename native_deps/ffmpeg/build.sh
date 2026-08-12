@@ -80,6 +80,12 @@ OPUS_TARBALL_PATH="$WORK_DIR/opus-${OPUS_VERSION}.tar.gz"
 OPUS_TARBALL_SHA256="9480e329e989f70d69886ded470c7f8cfe6c0667cc4196d4837ac9e668fb7404"
 OPUS_SRC_DIR="$WORK_DIR/opus-${OPUS_VERSION}"
 
+LIBXML2_VERSION="${LIBXML2_VERSION:-2.11.5}"
+LIBXML2_TARBALL_URL="${LIBXML2_TARBALL_URL:-https://download.gnome.org/sources/libxml2/2.11/libxml2-${LIBXML2_VERSION}.tar.xz}"
+LIBXML2_TARBALL_PATH="$WORK_DIR/libxml2-${LIBXML2_VERSION}.tar.xz"
+LIBXML2_TARBALL_SHA256="${LIBXML2_TARBALL_SHA256:-3727b078c360ec69fa869de14bd6f75d7ee8d36987b071e6928d4720a28df3a6}"
+LIBXML2_SRC_DIR="$WORK_DIR/libxml2-${LIBXML2_VERSION}"
+
 BUILD_STAMP="${BUILD_STAMP:-$(date -u +%Y%m%d%H%M)}"
 BUILD_ID="${BUILD_ID:-}"
 
@@ -194,6 +200,15 @@ ensure_source_archive() {
   test "$(shasum -a 256 "$archive" | awk '{print $1}')" = "$expected_sha"
 }
 
+apply_ffmpeg_patches() {
+  local patch
+  for patch in "$ROOT_DIR"/patches/*.patch; do
+    [[ -f "$patch" ]] || continue
+    echo "Applying patch: $patch"
+    patch -p1 -d "$FFMPEG_SRC_DIR" -i "$patch"
+  done
+}
+
 fetch_ffmpeg() {
   ensure_source_archive "$FFMPEG_TARBALL_URL" "$FFMPEG_TARBALL_PATH" "$FFMPEG_TARBALL_SHA256" "FFmpeg ${FFMPEG_VERSION}"
   if [[ -d "$FFMPEG_SRC_DIR" && -f "$FFMPEG_SRC_DIR/configure" ]]; then
@@ -203,6 +218,7 @@ fetch_ffmpeg() {
   rm -rf "$FFMPEG_SRC_DIR"
   echo "Extracting..."
   tar -xf "$FFMPEG_TARBALL_PATH" -C "$WORK_DIR"
+  apply_ffmpeg_patches
 }
 
 fetch_lame() {
@@ -274,6 +290,17 @@ fetch_opus() {
   echo "Extracting libopus..."
   mkdir -p "$OPUS_SRC_DIR"
   tar -xzf "$OPUS_TARBALL_PATH" --strip-components=1 -C "$OPUS_SRC_DIR"
+}
+
+fetch_libxml2() {
+  ensure_source_archive "$LIBXML2_TARBALL_URL" "$LIBXML2_TARBALL_PATH" "$LIBXML2_TARBALL_SHA256" "libxml2 ${LIBXML2_VERSION}"
+  if [[ -d "$LIBXML2_SRC_DIR" && -f "$LIBXML2_SRC_DIR/configure" ]]; then
+    echo "Using existing libxml2 source: $LIBXML2_SRC_DIR"
+    return 0
+  fi
+  rm -rf "$LIBXML2_SRC_DIR"
+  echo "Extracting libxml2..."
+  tar -xf "$LIBXML2_TARBALL_PATH" -C "$WORK_DIR"
 }
 
 # ── Per-arch build functions for each dependency ─────────────────
@@ -486,6 +513,43 @@ build_opus_arch() {
   cmake --install "$BUILD_OUT"
 }
 
+build_libxml2_arch() {
+  local ARCH="$1"
+  local PREFIX="$WORK_DIR/prefix-$ARCH"
+  local BUILD_OUT="$WORK_DIR/build-libxml2-$ARCH"
+
+  rm -rf "$BUILD_OUT"
+  mkdir -p "$BUILD_OUT"
+
+  export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
+  export CC CXX SDKROOT="$SDK"
+
+  local CFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O2"
+  local LDFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS"
+
+  echo ""
+  echo "==> Building libxml2 for $ARCH"
+  echo ""
+
+  pushd "$BUILD_OUT" >/dev/null
+
+  CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+    "$LIBXML2_SRC_DIR/configure" \
+    --prefix="$PREFIX" \
+    --host="${ARCH/arm64/aarch64}-apple-darwin" \
+    --disable-shared \
+    --enable-static \
+    --without-python \
+    --without-lzma \
+    --disable-dependency-tracking
+
+  make -j"$JOBS"
+  make install
+
+  popd >/dev/null
+  echo "libxml2 built for $ARCH -> $PREFIX"
+}
+
 # ── FFmpeg build per arch ────────────────────────────────────────
 
 build_one_arch() {
@@ -505,6 +569,7 @@ build_one_arch() {
   build_vpx_arch "$ARCH"
   build_webp_arch "$ARCH"
   build_opus_arch "$ARCH"
+  build_libxml2_arch "$ARCH"
 
   if [[ -n "$LIBASS_PREFIX_ROOT" ]]; then
     local LIBASS_PREFIX="$LIBASS_PREFIX_ROOT/$ARCH"
@@ -592,6 +657,7 @@ build_one_arch() {
     --enable-libvpx \
     --enable-libwebp \
     --enable-libopus \
+    --enable-libxml2 \
     ${LIBASS_PREFIX_ROOT:+--enable-libass} \
     ${LIBASS_PREFIX_ROOT:+--enable-filter=subtitles} \
     ${LIBASS_PREFIX_ROOT:+--enable-filter=ass} \
@@ -605,7 +671,8 @@ build_one_arch() {
     --enable-ffprobe \
     --disable-ffplay \
     \
-    --disable-network \
+    --enable-network \
+    --enable-securetransport \
     ${EXTRA_CONFIG[@]+"${EXTRA_CONFIG[@]}"}
 
   echo ""
@@ -723,6 +790,7 @@ vorbis_version=$VORBIS_VERSION
 vpx_version=$VPX_VERSION
 webp_version=$WEBP_VERSION
 opus_version=$OPUS_VERSION
+libxml2_version=$LIBXML2_VERSION
 linkage=$FFMPEG_LINKAGE
 build_stamp_utc=$BUILD_STAMP
 build_id=${BUILD_ID:-}
@@ -792,6 +860,7 @@ EOF
     fetch_vpx
     fetch_webp
     fetch_opus
+    fetch_libxml2
     fetch_ffmpeg
     build_one_arch arm64
     build_one_arch x86_64

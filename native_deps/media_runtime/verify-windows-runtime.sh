@@ -40,6 +40,7 @@ need_file "$RUNTIME_DIR/licenses/msys2-libass"
 need_file "$RUNTIME_DIR/licenses/msys2-freetype"
 need_file "$RUNTIME_DIR/licenses/msys2-fontconfig"
 need_file "$RUNTIME_DIR/licenses/msys2-expat"
+need_file "$RUNTIME_DIR/licenses/msys2-libxml2"
 need_file "$RUNTIME_DIR/licenses/ANGLE-BSD-3-Clause.txt"
 
 for imp in libavcodec.dll.a libavdevice.dll.a libavformat.dll.a libavutil.dll.a libavfilter.dll.a libswresample.dll.a libswscale.dll.a; do
@@ -132,11 +133,23 @@ if grep -Eq -- '--enable-(gpl|nonfree|version3|mbedtls)' <<<"$build_configuratio
   exit 1
 fi
 
+# Online playback now uses system TLS on macOS (SecureTransport) and Windows
+# (SChannel) so the runtime intentionally exposes HTTP/HTTPS/TLS protocols.
 protocols="$("$FFMPEG" -hide_banner -protocols 2>&1)"
-if grep -Eq '(^|[[:space:]])(https|tls|rtmps|rtmpts)($|[[:space:]])' <<<"$protocols"; then
-  echo "TLS protocol support is unexpectedly present" >&2
-  exit 1
-fi
+for proto in http https tls tcp rtmp rtmps rtsp rtp; do
+  if ! grep -Eq "(^|[[:space:]])${proto}($|[[:space:]])" <<<"$protocols"; then
+    echo "Missing required network protocol: $proto" >&2
+    exit 1
+  fi
+done
+
+demuxers="$("$FFMPEG" -hide_banner -demuxers 2>&1)"
+for demuxer in hls dash; do
+  if ! grep -Eq "(^|[[:space:]])${demuxer}($|[[:space:]])" <<<"$demuxers"; then
+    echo "Missing required network demuxer: $demuxer" >&2
+    exit 1
+  fi
+done
 
 # ── Optional ProRes 4444 alpha round-trip ─────────────────────────
 if [[ "${VERIFY_ALPHA_VIDEO:-0}" == "1" ]]; then
