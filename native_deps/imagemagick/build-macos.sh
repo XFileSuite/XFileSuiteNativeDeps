@@ -96,9 +96,12 @@ for arch in "${ARCHITECTURES[@]}"; do
     # Autoconf otherwise selects the runner's GNU gcc shim, which can produce
     # a target probe that macOS cannot execute. Keep every configure probe on
     # the same Apple Clang/toolchain and deployment target as its delegates.
-    export CC=clang CXX=clang++ CPP=clang-cpp
+    # Do not use Xcode's clang-cpp wrapper: unlike $CC it does not receive
+    # the target/SDK flags from this environment and fails Autoconf's CPP
+    # sanity check.  clang -E is the supported preprocessor invocation.
+    export CC=clang CXX=clang++ CPP='clang -E'
     export CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -I$prefix/include"
-    export CXXFLAGS="$CFLAGS" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib"
+    export CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib"
     # Keep Autoconf's compiler probes independent from runtime delegates.
     # Delegate libraries are discovered by pkg-config during their individual
     # feature checks; adding a delegate to LIBS globally also affects the
