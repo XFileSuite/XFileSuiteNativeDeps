@@ -631,6 +631,11 @@ build_one_arch() {
   echo ""
   echo "==> Configuring FFmpeg for $ARCH (min macOS $MIN_MACOS)"
   echo ""
+  echo "DEBUG PKG_CONFIG=$PKG_CONFIG"
+  echo "DEBUG PKG_CONFIG_LIBDIR=$PKG_CONFIG_LIBDIR"
+  ls -la "$PREFIX/lib/pkgconfig/"
+  cat "$PREFIX/lib/pkgconfig/libxml-2.0.pc" || true
+  "$PKG_CONFIG" --exists libxml-2.0 && echo "DEBUG libxml-2.0 found" || echo "DEBUG libxml-2.0 NOT found"
 
   pushd "$BUILD_OUT" >/dev/null
 
@@ -674,7 +679,11 @@ build_one_arch() {
     \
     --enable-network \
     --enable-securetransport \
-    ${EXTRA_CONFIG[@]+"${EXTRA_CONFIG[@]}"}
+    ${EXTRA_CONFIG[@]+"${EXTRA_CONFIG[@]}"} || {
+      echo "FFmpeg configure failed; dumping ffbuild/config.log" >&2
+      tail -n 200 "$BUILD_OUT/ffbuild/config.log" >&2
+      exit 1
+    }
 
   echo ""
   echo "==> Building FFmpeg for $ARCH"
