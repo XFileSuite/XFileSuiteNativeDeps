@@ -66,7 +66,21 @@ for arch in "${ARCHITECTURES[@]}"; do
     }
   fi
   prefix="$WORK_DIR/prefix-$arch"
-  mkdir -p "$prefix"
+  mkdir -p "$prefix/lib/pkgconfig"
+  # macOS supplies libz as a platform library but no zlib.pc. Our hermetic
+  # PKG_CONFIG_LIBDIR must still describe it because libpng, LibRaw and TIFF
+  # expose zlib through their pkg-config dependency metadata.
+  sed "s|@PREFIX@|$prefix|g" > "$prefix/lib/pkgconfig/zlib.pc" <<'EOF'
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: zlib
+Description: macOS SDK zlib
+Version: 1.2.12
+Libs: -lz
+EOF
   build_cmake "$arch" "$prefix" "$WORK_DIR/sources/mozjpeg" \
     -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
   (
@@ -116,6 +130,20 @@ for arch in "${ARCHITECTURES[@]}"; do
     # AC_EXEEXT executable probe.
     unset LIBS
     export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
+    for module in libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux; do
+      pkg-config --exists "$module" || {
+        echo "Incomplete $arch delegate metadata: $module" >&2
+        pkg-config --print-errors --exists "$module" >&2 || true
+        exit 1
+      }
+    done
+    # Metadata presence is insufficient: prove that every required delegate
+    # can link for the current target before running ImageMagick configure.
+    printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
+    "$CC" $CFLAGS .xfilesuite-delegate-smoke.c \
+      $(pkg-config --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+      $LDFLAGS -o .xfilesuite-delegate-smoke
+    rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke
     printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
     "$CC" $CFLAGS $LDFLAGS .xfilesuite-compiler-smoke.c -o .xfilesuite-compiler-smoke
     if [ "$arch" = x86_64 ]; then
@@ -131,6 +159,12 @@ for arch in "${ARCHITECTURES[@]}"; do
       --without-djvu --without-fftw --without-pango --without-gvc \
       --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
     trap - EXIT
+    for delegate in JPEG PNG RAW TIFF WEBP ZLIB; do
+      grep -Eq "^#define MAGICKCORE_${delegate}_DELEGATE 1$" config/config.h || {
+        echo "ImageMagick did not enable required $delegate delegate for $arch." >&2
+        exit 1
+      }
+    done
     make -j"$JOBS" && make install
   )
 done
