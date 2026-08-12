@@ -187,8 +187,6 @@ find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print0
 done
 
 chmod +x "$bundle/magick"
-tar -czf "$OUTPUT_DIR/$BUNDLE_NAME.tar.gz" -C "$OUTPUT_DIR" "$BUNDLE_NAME"
-shasum -a 256 "$OUTPUT_DIR/$BUNDLE_NAME.tar.gz" > "$OUTPUT_DIR/$BUNDLE_NAME.tar.gz.sha256"
 for arch in "${ARCHITECTURES[@]}"; do
   lipo "$bundle/magick" -verify_arch "$arch"
   formats="$(arch -"$arch" "$bundle/magick" -list format)"
@@ -196,7 +194,14 @@ for arch in "${ARCHITECTURES[@]}"; do
     grep -Eq "^[[:space:]]*$coder\\*?[[:space:]]+r[w-]" <<<"$formats" || { echo "Missing required $coder coder for $arch" >&2; exit 1; }
   done
 done
-test -f "$bundle/libraw"*.dylib
+test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw.*.dylib' -print -quit)" || {
+  echo "Missing versioned LibRaw runtime library." >&2
+  exit 1
+}
+test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)" || {
+  echo "Missing versioned thread-safe LibRaw runtime library." >&2
+  exit 1
+}
 while IFS= read -r binary; do
   absolute_dependencies="$(otool -L "$binary" | awk '/^[[:space:]]/ {print $1}' | grep -E '^/' | grep -Ev '^(/usr/lib/|/System/Library/)' || true)"
   test -z "$absolute_dependencies" || { echo "$binary contains non-system absolute dependencies:" >&2; echo "$absolute_dependencies" >&2; exit 1; }
@@ -217,3 +222,20 @@ for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIB
 done
 test -n "$(find "$license_dir" -maxdepth 1 -type f -name 'LIBRAW-*' -print -quit)"
 "$bundle/magick" -version
+
+# Publish only an archive that behaves identically after extraction. This also
+# catches missing compatibility names and tar layout mistakes before R2 upload.
+archive="$OUTPUT_DIR/$BUNDLE_NAME.tar.gz"
+tar -czf "$archive" -C "$OUTPUT_DIR" "$BUNDLE_NAME"
+verify_dir="$(mktemp -d "$WORK_DIR/archive-verify.XXXXXX")"
+trap 'rm -rf "$verify_dir"' EXIT
+tar -xzf "$archive" -C "$verify_dir"
+verify_bundle="$verify_dir/$BUNDLE_NAME"
+test -x "$verify_bundle/magick"
+MAGICK_CONFIGURE_PATH="$verify_bundle/ImageMagick-7" "$verify_bundle/magick" -version
+for arch in "${ARCHITECTURES[@]}"; do
+  arch -"$arch" "$verify_bundle/magick" -version >/dev/null
+done
+rm -rf "$verify_dir"
+trap - EXIT
+shasum -a 256 "$archive" > "$archive.sha256"
