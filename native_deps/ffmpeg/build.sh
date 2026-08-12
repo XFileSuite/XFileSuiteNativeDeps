@@ -204,8 +204,31 @@ apply_ffmpeg_patches() {
   local patch
   for patch in "$ROOT_DIR"/patches/*.patch; do
     [[ -f "$patch" ]] || continue
-    echo "Applying patch: $patch"
-    patch -p1 -d "$FFMPEG_SRC_DIR" -i "$patch"
+    # CI restores the source tree as part of its build cache.  Applying a
+    # patch only after extraction would leave a restored tree unpatched,
+    # while applying it unconditionally would fail on a subsequent run.
+    # Every FFmpeg patch in this directory removes a distinctive upstream
+    # fragment, so use that fragment to make the operation both strict and
+    # repeatable.
+    case "$(basename "$patch")" in
+      ffmpeg-tls-securetransport-no-private-api.patch)
+        if grep -q 'SecIdentityCreate(CFAllocatorRef' \
+          "$FFMPEG_SRC_DIR/libavformat/tls_securetransport.c"; then
+          echo "Applying patch: $patch"
+          patch -p1 -d "$FFMPEG_SRC_DIR" -i "$patch"
+        elif grep -q 'return AVERROR(ENOSYS);' \
+          "$FFMPEG_SRC_DIR/libavformat/tls_securetransport.c"; then
+          echo "Using already-patched FFmpeg source: $(basename "$patch")"
+        else
+          echo "FFmpeg source does not match expected TLS patch state: $patch" >&2
+          exit 1
+        fi
+        ;;
+      *)
+        echo "Unknown FFmpeg patch: $patch" >&2
+        exit 1
+        ;;
+    esac
   done
 }
 
@@ -213,11 +236,11 @@ fetch_ffmpeg() {
   ensure_source_archive "$FFMPEG_TARBALL_URL" "$FFMPEG_TARBALL_PATH" "$FFMPEG_TARBALL_SHA256" "FFmpeg ${FFMPEG_VERSION}"
   if [[ -d "$FFMPEG_SRC_DIR" && -f "$FFMPEG_SRC_DIR/configure" ]]; then
     echo "Using existing FFmpeg source: $FFMPEG_SRC_DIR"
-    return 0
+  else
+    rm -rf "$FFMPEG_SRC_DIR"
+    echo "Extracting..."
+    tar -xf "$FFMPEG_TARBALL_PATH" -C "$WORK_DIR"
   fi
-  rm -rf "$FFMPEG_SRC_DIR"
-  echo "Extracting..."
-  tar -xf "$FFMPEG_TARBALL_PATH" -C "$WORK_DIR"
   apply_ffmpeg_patches
 }
 

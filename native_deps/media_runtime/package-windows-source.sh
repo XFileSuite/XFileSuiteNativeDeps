@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 VERSION="${VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-2}"
+RELEASE_REVISION="${RELEASE_REVISION:-3}"
 RELEASE_ID="media-runtime-windows-${VERSION}-xfilesuite.${RELEASE_REVISION}"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/xfilesuite-media-win-source.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT

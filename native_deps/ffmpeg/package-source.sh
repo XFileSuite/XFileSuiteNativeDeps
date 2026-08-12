@@ -25,6 +25,7 @@ VORBIS_VERSION=1.3.7
 VPX_VERSION=1.15.2
 WEBP_VERSION=1.6.0
 OPUS_VERSION=1.5.2
+LIBXML2_VERSION=2.11.5
 
 ARCHIVE_NAME="xfilesuite-${RELEASE_ID}-source.tar.gz"
 STAGE_DIR="$WORK_DIR/$RELEASE_ID"
@@ -74,6 +75,7 @@ fetch "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.ta
 fetch "https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v${VPX_VERSION}" "libvpx-${VPX_VERSION}.tar.gz"
 fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz" "libwebp-${WEBP_VERSION}.tar.gz"
 fetch "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v${OPUS_VERSION}" "opus-${OPUS_VERSION}.tar.gz"
+fetch "https://download.gnome.org/sources/libxml2/2.11/libxml2-${LIBXML2_VERSION}.tar.xz" "libxml2-${LIBXML2_VERSION}.tar.xz"
 
 tar -xf "$DOWNLOAD_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 tar -xzf "$DOWNLOAD_DIR/lame-${LAME_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
@@ -84,9 +86,16 @@ tar -xzf "$DOWNLOAD_DIR/libvpx-${VPX_VERSION}.tar.gz" --strip-components=1 -C "$
 tar -xzf "$DOWNLOAD_DIR/libwebp-${WEBP_VERSION}.tar.gz" -C "$STAGE_DIR/sources"
 mkdir -p "$STAGE_DIR/sources/opus-${OPUS_VERSION}"
 tar -xzf "$DOWNLOAD_DIR/opus-${OPUS_VERSION}.tar.gz" --strip-components=1 -C "$STAGE_DIR/sources/opus-${OPUS_VERSION}"
+tar -xf "$DOWNLOAD_DIR/libxml2-${LIBXML2_VERSION}.tar.xz" -C "$STAGE_DIR/sources"
 
-# This is the only source-tree adjustment made by build.sh. Record the exact
-# patch against the extracted upstream source in every compliance archive.
+# FFmpeg itself is patched before configuration on macOS. Include the exact
+# reviewed patch in every source offer so the shipped SecureTransport backend
+# can be reproduced and audited for App Store private-API compliance.
+cp "$ROOT_DIR/patches/ffmpeg-tls-securetransport-no-private-api.patch" "$STAGE_DIR/patches/"
+
+# Record the macOS-only libvorbis adjustment against the extracted upstream
+# source in every compliance archive. The FFmpeg SecureTransport patch above
+# is included verbatim because it applies before FFmpeg is configured.
 VORBIS_CONFIGURE="$STAGE_DIR/sources/libvorbis-${VORBIS_VERSION}/configure"
 cp "$VORBIS_CONFIGURE" "$WORK_DIR/libvorbis-configure.orig"
 sed -i.bak 's/-force_cpusubtype_ALL//g' "$VORBIS_CONFIGURE"
@@ -103,6 +112,7 @@ copy_license "$STAGE_DIR/sources/libvorbis-${VORBIS_VERSION}" "$STAGE_DIR/licens
 copy_license "$STAGE_DIR/sources/libvpx-${VPX_VERSION}" "$STAGE_DIR/licenses/libvpx-BSD.txt"
 copy_license "$STAGE_DIR/sources/libwebp-${WEBP_VERSION}" "$STAGE_DIR/licenses/libwebp-BSD-3-Clause.txt"
 copy_license "$STAGE_DIR/sources/opus-${OPUS_VERSION}" "$STAGE_DIR/licenses/libopus-BSD-3-Clause.txt"
+copy_license "$STAGE_DIR/sources/libxml2-${LIBXML2_VERSION}" "$STAGE_DIR/licenses/libxml2-MIT.txt"
 
 cat > "$STAGE_DIR/SOURCE-URLS.txt" <<EOF
 FFmpeg ${FFMPEG_VERSION}
@@ -119,6 +129,8 @@ libwebp ${WEBP_VERSION}
 https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz
 libopus ${OPUS_VERSION}
 https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v${OPUS_VERSION}
+libxml2 ${LIBXML2_VERSION}
+https://download.gnome.org/sources/libxml2/2.11/libxml2-${LIBXML2_VERSION}.tar.xz
 EOF
 
 if [[ -f "$FFMPEG_BINARY" ]]; then
@@ -146,12 +158,16 @@ cat > "$STAGE_DIR/BUILDINFO.md" <<EOF
 | libvpx | ${VPX_VERSION} | BSD-style |
 | libwebp | ${WEBP_VERSION} | BSD-3-Clause |
 | libopus | ${OPUS_VERSION} | BSD-3-Clause |
+| libxml2 | ${LIBXML2_VERSION} | MIT |
 
 ## Build and modification information
 
 build.sh is the build script used for this binary family. It configures FFmpeg with
---disable-gpl --disable-nonfree --disable-version3 and statically links the listed
-libraries into the standalone FFmpeg executable. No FFmpeg source files were modified.
+--disable-gpl --disable-nonfree --disable-version3, statically links the listed
+libraries, and enables HTTP/HTTPS, HLS, DASH, RTMP/RTMPS and RTSP/RTP through
+the macOS SecureTransport backend. The included SecureTransport patch removes
+FFmpeg's private SecIdentityCreate reference; normal server-certificate TLS is
+unaffected, while client-certificate authentication returns ENOSYS.
 
 For macOS, the only source-tree adjustment is documented in
 patches/libvorbis-configure-macos-xcode.patch: it removes the obsolete

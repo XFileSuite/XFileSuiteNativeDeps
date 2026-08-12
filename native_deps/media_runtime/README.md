@@ -37,8 +37,11 @@ The build remains LGPL-compatible:
 
 - mpv is configured with `-Dgpl=false`;
 - FFmpeg is built without `--enable-gpl` or `--enable-nonfree`;
-- Mbed TLS and HTTPS/TLS/RTMPS playback protocols are excluded, so the runtime
-  remains compatible with LGPL-2.1 rather than requiring LGPL-3;
+- network playback supports HTTP/HTTPS, HLS, DASH, RTMP/RTMPS and RTSP/RTP
+  while remaining LGPL-2.1-compatible: macOS uses the system
+  SecureTransport backend and Windows uses the system SChannel backend;
+- Mbed TLS, OpenSSL, GnuTLS and other third-party TLS libraries are excluded,
+  so `--enable-version3` is not required;
 - GPL codec libraries such as x264 and x265 are not included;
 - the corresponding-source archive records exact upstream sources, patches,
   configuration and build scripts.
