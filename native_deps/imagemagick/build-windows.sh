@@ -5,8 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.1.2-27}"
-LIBRAW_VERSION="${LIBRAW_VERSION:-0.21.4}"
+IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.1.2-29}"
+LIBRAW_VERSION="${LIBRAW_VERSION:-0.22.2}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work-windows}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist-windows}"
 PREFIX="$WORK_DIR/prefix"
@@ -15,20 +15,20 @@ BUNDLE="$OUTPUT_DIR/imagemagick-windows-x64"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
 for tool in autoreconf curl find gcc g++ ldd make pkg-config tar; do need "$tool"; done
-download() { [ -f "$2" ] || curl -fL --retry 3 --connect-timeout 20 -o "$2" "$1"; }
+download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
 rm -rf "$WORK_DIR/sources" "$PREFIX" "$BUNDLE"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
-download "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${IMAGEMAGICK_VERSION}.tar.gz" "$WORK_DIR/downloads/imagemagick.tar.gz"
-download "https://github.com/LibRaw/LibRaw/archive/refs/tags/${LIBRAW_VERSION}.tar.gz" "$WORK_DIR/downloads/libraw.tar.gz"
+download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick.tar.gz"
+download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw.tar.gz"
 extract "$WORK_DIR/downloads/imagemagick.tar.gz" "$WORK_DIR/sources/imagemagick"
 extract "$WORK_DIR/downloads/libraw.tar.gz" "$WORK_DIR/sources/libraw"
 
 (
   cd "$WORK_DIR/sources/libraw"
   autoreconf -fi
-  ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples
+  ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms
   make -j"$JOBS" && make install
 )
 (
@@ -62,7 +62,14 @@ copy_dlls() {
   done < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
 }
 copy_dlls "$BUNDLE/magick.exe"
-while IFS= read -r dll; do copy_dlls "$dll"; done < <(find "$BUNDLE" -maxdepth 1 -name '*.dll' -type f)
+# ldd lists direct dependencies only. Repeat until no new DLL is discovered so
+# the packaged closure also contains transitive MinGW and delegate DLLs.
+while :; do
+  before="$(find "$BUNDLE" -maxdepth 1 -type f -name '*.dll' | wc -l)"
+  while IFS= read -r dll; do copy_dlls "$dll"; done < <(find "$BUNDLE" -maxdepth 1 -name '*.dll' -type f)
+  after="$(find "$BUNDLE" -maxdepth 1 -type f -name '*.dll' | wc -l)"
+  [ "$before" = "$after" ] && break
+done
 
 formats="$(PATH="$BUNDLE:$PATH" "$BUNDLE/magick.exe" -list format)"
 for coder in GIF JPEG PNG WEBP TIFF BMP ICO PSD DNG CR2 NEF ARW; do

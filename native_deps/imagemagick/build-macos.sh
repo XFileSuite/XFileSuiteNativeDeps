@@ -5,12 +5,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.1.2-27}"
-LIBRAW_VERSION="${LIBRAW_VERSION:-0.21.4}"
+IMAGEMAGICK_VERSION="${IMAGEMAGICK_VERSION:-7.1.2-29}"
+LIBRAW_VERSION="${LIBRAW_VERSION:-0.22.2}"
 MOZJPEG_VERSION="${MOZJPEG_VERSION:-4.1.1}"
-LIBPNG_VERSION="${LIBPNG_VERSION:-1.6.51}"
+LIBPNG_VERSION="${LIBPNG_VERSION:-1.6.58}"
 LIBWEBP_VERSION="${LIBWEBP_VERSION:-1.6.0}"
-LIBTIFF_VERSION="${LIBTIFF_VERSION:-4.7.1}"
+LIBTIFF_VERSION="${LIBTIFF_VERSION:-4.7.2}"
 GIFLIB_VERSION="${GIFLIB_VERSION:-5.2.2}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist}"
@@ -20,7 +20,7 @@ BUNDLE_NAME="imagemagick-macos-universal"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
 for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
-download() { [ -f "$2" ] || curl -fL --retry 3 --connect-timeout 20 -o "$2" "$1"; }
+download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
 build_cmake() {
@@ -36,8 +36,8 @@ build_cmake() {
 # Rebuild sources/prefixes, but retain downloads to make CI retries inexpensive.
 rm -rf "$WORK_DIR/sources" "$WORK_DIR"/prefix-* "$WORK_DIR"/build-imagemagick-* "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
-download "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${IMAGEMAGICK_VERSION}.tar.gz" "$WORK_DIR/downloads/imagemagick.tar.gz"
-download "https://github.com/LibRaw/LibRaw/archive/refs/tags/${LIBRAW_VERSION}.tar.gz" "$WORK_DIR/downloads/libraw.tar.gz"
+download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick.tar.gz"
+download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw.tar.gz"
 download "https://github.com/mozilla/mozjpeg/archive/refs/tags/v${MOZJPEG_VERSION}.tar.gz" "$WORK_DIR/downloads/mozjpeg.tar.gz"
 download "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/downloads/libpng.tar.gz"
 download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/downloads/libwebp.tar.gz"
@@ -78,12 +78,16 @@ for arch in "${ARCHITECTURES[@]}"; do
     make distclean >/dev/null 2>&1 || true
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
       CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
-      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples
+      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms
     make -j"$JOBS" && make install
   )
   build_dir="$WORK_DIR/build-imagemagick-$arch"; cp -R "$WORK_DIR/sources/imagemagick" "$build_dir"
   (
     cd "$build_dir"
+    # Autoconf otherwise selects the runner's GNU gcc shim, which can produce
+    # a target probe that macOS cannot execute. Keep every configure probe on
+    # the same Apple Clang/toolchain and deployment target as its delegates.
+    export CC=clang CXX=clang++ CPP=clang-cpp
     export CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -I$prefix/include"
     export CXXFLAGS="$CFLAGS" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib"
     export LIBS="-lsharpyuv" PKG_CONFIG_PATH="$prefix/lib/pkgconfig"

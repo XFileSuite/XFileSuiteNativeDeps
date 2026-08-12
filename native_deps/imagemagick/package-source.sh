@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="${IMAGEMAGICK_VERSION:-7.1.2-27}"
+VERSION="${IMAGEMAGICK_VERSION:-7.1.2-29}"
 PLATFORM="${PLATFORM:-macos}"
 RELEASE_ID="${RELEASE_ID:-imagemagick-${PLATFORM}-${VERSION}-xfilesuite.1}"
 if [ "$PLATFORM" = windows ]; then
