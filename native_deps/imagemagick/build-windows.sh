@@ -19,7 +19,7 @@ JOBS="${JOBS:-$(nproc)}"
 BUNDLE="$OUTPUT_DIR/imagemagick-windows-x64"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
-for tool in autoreconf cmake curl find gcc g++ ldd make ninja pkg-config tar zip; do need "$tool"; done
+for tool in autoreconf cmake curl find gcc g++ ldd make ninja pkg-config tar unzip zip; do need "$tool"; done
 download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 build_cmake_static() {
