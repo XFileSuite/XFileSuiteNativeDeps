@@ -1,7 +1,7 @@
 diff --git a/coders/jpeg.c b/coders/jpeg.c
 --- a/coders/jpeg.c
 +++ b/coders/jpeg.c
-@@ -3122,6 +3122,50 @@ static MagickBooleanType WriteJPEGImage(const ImageInfo *image_info,
+@@ -3122,5 +3122,43 @@ static MagickBooleanType WriteJPEGImage(const ImageInfo *image_info,
          }
      }
 +#if defined(JPEG_C_PARAM_SUPPORTED)
