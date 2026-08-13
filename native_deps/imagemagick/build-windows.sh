@@ -107,12 +107,17 @@ echo "Building dynamic ImageMagick against the private prefix..."
   for delegate in JPEG PNG TIFF WEBP ZLIB; do
     grep -Eq "^#define ${delegate}_DELEGATE 1$" config/config.h || { echo "Missing $delegate delegate" >&2; exit 1; }
   done
-  # Libtool's MinGW shared-library link drops transitive static archives from
-  # pkg-config's private fields. Append the exact private-prefix archives at
-  # the end of LIBS, where GNU ld can resolve references from MagickCore's
-  # coder objects. Absolute paths also prevent similarly named MSYS2 import
-  # libraries from being selected.
-  sed -i "/^LIBS =/ s|$| $PREFIX/lib/libtiff.a $PREFIX/lib/libjpeg.a $PREFIX/lib/libpng16.a $PREFIX/lib/libwebpmux.a $PREFIX/lib/libwebpdemux.a $PREFIX/lib/libwebp.a $PREFIX/lib/libsharpyuv.a $PREFIX/lib/libgif.a -lz -lbz2|" Makefile
+  # GNU libtool refuses ordinary external .a arguments when producing a
+  # Windows DLL. Pass the pinned private archives through to ld instead and
+  # append them to MagickCore's real LIBADD variable (not the unused top-level
+  # LIBS variable). This preserves link order and cannot select MSYS2 import
+  # libraries with the same names.
+  static_delegate_ldflags=""
+  for archive_name in libtiff.a libjpeg.a libpng16.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libgif.a; do
+    test -f "$PREFIX/lib/$archive_name"
+    static_delegate_ldflags+=" -Wl,$PREFIX/lib/$archive_name"
+  done
+  sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|$|$static_delegate_ldflags -lz -lbz2|" Makefile
   make -j"$JOBS" && make install
 )
 
