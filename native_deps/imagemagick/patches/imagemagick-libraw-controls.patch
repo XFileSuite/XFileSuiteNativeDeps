@@ -1,7 +1,7 @@
 diff --git a/coders/dng.c b/coders/dng.c
 --- a/coders/dng.c
 +++ b/coders/dng.c
-@@ -304,6 +304,22 @@ static void SetLibRawParams(const ImageInfo *image_info,Image *image,
+@@ -304,6 +304,28 @@ static void SetLibRawParams(const ImageInfo *image_info,Image *image,
      option=GetImageOption(image_info,"dng:no_auto_bright");
    if (option != (const char *) NULL)
      raw_info->params.no_auto_bright=IsStringTrue(option) != MagickFalse ? 1 : 0;
@@ -17,10 +17,16 @@ diff --git a/coders/dng.c b/coders/dng.c
 +    raw_info->params.highlight=StringToInteger(option);
 +  option=GetImageOption(image_info,"dng:exposure-shift");
 +  if (option != (const char *) NULL)
-+    raw_info->params.exp_shift=(float) StringToDouble(option,(char **) NULL);
++    {
++      raw_info->params.exp_correc=1;
++      raw_info->params.exp_shift=(float) StringToDouble(option,(char **) NULL);
++    }
 +  option=GetImageOption(image_info,"dng:exposure-preserve");
 +  if (option != (const char *) NULL)
-+    raw_info->params.exp_preser=(float) StringToDouble(option,(char **) NULL);
++    {
++      raw_info->params.exp_correc=1;
++      raw_info->params.exp_preser=(float) StringToDouble(option,(char **) NULL);
++    }
    option=GetImageOption(image_info,"dng:output-color");
    if (option == (const char *) NULL)
      option=GetImageOption(image_info,"dng:output_color");
