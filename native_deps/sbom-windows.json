@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-13T02:51:56Z",
+  "generatedAt": "2026-08-13T03:33:17Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-560290b7baf9ecd16d47d1e6bdd8a2d5705005f941147f9adbfe3c32f2ade25b.zip",
+      "r2Key": "deps/imagemagick-windows-x64-f6d13ccb7c3d5e8bfc3d0e79fd5f0d849380642c4b21a83b44456842a61d3b80.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "560290b7baf9ecd16d47d1e6bdd8a2d5705005f941147f9adbfe3c32f2ade25b"
+      "bundleSha256": "f6d13ccb7c3d5e8bfc3d0e79fd5f0d849380642c4b21a83b44456842a61d3b80"
     },
     {
       "name": "mediaRuntime",
@@ -46,7 +46,7 @@
       "releaseRevision": 3,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-4f0b675c6df2bf7568e8b792c192e35527611d0294a8c1cf81718e4c6b0dea1b",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-bbb5705984b32a7bf2dd983bd947955acd773bcc3b266c679be3245172286cbb",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -134,7 +134,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "4f0b675c6df2bf7568e8b792c192e35527611d0294a8c1cf81718e4c6b0dea1b"
+      "bundleSha256": "bbb5705984b32a7bf2dd983bd947955acd773bcc3b266c679be3245172286cbb"
     }
   ]
 }
