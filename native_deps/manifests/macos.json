@@ -7,8 +7,8 @@
       "version": "7.1.2-29",
       "releaseRevision": 2,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-495516c895da5747f226632fbf72eb0dd413737bb89b8e2afcfbcf76fdb8b7ae.tar.gz",
-      "bundleSha256": "495516c895da5747f226632fbf72eb0dd413737bb89b8e2afcfbcf76fdb8b7ae",
+      "r2Key": "deps/imagemagick-macos-universal-8670e370ed1510d79566fb701fccf6f6b6b1f58d5effc6c2bc8e268bc729ab49.tar.gz",
+      "bundleSha256": "8670e370ed1510d79566fb701fccf6f6b6b1f58d5effc6c2bc8e268bc729ab49",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2"
     },
     "resvg": {
