@@ -40,6 +40,7 @@ LICENSES = {
   'giflib'        => 'MIT',
   'libraw'        => 'LGPL-2.1 OR CDDL-1.0',
   'resvg'         => 'Apache-2.0 OR MIT',
+  'oxipng'        => 'MIT',
   'mediaRuntime'  => 'LGPL-2.1 aggregate; see subComponents for bundled licenses'
 }.freeze
 

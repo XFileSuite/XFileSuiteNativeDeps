@@ -51,6 +51,7 @@ extract "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/sources
 extract "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/sources/libwebp"
 extract "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/sources/libtiff"
 extract "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz" "$WORK_DIR/sources/giflib"
+patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure" || {
   echo "Downloaded ImageMagick source does not match ${IMAGEMAGICK_VERSION}." >&2
   exit 1
@@ -114,7 +115,12 @@ EOF
     make distclean >/dev/null 2>&1 || true
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
       CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
-      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms
+      CPPFLAGS="-I$prefix/include" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib" \
+      ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
+    grep -Eq '^#define USE_JPEG 1$' config.h || {
+      echo "LibRaw did not enable MozJPEG support for lossy DNG on $arch." >&2
+      exit 1
+    }
     make -j"$JOBS" && make install
   )
   build_dir="$WORK_DIR/build-imagemagick-$arch"; cp -R "$WORK_DIR/sources/imagemagick" "$build_dir"
@@ -247,6 +253,18 @@ test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -q
   echo "Missing versioned thread-safe LibRaw runtime library." >&2
   exit 1
 }
+# MozJPEG is intentionally incorporated into LibRaw statically, so otool must
+# not show a separate JPEG dylib even though lossy-DNG JPEG support is enabled.
+for raw_library in "$bundle"/libraw.25.dylib "$bundle"/libraw_r.25.dylib; do
+  nm "$raw_library" | grep -q '[[:space:]]_jpeg_mem_src$' || {
+    echo "$raw_library does not contain the statically linked MozJPEG decoder." >&2
+    exit 1
+  }
+  ! otool -L "$raw_library" | grep -qi 'libjpeg' || {
+    echo "$raw_library unexpectedly depends on a separate JPEG dylib." >&2
+    exit 1
+  }
+done
 unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libjpeg*.dylib' -o -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
 test -z "$unexpected_delegates" || {
   echo "Delegates that must be static were packaged as dylibs:" >&2
@@ -273,6 +291,19 @@ for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIB
 done
 test -n "$(find "$license_dir" -maxdepth 1 -type f -name 'LIBRAW-*' -print -quit)"
 "$bundle/magick" -version
+trellis_test_dir="$(mktemp -d "$WORK_DIR/trellis-verify.XXXXXX")"
+"$bundle/magick" -size 256x256 gradient:'#123456-#f0c080' \
+  -quality 72 -interlace JPEG -define jpeg:trellis-quantization=on \
+  -define jpeg:optimize-scans=on "$trellis_test_dir/on.jpg"
+"$bundle/magick" -size 256x256 gradient:'#123456-#f0c080' \
+  -quality 72 -interlace JPEG -define jpeg:trellis-quantization=off \
+  -define jpeg:optimize-scans=off "$trellis_test_dir/off.jpg"
+test -s "$trellis_test_dir/on.jpg"; test -s "$trellis_test_dir/off.jpg"
+cmp -s "$trellis_test_dir/on.jpg" "$trellis_test_dir/off.jpg" && {
+  echo "MozJPEG trellis controls did not affect JPEG output." >&2
+  exit 1
+}
+rm -rf "$trellis_test_dir"
 
 # Publish only an archive that behaves identically after extraction. This also
 # catches missing compatibility names and tar layout mistakes before R2 upload.

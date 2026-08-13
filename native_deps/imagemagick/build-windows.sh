@@ -48,9 +48,10 @@ for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
   tarball="$WORK_DIR/downloads/$component-${!version_var}.tar.gz"
   extract "$tarball" "$WORK_DIR/sources/$component"
 done
+patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
-delegate_stamp="$PREFIX/.xfilesuite-delegates-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
+delegate_stamp="$PREFIX/.xfilesuite-delegates-jpegraw-v2-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
 delegate_cache_valid=true
 for cached_file in \
   lib/libjpeg.a lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
@@ -96,7 +97,11 @@ echo "Building dynamic LibRaw..."
   autoreconf -fi
   export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:/mingw64/lib/pkgconfig"
   CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
-    ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms
+    ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
+  grep -Eq '^#define USE_JPEG 1$' config.h || {
+    echo "LibRaw did not enable MozJPEG support for lossy DNG." >&2
+    exit 1
+  }
   make -j"$JOBS" && make install
 )
 touch "$delegate_stamp"
@@ -230,6 +235,20 @@ validate_bundle() {
 }
 
 validate_bundle "$BUNDLE"
+trellis_test_dir="$WORK_DIR/trellis-verify"
+rm -rf "$trellis_test_dir"; mkdir -p "$trellis_test_dir"
+PATH="$BUNDLE:$PATH" "$BUNDLE/magick.exe" -size 256x256 gradient:'#123456-#f0c080' \
+  -quality 72 -interlace JPEG -define jpeg:trellis-quantization=on \
+  -define jpeg:optimize-scans=on "$trellis_test_dir/on.jpg"
+PATH="$BUNDLE:$PATH" "$BUNDLE/magick.exe" -size 256x256 gradient:'#123456-#f0c080' \
+  -quality 72 -interlace JPEG -define jpeg:trellis-quantization=off \
+  -define jpeg:optimize-scans=off "$trellis_test_dir/off.jpg"
+test -s "$trellis_test_dir/on.jpg"; test -s "$trellis_test_dir/off.jpg"
+cmp -s "$trellis_test_dir/on.jpg" "$trellis_test_dir/off.jpg" && {
+  echo "MozJPEG trellis controls did not affect JPEG output." >&2
+  exit 1
+}
+rm -rf "$trellis_test_dir"
 archive="$OUTPUT_DIR/imagemagick-$IMAGEMAGICK_VERSION-windows-x64.zip"
 (cd "$OUTPUT_DIR" && zip -qr "$(basename "$archive")" "$(basename "$BUNDLE")")
 verify_dir="$WORK_DIR/archive-verify"

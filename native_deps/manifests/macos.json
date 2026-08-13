@@ -19,6 +19,14 @@
       "binarySha256": "ca81ac10a44e3d3770d28cb19333e491392008aa6c1ec77a2a83868189a7114c",
       "sourceRelease": "resvg-macos-0.47.0-xfilesuite.1"
     },
+    "oxipng": {
+      "version": "9.1.5",
+      "releaseRevision": 1,
+      "architecture": "universal",
+      "r2Key": "pending",
+      "bundleSha256": "pending",
+      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5"
+    },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,

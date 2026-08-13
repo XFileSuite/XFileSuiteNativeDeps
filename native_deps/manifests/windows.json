@@ -11,6 +11,14 @@
       "bundleSha256": "f6d13ccb7c3d5e8bfc3d0e79fd5f0d849380642c4b21a83b44456842a61d3b80",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2"
     },
+    "oxipng": {
+      "version": "9.1.5",
+      "releaseRevision": 1,
+      "architecture": "x64",
+      "r2Key": "pending",
+      "bundleSha256": "pending",
+      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5"
+    },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,

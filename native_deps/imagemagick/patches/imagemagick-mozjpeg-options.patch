@@ -1,0 +1,47 @@
+diff --git a/coders/jpeg.c b/coders/jpeg.c
+--- a/coders/jpeg.c
++++ b/coders/jpeg.c
+@@ -3122,6 +3122,50 @@ static MagickBooleanType WriteJPEGImage(const ImageInfo *image_info,
+         }
+     }
++#if defined(JPEG_C_PARAM_SUPPORTED)
++  /*
++    Expose MozJPEG's compression controls through ImageMagick defines.  Keep
++    MozJPEG defaults when an option is absent, so this remains opt-in and the
++    coder also continues to compile against ordinary libjpeg implementations.
++  */
++#define SetMozJPEGBooleanOption(name,param) \
++  option=GetImageOption(image_info,name); \
++  if ((option != (const char *) NULL) && \
++      (jpeg_c_bool_param_supported(jpeg_info,param) != FALSE)) \
++    jpeg_c_set_bool_param(jpeg_info,param, \
++      IsStringTrue(option) != MagickFalse ? TRUE : FALSE)
++  SetMozJPEGBooleanOption("jpeg:trellis-quantization",
++    JBOOLEAN_TRELLIS_QUANT);
++  SetMozJPEGBooleanOption("jpeg:trellis-quantization-dc",
++    JBOOLEAN_TRELLIS_QUANT_DC);
++  SetMozJPEGBooleanOption("jpeg:trellis-eob-optimization",
++    JBOOLEAN_TRELLIS_EOB_OPT);
++  SetMozJPEGBooleanOption("jpeg:trellis-use-scans",
++    JBOOLEAN_USE_SCANS_IN_TRELLIS);
++  SetMozJPEGBooleanOption("jpeg:trellis-quant-table-optimization",
++    JBOOLEAN_TRELLIS_Q_OPT);
++  SetMozJPEGBooleanOption("jpeg:optimize-scans",
++    JBOOLEAN_OPTIMIZE_SCANS);
++  SetMozJPEGBooleanOption("jpeg:overshoot-deringing",
++    JBOOLEAN_OVERSHOOT_DERINGING);
++#undef SetMozJPEGBooleanOption
++  option=GetImageOption(image_info,"jpeg:trellis-frequency-split");
++  if ((option != (const char *) NULL) &&
++      (jpeg_c_int_param_supported(jpeg_info,JINT_TRELLIS_FREQ_SPLIT) != FALSE))
++    jpeg_c_set_int_param(jpeg_info,JINT_TRELLIS_FREQ_SPLIT,
++      StringToInteger(option));
++  option=GetImageOption(image_info,"jpeg:trellis-num-loops");
++  if ((option != (const char *) NULL) &&
++      (jpeg_c_int_param_supported(jpeg_info,JINT_TRELLIS_NUM_LOOPS) != FALSE))
++    jpeg_c_set_int_param(jpeg_info,JINT_TRELLIS_NUM_LOOPS,
++      StringToInteger(option));
++#endif
+ #if defined(C_ARITH_CODING_SUPPORTED)
+   option=GetImageOption(image_info,"jpeg:arithmetic-coding");
+   if (IsStringTrue(option) != MagickFalse)
