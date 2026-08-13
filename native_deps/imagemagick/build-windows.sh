@@ -129,14 +129,18 @@ echo "Building dynamic ImageMagick against the private prefix..."
   # append them to MagickCore's real LIBADD variable (not the unused top-level
   # LIBS variable). This preserves link order and cannot select MSYS2 import
   # libraries with the same names.
-  test -f /mingw64/lib/libz.a
-  test -f /mingw64/lib/libbz2.a
+  # zlib and bzip2 are Windows runtime dependencies, not pinned image
+  # delegates. Use their import libraries after libpng/libtiff so GNU ld can
+  # resolve those archives without also mixing static zlib with the import
+  # library already selected by ImageMagick's generated link command.
+  test -f /mingw64/lib/libz.dll.a
+  test -f /mingw64/lib/libbz2.dll.a
   static_delegate_ldflags=" -Wl,--start-group"
   for archive_name in libtiff.a libjpeg.a libpng16.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libgif.a; do
     test -f "$PREFIX/lib/$archive_name"
     static_delegate_ldflags+=",$PREFIX/lib/$archive_name"
   done
-  static_delegate_ldflags+=",/mingw64/lib/libz.a,/mingw64/lib/libbz2.a,--end-group"
+  static_delegate_ldflags+=",/mingw64/lib/libz.dll.a,/mingw64/lib/libbz2.dll.a,--end-group"
   # Automake emits this assignment as a continued line. Insert before its
   # trailing backslash; appending after it turns the next line into a recipe.
   sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|[[:space:]]*\\\\$|$static_delegate_ldflags \\\\|" Makefile
