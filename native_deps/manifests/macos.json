@@ -7,8 +7,8 @@
       "version": "7.1.2-29",
       "releaseRevision": 2,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-8670e370ed1510d79566fb701fccf6f6b6b1f58d5effc6c2bc8e268bc729ab49.tar.gz",
-      "bundleSha256": "8670e370ed1510d79566fb701fccf6f6b6b1f58d5effc6c2bc8e268bc729ab49",
+      "r2Key": "deps/imagemagick-macos-universal-8294eda76af5c117165abd38babb8f0a7cec51c3c38bbc943e23e334bc59c271.tar.gz",
+      "bundleSha256": "8294eda76af5c117165abd38babb8f0a7cec51c3c38bbc943e23e334bc59c271",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2"
     },
     "resvg": {
@@ -23,16 +23,16 @@
       "version": "9.1.5",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/oxipng-macos-universal-1055205ac2e48a2c6373c781ef84c4b21c70410daafe6c3cb2f13e283bed49e7.tar.gz",
-      "bundleSha256": "1055205ac2e48a2c6373c781ef84c4b21c70410daafe6c3cb2f13e283bed49e7",
+      "r2Key": "deps/oxipng-macos-universal-3f5b844232ee2f443d84c29384502a60d7391bea2bb6f712948faa22faeae03d.tar.gz",
+      "bundleSha256": "3f5b844232ee2f443d84c29384502a60d7391bea2bb6f712948faa22faeae03d",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,
       "architecture": "universal",
-      "bundleSha256": "b86128cc9d73d50ad3efeff9c54edd04dc83ac8d61b6f754f38d79d6181bab92",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-b86128cc9d73d50ad3efeff9c54edd04dc83ac8d61b6f754f38d79d6181bab92",
+      "bundleSha256": "6e533d8f4f62ee6d1371573d5e5df8b69f5167d2c6c11662da5b81ea71bcab23",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-6e533d8f4f62ee6d1371573d5e5df8b69f5167d2c6c11662da5b81ea71bcab23",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3"
     }
   }
