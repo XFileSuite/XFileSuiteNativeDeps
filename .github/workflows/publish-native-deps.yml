@@ -384,6 +384,7 @@ jobs:
           "FFMPEG_VERSION=$ffmpegVersion" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "IMAGEMAGICK_VERSION=$($manifest.components.imagemagick.version)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Restore source tarballs cache
+        id: windows-source-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -391,7 +392,7 @@ jobs:
             native_deps/media_runtime/work/*.tar.gz
             native_deps/media_runtime/work/*.7z
             native_deps/media_runtime/work/ffmpeg/*.tar.xz
-            native_deps/imagemagick/work-windows
+            native_deps/imagemagick/work-windows/downloads
           key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
           restore-keys: |
             windows-src-v3-${{ inputs.component }}-
@@ -405,6 +406,13 @@ jobs:
           key: windows-ccache-v1-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh') }}
           restore-keys: |
             windows-ccache-v1-
+      - name: Restore Windows ImageMagick delegate cache
+        id: windows-imagemagick-delegate-cache
+        if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
+        uses: actions/cache@v4
+        with:
+          path: native_deps/imagemagick/work-windows/delegate-prefix
+          key: windows-imagemagick-delegates-v1-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2-5.2.2
       - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' || inputs.component == 'imagemagick' }}
         uses: msys2/setup-msys2@v2
@@ -440,17 +448,6 @@ jobs:
           name: media-runtime-windows-build-log-${{ github.run_attempt }}
           path: media-runtime-windows-build.log
           if-no-files-found: warn
-      - name: Save Windows source cache after diagnostics
-        if: ${{ always() && steps.windows-source-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            native_deps/ffmpeg/work-windows
-            native_deps/media_runtime/work/*.tar.gz
-            native_deps/media_runtime/work/*.7z
-            native_deps/media_runtime/work/ffmpeg/*.tar.xz
-            native_deps/imagemagick/work-windows
-          key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
       - name: Save Windows compiler cache after diagnostics
         if: ${{ always() && (inputs.component == 'all' || inputs.component == 'media-runtime') && steps.windows-compiler-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
@@ -461,6 +458,36 @@ jobs:
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
         shell: msys2 {0}
         run: native_deps/imagemagick/build-windows.sh
+      - name: Save Windows source cache after builds
+        if: ${{ always() && steps.windows-source-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            native_deps/ffmpeg/work-windows
+            native_deps/media_runtime/work/*.tar.gz
+            native_deps/media_runtime/work/*.7z
+            native_deps/media_runtime/work/ffmpeg/*.tar.xz
+            native_deps/imagemagick/work-windows/downloads
+          key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
+      - name: Check Windows ImageMagick delegate cache completeness
+        id: windows-imagemagick-delegate-cache-ready
+        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'imagemagick') }}
+        shell: msys2 {0}
+        run: |
+          if compgen -G 'native_deps/imagemagick/work-windows/delegate-prefix/.xfilesuite-delegates-*' >/dev/null; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Save Windows ImageMagick delegate cache
+        # The completeness stamp is written only after every delegate and
+        # LibRaw has installed, so a later ImageMagick failure must not throw
+        # away hours of reusable compilation work.
+        if: ${{ always() && steps.windows-imagemagick-delegate-cache-ready.outputs.ready == 'true' && steps.windows-imagemagick-delegate-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: native_deps/imagemagick/work-windows/delegate-prefix
+          key: windows-imagemagick-delegates-v1-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2-5.2.2
       - name: Create Windows corresponding-source archives
         shell: pwsh
         run: |

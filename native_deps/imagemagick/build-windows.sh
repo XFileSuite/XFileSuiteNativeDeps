@@ -14,7 +14,7 @@ LIBTIFF_VERSION="${LIBTIFF_VERSION:-4.7.2}"
 GIFLIB_VERSION="${GIFLIB_VERSION:-5.2.2}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work-windows}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist-windows}"
-PREFIX="$WORK_DIR/prefix"
+PREFIX="$WORK_DIR/delegate-prefix"
 JOBS="${JOBS:-$(nproc)}"
 BUNDLE="$OUTPUT_DIR/imagemagick-windows-x64"
 
@@ -31,9 +31,9 @@ build_cmake_static() {
   cmake --install "$source/build-x64"
 }
 
-# Retain downloads only. Rebuilding from clean sources prevents stale shared
-# libraries or configure results from entering a release archive.
-rm -rf "$WORK_DIR/sources" "$PREFIX" "$OUTPUT_DIR"
+# Sources and ImageMagick itself are rebuilt cleanly. The versioned delegate
+# prefix is safe to restore from Actions cache after its contents are verified.
+rm -rf "$WORK_DIR/sources" "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
 download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz"
 download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz"
@@ -50,6 +50,21 @@ for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
 done
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
+delegate_stamp="$PREFIX/.xfilesuite-delegates-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
+delegate_cache_valid=true
+for cached_file in \
+  lib/libjpeg.a lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
+  lib/pkgconfig/libjpeg.pc lib/pkgconfig/libpng.pc lib/pkgconfig/libraw_r.pc lib/pkgconfig/libtiff-4.pc lib/pkgconfig/libwebp.pc; do
+  test -f "$PREFIX/$cached_file" || delegate_cache_valid=false
+done
+find "$PREFIX/bin" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
+find "$PREFIX/lib" -maxdepth 1 -type f \( -iname '*raw*.dll.a' -o -iname '*raw*.a' \) -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
+test -f "$delegate_stamp" || delegate_cache_valid=false
+
+if "$delegate_cache_valid"; then
+  echo "Using verified cached ImageMagick delegates."
+else
+rm -rf "$PREFIX"
 mkdir -p "$PREFIX/lib/pkgconfig"
 echo "Building static ImageMagick delegates..."
 build_cmake_static "$WORK_DIR/sources/mozjpeg" \
@@ -84,6 +99,8 @@ echo "Building dynamic LibRaw..."
     ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms
   make -j"$JOBS" && make install
 )
+touch "$delegate_stamp"
+fi
 
 echo "Building dynamic ImageMagick against the private prefix..."
 (
@@ -102,7 +119,7 @@ echo "Building dynamic ImageMagick against the private prefix..."
   ./configure --prefix="$PREFIX/imagemagick" --enable-shared --disable-static --without-modules \
     --without-perl --without-x --without-fontconfig --without-freetype --without-heic \
     --without-xml --without-openexr --without-lcms --without-lqr --with-raw --without-rsvg --without-gslib \
-    --without-djvu --without-fftw --without-openmp --without-pango --without-cairo --without-gvc \
+    --without-djvu --without-fftw --disable-openmp --without-pango --without-gvc --without-jbig \
     --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
   for delegate in JPEG PNG TIFF WEBP ZLIB; do
     grep -Eq "^#define ${delegate}_DELEGATE 1$" config/config.h || { echo "Missing $delegate delegate" >&2; exit 1; }
@@ -112,14 +129,17 @@ echo "Building dynamic ImageMagick against the private prefix..."
   # append them to MagickCore's real LIBADD variable (not the unused top-level
   # LIBS variable). This preserves link order and cannot select MSYS2 import
   # libraries with the same names.
-  static_delegate_ldflags=""
+  test -f /mingw64/lib/libz.a
+  test -f /mingw64/lib/libbz2.a
+  static_delegate_ldflags=" -Wl,--start-group"
   for archive_name in libtiff.a libjpeg.a libpng16.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libgif.a; do
     test -f "$PREFIX/lib/$archive_name"
-    static_delegate_ldflags+=" -Wl,$PREFIX/lib/$archive_name"
+    static_delegate_ldflags+=",$PREFIX/lib/$archive_name"
   done
+  static_delegate_ldflags+=",/mingw64/lib/libz.a,/mingw64/lib/libbz2.a,--end-group"
   # Automake emits this assignment as a continued line. Insert before its
   # trailing backslash; appending after it turns the next line into a recipe.
-  sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|[[:space:]]*\\\\$|$static_delegate_ldflags -lz -lbz2 \\\\|" Makefile
+  sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|[[:space:]]*\\\\$|$static_delegate_ldflags \\\\|" Makefile
   make -n MagickCore/libMagickCore-7.Q16HDRI.la >/dev/null
   make -j"$JOBS" && make install
 )
