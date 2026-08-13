@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-13T13:13:00Z",
+  "generatedAt": "2026-08-13T14:30:14Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-bdb3edf71a8806cd5b282311812d637b29db4f06327cad9bfd4e590c5a1871d6.zip",
+      "r2Key": "deps/imagemagick-windows-x64-3da332d9f340802601bd70579ec1c72cdbabee2338afb4446f4f09aac62338ae.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "bdb3edf71a8806cd5b282311812d637b29db4f06327cad9bfd4e590c5a1871d6"
+      "bundleSha256": "3da332d9f340802601bd70579ec1c72cdbabee2338afb4446f4f09aac62338ae"
     },
     {
       "name": "oxipng",
@@ -46,12 +46,12 @@
       "releaseRevision": 1,
       "architecture": "x64",
       "license": "MIT",
-      "r2Key": "pending",
+      "r2Key": "deps/oxipng-windows-x64-aba05366b2036d77ebb1d1da97ab53f549aa30110651b9ad8a0bea0e1d0c10ea.zip",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5",
       "subComponents": [
 
       ],
-      "bundleSha256": "pending"
+      "bundleSha256": "aba05366b2036d77ebb1d1da97ab53f549aa30110651b9ad8a0bea0e1d0c10ea"
     },
     {
       "name": "mediaRuntime",
@@ -59,7 +59,7 @@
       "releaseRevision": 3,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-bbb5705984b32a7bf2dd983bd947955acd773bcc3b266c679be3245172286cbb",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-fa021ec60e82312f3cb86cebe34dbb8cdd3c28a8f237f2bf18a73c6b30e3bf8d",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -147,7 +147,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "bbb5705984b32a7bf2dd983bd947955acd773bcc3b266c679be3245172286cbb"
+      "bundleSha256": "fa021ec60e82312f3cb86cebe34dbb8cdd3c28a8f237f2bf18a73c6b30e3bf8d"
     }
   ]
 }
