@@ -54,10 +54,11 @@ grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagi
 delegate_stamp="$PREFIX/.xfilesuite-delegates-sharedjpeg-v3-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
 delegate_cache_valid=true
 for cached_file in \
-  lib/libjpeg.dll.a bin/jpeg62.dll lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
+  lib/libjpeg.dll.a lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
   lib/pkgconfig/libjpeg.pc lib/pkgconfig/libpng.pc lib/pkgconfig/libraw_r.pc lib/pkgconfig/libtiff-4.pc lib/pkgconfig/libwebp.pc; do
   test -f "$PREFIX/$cached_file" || delegate_cache_valid=false
 done
+find "$PREFIX/bin" -maxdepth 1 -type f -iname '*jpeg*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/bin" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/lib" -maxdepth 1 -type f \( -iname '*raw*.dll.a' -o -iname '*raw*.a' \) -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 test -f "$delegate_stamp" || delegate_cache_valid=false
@@ -196,16 +197,18 @@ while :; do
 done
 
 validate_bundle() {
-  local bundle="$1" unexpected formats coder test_dir bundled_license_dir license raw_dll core_dll
+  local bundle="$1" unexpected formats coder test_dir bundled_license_dir license raw_dll core_dll jpeg_dll jpeg_dll_name
   unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
   raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit)"
   test -n "$raw_dll" || { echo "Missing LibRaw DLL" >&2; return 1; }
-  test -f "$bundle/jpeg62.dll" || { echo "Missing shared MozJPEG DLL" >&2; return 1; }
+  jpeg_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*jpeg*.dll' -print -quit)"
+  test -n "$jpeg_dll" || { echo "Missing shared MozJPEG DLL" >&2; return 1; }
   core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
   test -n "$core_dll" || { echo "Missing MagickCore DLL" >&2; return 1; }
-  ldd "$raw_dll" | grep -qi 'jpeg62\.dll' || { echo "LibRaw is not dynamically linked to MozJPEG" >&2; return 1; }
-  ldd "$core_dll" | grep -qi 'jpeg62\.dll' || { echo "MagickCore is not dynamically linked to MozJPEG" >&2; return 1; }
+  jpeg_dll_name="$(basename "$jpeg_dll")"
+  ldd "$raw_dll" | grep -Fqi "$jpeg_dll_name" || { echo "LibRaw is not dynamically linked to MozJPEG $jpeg_dll_name" >&2; return 1; }
+  ldd "$core_dll" | grep -Fqi "$jpeg_dll_name" || { echo "MagickCore is not dynamically linked to MozJPEG $jpeg_dll_name" >&2; return 1; }
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
   for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }

@@ -217,11 +217,13 @@ raw_name="$(basename "$raw_versioned_arm")"
 raw_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$raw_name"
 test -f "$raw_versioned_x86"
 lipo -create "$raw_versioned_arm" "$raw_versioned_x86" -output "$bundle/$raw_name"
-jpeg_versioned_arm="$(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type f -name 'libjpeg.*.dylib' -print -quit)"
-test -n "$jpeg_versioned_arm"
-jpeg_name="$(basename "$jpeg_versioned_arm")"
+# MozJPEG installs a real libjpeg.62.3.0.dylib plus ABI/development symlinks,
+# while consumers record libjpeg.62.dylib as the install name. Resolve the ABI
+# symlink for lipo input but publish it under the exact recorded install name.
+jpeg_name="libjpeg.62.dylib"
+jpeg_versioned_arm="$WORK_DIR/prefix-arm64/lib/$jpeg_name"
 jpeg_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$jpeg_name"
-test -f "$jpeg_versioned_x86"
+test -e "$jpeg_versioned_arm"; test -e "$jpeg_versioned_x86"
 lipo -create "$jpeg_versioned_arm" "$jpeg_versioned_x86" -output "$bundle/$jpeg_name"
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
