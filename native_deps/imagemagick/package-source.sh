@@ -68,6 +68,7 @@ else
 fi
 mkdir -p "$WORK_DIR/patches"
 cp "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch" "$WORK_DIR/patches/"
+cp "$SCRIPT_DIR/patches/imagemagick-libraw-controls.patch" "$WORK_DIR/patches/"
 
 binary_sha="$(shasum -a 256 "$BINARY" | awk '{print $1}')"
 source_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"

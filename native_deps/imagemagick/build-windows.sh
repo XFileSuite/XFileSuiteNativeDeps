@@ -49,6 +49,13 @@ for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
   extract "$tarball" "$WORK_DIR/sources/$component"
 done
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
+patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-libraw-controls.patch"
+for control in bright auto_bright_thr highlight exp_shift exp_preser; do
+  grep -Fq "raw_info->params.$control=" "$WORK_DIR/sources/imagemagick/coders/dng.c" || {
+    echo "ImageMagick DNG coder is missing LibRaw control: $control" >&2
+    exit 1
+  }
+done
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
 delegate_stamp="$PREFIX/.xfilesuite-delegates-sharedjpeg-v3-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
