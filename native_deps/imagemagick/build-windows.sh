@@ -56,8 +56,12 @@ for control in bright auto_bright_thr highlight exp_shift exp_preser; do
     exit 1
   }
 done
-test "$(grep -c 'raw_info->params.exp_correc=1;' "$WORK_DIR/sources/imagemagick/coders/dng.c")" -ge 2 || {
+test "$(grep -c 'raw_info->params.exp_correc=1;' "$WORK_DIR/sources/imagemagick/coders/dng.c")" -eq 1 || {
   echo "ImageMagick DNG exposure controls do not enable LibRaw exposure correction." >&2
+  exit 1
+}
+test "$(grep -c 'exposure_correction=MagickTrue;' "$WORK_DIR/sources/imagemagick/coders/dng.c")" -eq 2 || {
+  echo "Both ImageMagick DNG exposure controls must activate exposure correction." >&2
   exit 1
 }
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"

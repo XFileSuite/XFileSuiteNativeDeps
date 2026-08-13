@@ -1,7 +1,27 @@
-diff --git a/coders/dng.c b/coders/dng.c
 --- a/coders/dng.c
 +++ b/coders/dng.c
-@@ -304,6 +304,28 @@ static void SetLibRawParams(const ImageInfo *image_info,Image *image,
+@@ -267,12 +267,18 @@
+ }
+
+ #if defined(MAGICKCORE_RAW_R_DELEGATE)
+-static void SetLibRawParams(const ImageInfo *image_info,Image *image,
+-  libraw_data_t *raw_info)
++static MagickBooleanType SetLibRawParams(const ImageInfo *image_info,
++  Image *image,libraw_data_t *raw_info,ExceptionInfo *exception)
+ {
++  char
++    *q;
++
+   const char
+     *option;
+
++  MagickBooleanType
++    exposure_correction;
++
+ #if LIBRAW_COMPILE_CHECK_VERSION_NOTLESS(0,20)
+ #if LIBRAW_COMPILE_CHECK_VERSION_NOTLESS(0,21)
+   raw_info->rawparams.max_raw_memory_mb=8192;
+@@ -306,6 +312,57 @@
      option=GetImageOption(image_info,"dng:no_auto_bright");
    if (option != (const char *) NULL)
      raw_info->params.no_auto_bright=IsStringTrue(option) != MagickFalse ? 1 : 0;
@@ -15,18 +35,69 @@ diff --git a/coders/dng.c b/coders/dng.c
 +  option=GetImageOption(image_info,"dng:highlight");
 +  if (option != (const char *) NULL)
 +    raw_info->params.highlight=StringToInteger(option);
++  exposure_correction=MagickFalse;
 +  option=GetImageOption(image_info,"dng:exposure-shift");
 +  if (option != (const char *) NULL)
 +    {
-+      raw_info->params.exp_correc=1;
-+      raw_info->params.exp_shift=(float) StringToDouble(option,(char **) NULL);
++      double
++        value;
++
++      q=(char *) NULL;
++      value=StringToDouble(option,&q);
++      if ((q == option) || (*q != '\0') || (isfinite(value) == 0) ||
++          (value <= 0.0))
++        {
++          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
++            "InvalidArgument","`%s': dng:exposure-shift must be greater "
++            "than zero",option);
++          return(MagickFalse);
++        }
++      raw_info->params.exp_shift=(float) value;
++      exposure_correction=MagickTrue;
 +    }
 +  option=GetImageOption(image_info,"dng:exposure-preserve");
 +  if (option != (const char *) NULL)
 +    {
-+      raw_info->params.exp_correc=1;
-+      raw_info->params.exp_preser=(float) StringToDouble(option,(char **) NULL);
++      double
++        value;
++
++      q=(char *) NULL;
++      value=StringToDouble(option,&q);
++      if ((q == option) || (*q != '\0') || (isfinite(value) == 0) ||
++          (value < 0.0) || (value > 1.0))
++        {
++          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
++            "InvalidArgument","`%s': dng:exposure-preserve must be between "
++            "zero and one",option);
++          return(MagickFalse);
++        }
++      raw_info->params.exp_preser=(float) value;
++      exposure_correction=MagickTrue;
 +    }
++  if (exposure_correction != MagickFalse)
++    raw_info->params.exp_correc=1;
    option=GetImageOption(image_info,"dng:output-color");
    if (option == (const char *) NULL)
      option=GetImageOption(image_info,"dng:output_color");
+@@ -329,6 +386,7 @@
+         raw_info->params.user_qual=value;
+     }
+ #endif
++  return(MagickTrue);
+ }
+
+ static void LibRawDataError(void *data,const char *magick_unused(file),
+@@ -557,7 +615,12 @@
+         libraw_close(raw_info);
+         return(DestroyImageList(image));
+       }
+-    SetLibRawParams(image_info,image,raw_info);
++    status=SetLibRawParams(image_info,image,raw_info,exception);
++    if (status == MagickFalse)
++      {
++        libraw_close(raw_info);
++        return(DestroyImageList(image));
++      }
+     errcode=libraw_dcraw_process(raw_info);
+     if (errcode != LIBRAW_SUCCESS)
+       {
