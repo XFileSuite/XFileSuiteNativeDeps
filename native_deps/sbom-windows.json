@@ -1,21 +1,44 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-12T12:11:14Z",
+  "generatedAt": "2026-08-13T02:51:56Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
     {
       "name": "imagemagick",
-      "version": "7.1.2-27",
-      "releaseRevision": 1,
+      "version": "7.1.2-29",
+      "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c.zip",
-      "sourceRelease": "imagemagick-windows-7.1.2-27-xfilesuite.1",
+      "r2Key": "deps/imagemagick-windows-x64-560290b7baf9ecd16d47d1e6bdd8a2d5705005f941147f9adbfe3c32f2ade25b.zip",
+      "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
-
+        {
+          "name": "libraw",
+          "license": "LGPL-2.1 OR CDDL-1.0"
+        },
+        {
+          "name": "mozjpeg",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libpng",
+          "license": "BSD-2-Clause"
+        },
+        {
+          "name": "libwebp",
+          "license": "BSD-3-Clause"
+        },
+        {
+          "name": "libtiff",
+          "license": "MIT"
+        },
+        {
+          "name": "giflib",
+          "license": "MIT"
+        }
       ],
-      "bundleSha256": "04bd7be689df0e5aabb2ac7e25e06833815fd587bcb58ee9115137012a23c42c"
+      "bundleSha256": "560290b7baf9ecd16d47d1e6bdd8a2d5705005f941147f9adbfe3c32f2ade25b"
     },
     {
       "name": "mediaRuntime",
