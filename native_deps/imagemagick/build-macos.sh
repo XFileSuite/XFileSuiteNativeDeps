@@ -198,12 +198,17 @@ while IFS= read -r -d '' arm_file; do
     *) continue ;;
   esac
   lipo -create "$arm_file" "$x86_file" -output "$destination"
-done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/imagemagick/lib" \( -type f -o -type l \) -print0)
-while IFS= read -r -d '' arm_file; do
-  name="$(basename "$arm_file")"; x86_file="$WORK_DIR/prefix-x86_64/lib/$name"
-  test -e "$x86_file" || continue
-  lipo -create "$arm_file" "$x86_file" -output "$bundle/$name"
-done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 \( -type f -o -type l \) \( -name 'libraw*.dylib' -o -name 'libraw_r*.dylib' \) -print0)
+done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/imagemagick/lib" -type f -print0)
+# ImageMagick links to LibRaw's thread-safe, versioned install name.  The
+# unversioned files installed by LibRaw are development symlinks; feeding them
+# through lipo would turn them into full duplicate files.  The non-thread-safe
+# libraw variant is not referenced by this runtime either.
+raw_versioned_arm="$(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)"
+test -n "$raw_versioned_arm"
+raw_name="$(basename "$raw_versioned_arm")"
+raw_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$raw_name"
+test -f "$raw_versioned_x86"
+lipo -create "$raw_versioned_arm" "$raw_versioned_x86" -output "$bundle/$raw_name"
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
 # MAGICK_CONFIGURE_PATH points at ImageMagick-7 in the App Resources folder.
@@ -245,26 +250,26 @@ for arch in "${ARCHITECTURES[@]}"; do
     grep -Eq "^[[:space:]]*$coder\\*?[[:space:]]+r[w-]" <<<"$formats" || { echo "Missing required $coder coder for $arch" >&2; exit 1; }
   done
 done
-test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw.*.dylib' -print -quit)" || {
-  echo "Missing versioned LibRaw runtime library." >&2
+raw_library="$(find "$bundle" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)"
+test -n "$raw_library" || {
+  echo "Missing versioned thread-safe LibRaw runtime library." >&2
   exit 1
 }
-test -n "$(find "$bundle" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)" || {
-  echo "Missing versioned thread-safe LibRaw runtime library." >&2
+test "$(find "$bundle" -maxdepth 1 -type f -name 'libraw*.dylib' | wc -l | tr -d ' ')" = 1 || {
+  echo "The runtime must contain only the versioned thread-safe LibRaw library." >&2
+  find "$bundle" -maxdepth 1 -type f -name 'libraw*.dylib' -print >&2
   exit 1
 }
 # MozJPEG is intentionally incorporated into LibRaw statically, so otool must
 # not show a separate JPEG dylib even though lossy-DNG JPEG support is enabled.
-for raw_library in "$bundle"/libraw.25.dylib "$bundle"/libraw_r.25.dylib; do
-  nm "$raw_library" | grep -q '[[:space:]]_jpeg_mem_src$' || {
-    echo "$raw_library does not contain the statically linked MozJPEG decoder." >&2
-    exit 1
-  }
-  ! otool -L "$raw_library" | grep -qi 'libjpeg' || {
-    echo "$raw_library unexpectedly depends on a separate JPEG dylib." >&2
-    exit 1
-  }
-done
+nm "$raw_library" | grep -q '[[:space:]]_jpeg_mem_src$' || {
+  echo "$raw_library does not contain the statically linked MozJPEG decoder." >&2
+  exit 1
+}
+! otool -L "$raw_library" | grep -qi 'libjpeg' || {
+  echo "$raw_library unexpectedly depends on a separate JPEG dylib." >&2
+  exit 1
+}
 unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libjpeg*.dylib' -o -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
 test -z "$unexpected_delegates" || {
   echo "Delegates that must be static were packaged as dylibs:" >&2
