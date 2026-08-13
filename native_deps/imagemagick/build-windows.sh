@@ -26,7 +26,7 @@ build_cmake_static() {
   local source="$1"; shift
   cmake -S "$source" -B "$source/build-x64" -G Ninja -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-    -DBUILD_SHARED_LIBS=OFF "$@"
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_SHARED_LIBS=OFF "$@"
   cmake --build "$source/build-x64" --parallel "$JOBS"
   cmake --install "$source/build-x64"
 }
