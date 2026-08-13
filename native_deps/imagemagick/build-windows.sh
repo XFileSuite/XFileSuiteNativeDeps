@@ -117,7 +117,10 @@ echo "Building dynamic ImageMagick against the private prefix..."
     test -f "$PREFIX/lib/$archive_name"
     static_delegate_ldflags+=" -Wl,$PREFIX/lib/$archive_name"
   done
-  sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|$|$static_delegate_ldflags -lz -lbz2|" Makefile
+  # Automake emits this assignment as a continued line. Insert before its
+  # trailing backslash; appending after it turns the next line into a recipe.
+  sed -i "/^MagickCore_libMagickCore_7_Q16HDRI_la_LIBADD =/ s|[[:space:]]*\\\\$|$static_delegate_ldflags -lz -lbz2 \\\\|" Makefile
+  make -n MagickCore/libMagickCore-7.Q16HDRI.la >/dev/null
   make -j"$JOBS" && make install
 )
 
