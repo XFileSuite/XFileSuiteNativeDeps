@@ -7,8 +7,8 @@
       "version": "7.1.2-29",
       "releaseRevision": 2,
       "architecture": "x64",
-      "r2Key": "deps/imagemagick-windows-x64-26fad82bffb556f7880d19f27cca5c00df5d04eacf62d56ff688619c3a4bb095.zip",
-      "bundleSha256": "26fad82bffb556f7880d19f27cca5c00df5d04eacf62d56ff688619c3a4bb095",
+      "r2Key": "deps/imagemagick-windows-x64-c248c7b74c8be429d9c57bbbcb36f02d3e0543b40bd9ee83e0f9b1de0d626f0a.zip",
+      "bundleSha256": "c248c7b74c8be429d9c57bbbcb36f02d3e0543b40bd9ee83e0f9b1de0d626f0a",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2"
     },
     "oxipng": {
