@@ -98,7 +98,7 @@ echo "Building dynamic LibRaw..."
   export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:/mingw64/lib/pkgconfig"
   CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
     ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
-  grep -Eq '^#define USE_JPEG 1$' config.h || {
+  grep -Eq '(^|[[:space:]])-DUSE_JPEG([[:space:]]|$)' Makefile || {
     echo "LibRaw did not enable MozJPEG support for lossy DNG." >&2
     exit 1
   }

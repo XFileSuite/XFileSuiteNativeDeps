@@ -117,7 +117,7 @@ EOF
       CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
       CPPFLAGS="-I$prefix/include" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib" \
       ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
-    grep -Eq '^#define USE_JPEG 1$' config.h || {
+    grep -Eq '(^|[[:space:]])-DUSE_JPEG([[:space:]]|$)' Makefile || {
       echo "LibRaw did not enable MozJPEG support for lossy DNG on $arch." >&2
       exit 1
     }
