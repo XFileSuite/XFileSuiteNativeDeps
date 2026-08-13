@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-12T19:01:42Z",
+  "generatedAt": "2026-08-13T03:45:49Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "universal",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-macos-universal-e394152122c5deee214b41eeec90bb9c9f6bec35130fe5f473509497a5a92763.tar.gz",
+      "r2Key": "deps/imagemagick-macos-universal-495516c895da5747f226632fbf72eb0dd413737bb89b8e2afcfbcf76fdb8b7ae.tar.gz",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "e394152122c5deee214b41eeec90bb9c9f6bec35130fe5f473509497a5a92763"
+      "bundleSha256": "495516c895da5747f226632fbf72eb0dd413737bb89b8e2afcfbcf76fdb8b7ae"
     },
     {
       "name": "resvg",
@@ -59,7 +59,7 @@
       "releaseRevision": 3,
       "architecture": "universal",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-17124906e2ab6445409d90d7b42273ccede0596e081c70f2362e0c3fe6118acf",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-b86128cc9d73d50ad3efeff9c54edd04dc83ac8d61b6f754f38d79d6181bab92",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -131,7 +131,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "17124906e2ab6445409d90d7b42273ccede0596e081c70f2362e0c3fe6118acf"
+      "bundleSha256": "b86128cc9d73d50ad3efeff9c54edd04dc83ac8d61b6f754f38d79d6181bab92"
     }
   ]
 }
