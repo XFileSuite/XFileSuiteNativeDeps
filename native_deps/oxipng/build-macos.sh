@@ -8,9 +8,23 @@ BASE_URL="https://github.com/oxipng/oxipng/releases/download/v$VERSION"
 ARM_ARCHIVE="oxipng-$VERSION-aarch64-apple-darwin.tar.gz"
 X64_ARCHIVE="oxipng-$VERSION-x86_64-apple-darwin.tar.gz"
 ARM_SHA256="a3fbb890c934ca785302d8533d5f076c053cc61946d52b728bca5df7f47cb2e8"
-X64_SHA256="3e55de868eeea1ea41fe5ecddd5790871669c7e2527d996827e91bba8004c289"
+X64_SHA256="c59ca46fe281e95ca2728ca9950096f1099f0776ff4c7eeafae84fdedb26f737"
 
-download() { local name="$1" sha="$2"; mkdir -p "$DOWNLOAD_DIR"; if [ ! -f "$DOWNLOAD_DIR/$name" ] || [ "$(shasum -a 256 "$DOWNLOAD_DIR/$name" | awk '{print $1}')" != "$sha" ]; then curl -fL --retry 5 --retry-all-errors -o "$DOWNLOAD_DIR/$name" "$BASE_URL/$name"; fi; echo "$sha  $DOWNLOAD_DIR/$name" | shasum -a 256 -c -; }
+download() {
+  local name="$1" sha="$2" actual
+  mkdir -p "$DOWNLOAD_DIR"
+  if [ ! -f "$DOWNLOAD_DIR/$name" ] || [ "$(shasum -a 256 "$DOWNLOAD_DIR/$name" | awk '{print $1}')" != "$sha" ]; then
+    curl -fL --retry 5 --retry-all-errors -o "$DOWNLOAD_DIR/$name" "$BASE_URL/$name"
+  fi
+  actual="$(shasum -a 256 "$DOWNLOAD_DIR/$name" | awk '{print $1}')"
+  if [ "$actual" != "$sha" ]; then
+    echo "Official Oxipng archive checksum mismatch: $name" >&2
+    echo "Expected SHA-256: $sha" >&2
+    echo "Actual SHA-256:   $actual" >&2
+    echo "Downloaded size: $(wc -c < "$DOWNLOAD_DIR/$name" | tr -d ' ') bytes" >&2
+    exit 1
+  fi
+}
 download "$ARM_ARCHIVE" "$ARM_SHA256"
 download "$X64_ARCHIVE" "$X64_SHA256"
 stage="$OUTPUT_DIR/oxipng-macos-universal"; rm -rf "$OUTPUT_DIR"; mkdir -p "$stage/ThirdPartyLicenses/Oxipng" "$OUTPUT_DIR/arm" "$OUTPUT_DIR/x64"
