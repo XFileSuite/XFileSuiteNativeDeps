@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds a self-contained x64 Windows runtime. ImageMagick and LibRaw remain
-# dynamic; JPEG, PNG, WebP, TIFF and GIF are linked statically into MagickCore.
+# dynamic; MozJPEG is shared by both, while PNG, WebP, TIFF and GIF are static.
 set -euo pipefail
 trap 'status=$?; echo "Windows ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -51,10 +51,10 @@ done
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
-delegate_stamp="$PREFIX/.xfilesuite-delegates-jpegraw-v2-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
+delegate_stamp="$PREFIX/.xfilesuite-delegates-sharedjpeg-v3-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
 delegate_cache_valid=true
 for cached_file in \
-  lib/libjpeg.a lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
+  lib/libjpeg.dll.a bin/jpeg62.dll lib/libpng16.a lib/libwebp.a lib/libsharpyuv.a lib/libtiff.a lib/libgif.a \
   lib/pkgconfig/libjpeg.pc lib/pkgconfig/libpng.pc lib/pkgconfig/libraw_r.pc lib/pkgconfig/libtiff-4.pc lib/pkgconfig/libwebp.pc; do
   test -f "$PREFIX/$cached_file" || delegate_cache_valid=false
 done
@@ -67,9 +67,13 @@ if "$delegate_cache_valid"; then
 else
 rm -rf "$PREFIX"
 mkdir -p "$PREFIX/lib/pkgconfig"
-echo "Building static ImageMagick delegates..."
-build_cmake_static "$WORK_DIR/sources/mozjpeg" \
-  -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+echo "Building ImageMagick delegates with shared MozJPEG..."
+cmake -S "$WORK_DIR/sources/mozjpeg" -B "$WORK_DIR/sources/mozjpeg/build-x64" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_SHARED=ON -DENABLE_STATIC=OFF \
+  -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+cmake --build "$WORK_DIR/sources/mozjpeg/build-x64" --parallel "$JOBS"
+cmake --install "$WORK_DIR/sources/mozjpeg/build-x64"
 (
   cd "$WORK_DIR/sources/libpng"
   ./configure --prefix="$PREFIX" --disable-shared --enable-static
@@ -120,7 +124,8 @@ echo "Building dynamic ImageMagick against the private prefix..."
     pkg-config --exists "$module" || { pkg-config --print-errors --exists "$module" >&2 || true; exit 1; }
   done
   printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
-  gcc .xfilesuite-delegate-smoke.c $(pkg-config --static --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+  gcc .xfilesuite-delegate-smoke.c $(pkg-config --libs libjpeg) \
+    $(pkg-config --static --libs libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
     -L"$PREFIX/lib" -o .xfilesuite-delegate-smoke.exe
   ./.xfilesuite-delegate-smoke.exe
   rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke.exe
@@ -144,7 +149,7 @@ echo "Building dynamic ImageMagick against the private prefix..."
   test -f /mingw64/lib/libz.dll.a
   test -f /mingw64/lib/libbz2.dll.a
   static_delegate_ldflags=" -Wl,--start-group"
-  for archive_name in libtiff.a libjpeg.a libpng16.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libgif.a; do
+  for archive_name in libtiff.a libpng16.a libwebpmux.a libwebpdemux.a libwebp.a libsharpyuv.a libgif.a; do
     test -f "$PREFIX/lib/$archive_name"
     static_delegate_ldflags+=",$PREFIX/lib/$archive_name"
   done
@@ -191,10 +196,16 @@ while :; do
 done
 
 validate_bundle() {
-  local bundle="$1" unexpected formats coder test_dir bundled_license_dir license
-  unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libjpeg*.dll' -o -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
+  local bundle="$1" unexpected formats coder test_dir bundled_license_dir license raw_dll core_dll
+  unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
-  find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit | grep -q . || { echo "Missing LibRaw DLL" >&2; return 1; }
+  raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit)"
+  test -n "$raw_dll" || { echo "Missing LibRaw DLL" >&2; return 1; }
+  test -f "$bundle/jpeg62.dll" || { echo "Missing shared MozJPEG DLL" >&2; return 1; }
+  core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
+  test -n "$core_dll" || { echo "Missing MagickCore DLL" >&2; return 1; }
+  ldd "$raw_dll" | grep -qi 'jpeg62\.dll' || { echo "LibRaw is not dynamically linked to MozJPEG" >&2; return 1; }
+  ldd "$core_dll" | grep -qi 'jpeg62\.dll' || { echo "MagickCore is not dynamically linked to MozJPEG" >&2; return 1; }
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
   for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }

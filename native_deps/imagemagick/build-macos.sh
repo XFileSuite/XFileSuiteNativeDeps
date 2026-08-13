@@ -83,8 +83,15 @@ Description: macOS SDK zlib
 Version: 1.2.12
 Libs: -lz
 EOF
-  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/mozjpeg" \
-    -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+  # MozJPEG is the single shared JPEG implementation used by both LibRaw and
+  # ImageMagick. Other image delegates remain static.
+  cmake -S "$WORK_DIR/sources/mozjpeg" -B "$WORK_DIR/sources/mozjpeg/build-$arch" \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
+    -DCMAKE_OSX_ARCHITECTURES="$arch" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_SHARED=ON -DENABLE_STATIC=OFF \
+    -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+  cmake --build "$WORK_DIR/sources/mozjpeg/build-$arch" --parallel "$JOBS"
+  cmake --install "$WORK_DIR/sources/mozjpeg/build-$arch"
   (
     cd "$WORK_DIR/sources/libpng"
     make distclean >/dev/null 2>&1 || true
@@ -152,7 +159,8 @@ EOF
     # can link for the current target before running ImageMagick configure.
     printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
     "$CC" $CFLAGS .xfilesuite-delegate-smoke.c \
-      $(pkg-config --static --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+      $(pkg-config --libs libjpeg) \
+      $(pkg-config --static --libs libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
       $LDFLAGS -o .xfilesuite-delegate-smoke
     rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke
     printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
@@ -186,8 +194,8 @@ done
 
 bundle="$OUTPUT_DIR/$BUNDLE_NAME"; mkdir -p "$bundle"
 echo "Assembling universal ImageMagick runtime..."
-# Merge the shared ImageMagick runtime. JPEG, PNG, WebP, TIFF and GIF are
-# already incorporated into libMagickCore from static archives.
+# Merge the shared ImageMagick runtime. PNG, WebP, TIFF and GIF are already
+# incorporated into libMagickCore; MozJPEG remains shared with LibRaw.
 while IFS= read -r -d '' arm_file; do
   relative="${arm_file#"$WORK_DIR/prefix-arm64/imagemagick/"}"
   x86_file="$WORK_DIR/prefix-x86_64/imagemagick/$relative"
@@ -209,6 +217,12 @@ raw_name="$(basename "$raw_versioned_arm")"
 raw_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$raw_name"
 test -f "$raw_versioned_x86"
 lipo -create "$raw_versioned_arm" "$raw_versioned_x86" -output "$bundle/$raw_name"
+jpeg_versioned_arm="$(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type f -name 'libjpeg.*.dylib' -print -quit)"
+test -n "$jpeg_versioned_arm"
+jpeg_name="$(basename "$jpeg_versioned_arm")"
+jpeg_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$jpeg_name"
+test -f "$jpeg_versioned_x86"
+lipo -create "$jpeg_versioned_arm" "$jpeg_versioned_x86" -output "$bundle/$jpeg_name"
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
 # MAGICK_CONFIGURE_PATH points at ImageMagick-7 in the App Resources folder.
@@ -260,17 +274,18 @@ test "$(find "$bundle" -maxdepth 1 -type f -name 'libraw*.dylib' | wc -l | tr -d
   find "$bundle" -maxdepth 1 -type f -name 'libraw*.dylib' -print >&2
   exit 1
 }
-# MozJPEG is intentionally incorporated into LibRaw statically, so otool must
-# not show a separate JPEG dylib even though lossy-DNG JPEG support is enabled.
-nm "$raw_library" | grep -q '[[:space:]]_jpeg_mem_src$' || {
-  echo "$raw_library does not contain the statically linked MozJPEG decoder." >&2
+jpeg_library="$(find "$bundle" -maxdepth 1 -type f -name 'libjpeg.*.dylib' -print -quit)"
+test -n "$jpeg_library" || { echo "Missing shared MozJPEG runtime library." >&2; exit 1; }
+otool -L "$raw_library" | grep -q '@rpath/libjpeg\..*\.dylib' || {
+  echo "$raw_library is not dynamically linked to the bundled MozJPEG library." >&2
   exit 1
 }
-! otool -L "$raw_library" | grep -qi 'libjpeg' || {
-  echo "$raw_library unexpectedly depends on a separate JPEG dylib." >&2
+otool -L "$bundle/libMagickCore-7.Q16HDRI.10.dylib" | grep -q '@rpath/libjpeg\..*\.dylib' || {
+  echo "MagickCore is not dynamically linked to the bundled MozJPEG library." >&2
   exit 1
 }
-unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libjpeg*.dylib' -o -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
+nm "$jpeg_library" | grep -q '[[:space:]]_jpeg_mem_src$' || { echo "Bundled MozJPEG decoder is invalid." >&2; exit 1; }
+unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
 test -z "$unexpected_delegates" || {
   echo "Delegates that must be static were packaged as dylibs:" >&2
   echo "$unexpected_delegates" >&2
