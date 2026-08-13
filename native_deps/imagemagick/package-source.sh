@@ -70,6 +70,12 @@ fi
 binary_sha="$(shasum -a 256 "$BINARY" | awk '{print $1}')"
 source_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
 "$BINARY" -version > "$WORK_DIR/MAGICK-VERSION.txt"
+if [ "$PLATFORM" = windows ]; then
+  runtime_archive="$SCRIPT_DIR/dist-windows/imagemagick-${VERSION}-windows-x64.zip"
+else
+  runtime_archive="$SCRIPT_DIR/dist/imagemagick-macos-universal.tar.gz"
+fi
+test -f "$runtime_archive"
 
 cat > "$WORK_DIR/BUILDINFO.md" <<EOF
 # XFileSuite ${PLATFORM} ImageMagick source correspondence
@@ -77,7 +83,7 @@ cat > "$WORK_DIR/BUILDINFO.md" <<EOF
 - Release identifier: $RELEASE_ID
 - Shipped binary: $BINARY
 - Binary SHA-256: $binary_sha
-- Runtime archive: $SCRIPT_DIR/dist/imagemagick-macos-universal.tar.gz
+- Runtime archive: $runtime_archive
 - Source repository: $SOURCE_REPOSITORY
 - Source tag: $VERSION
 - Source commit: $source_commit
@@ -90,8 +96,8 @@ ImageMagick is distributed under the ImageMagick License. The license and upstre
 NOTICE are in licenses/. For macOS, the release artifact is a relocatable tar.gz
 runtime directory containing magick, its dylibs and configuration files as
 direct macOS Resources children, including ThirdPartyLicenses/ImageMagick. This
-archive also includes the exact LibRaw source tree and license. The macOS
-macOS and Windows archives additionally include MozJPEG, libpng, libwebp,
+archive also includes the exact LibRaw source tree and license. The macOS and
+Windows archives additionally include MozJPEG, libpng, libwebp,
 libtiff and giflib, which are statically linked into MagickCore.
 XFileSuite is proprietary software and does not claim ownership of any of these
 components.

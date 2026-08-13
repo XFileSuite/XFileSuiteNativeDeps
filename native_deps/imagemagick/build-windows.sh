@@ -101,6 +101,9 @@ echo "Building dynamic LibRaw..."
 )
 touch "$delegate_stamp"
 fi
+# ImageMagick is deliberately not part of the delegate cache. Older cache
+# entries may contain it because both previously shared a prefix.
+rm -rf "$PREFIX/imagemagick"
 
 echo "Building dynamic ImageMagick against the private prefix..."
 (
@@ -177,24 +180,57 @@ while :; do
   [ "$before" = "$after" ] && break
 done
 
-unexpected="$(find "$BUNDLE" -maxdepth 1 -type f \( -iname 'libjpeg*.dll' -o -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
-[ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; exit 1; }
-find "$BUNDLE" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit | grep -q . || { echo "Missing LibRaw DLL" >&2; exit 1; }
-formats="$(PATH="$BUNDLE:$PATH" "$BUNDLE/magick.exe" -list format)"
-for coder in GIF JPEG PNG WEBP TIFF BMP ICO PSD DNG CR2 NEF ARW; do
-  grep -Eq "^[[:space:]]*$coder\\*?[[:space:]]+r[w-]" <<<"$formats" || { echo "Missing required $coder coder" >&2; exit 1; }
-done
+validate_bundle() {
+  local bundle="$1" unexpected formats coder test_dir
+  unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libjpeg*.dll' -o -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
+  [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
+  find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit | grep -q . || { echo "Missing LibRaw DLL" >&2; return 1; }
+  while IFS= read -r binary; do
+    if ldd "$binary" | grep -q 'not found'; then
+      echo "Unresolved DLL dependency in $binary:" >&2
+      ldd "$binary" >&2
+      return 1
+    fi
+  done < <(find "$bundle" -maxdepth 1 -type f \( -iname '*.exe' -o -iname '*.dll' \))
+  formats="$(PATH="$bundle:$PATH" "$bundle/magick.exe" -list format)"
+  for coder in GIF JPEG PNG WEBP TIFF BMP ICO PSD; do
+    # Windows output includes a module column (for example: GIF* GIF rw+).
+    # Locate the capability field instead of assuming it is column two.
+    awk -v wanted="$coder" '
+      { format=$1; sub(/\*$/, "", format) }
+      format == wanted { for (i=2; i<=NF; i++) if ($i ~ /^rw/) found=1 }
+      END { exit(found ? 0 : 1) }
+    ' <<<"$formats" || { printf '%s\n' "$formats" >&2; echo "Missing required $coder read/write coder" >&2; return 1; }
+  done
+  for coder in DNG CR2 NEF ARW; do
+    awk -v wanted="$coder" '
+      { format=$1; sub(/\*$/, "", format) }
+      format == wanted { for (i=2; i<=NF; i++) if ($i ~ /^r/) found=1 }
+      END { exit(found ? 0 : 1) }
+    ' <<<"$formats" || { printf '%s\n' "$formats" >&2; echo "Missing required $coder RAW reader" >&2; return 1; }
+  done
+  test_dir="$bundle/.xfilesuite-format-test"
+  rm -rf "$test_dir"; mkdir -p "$test_dir"
+  for extension in png jpg gif webp tiff; do
+    PATH="$bundle:$PATH" "$bundle/magick.exe" -size 2x2 xc:'#336699' "$test_dir/test.$extension"
+    PATH="$bundle:$PATH" "$bundle/magick.exe" identify "$test_dir/test.$extension" >/dev/null
+  done
+  rm -rf "$test_dir"
+  PATH="$bundle:$PATH" "$bundle/magick.exe" -version
+}
+
+validate_bundle "$BUNDLE"
 for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
   test -f "$license_dir/$license"
 done
-PATH="$BUNDLE:$PATH" "$BUNDLE/magick.exe" -version
-
+find "$license_dir" -maxdepth 1 -type f -iname '*libraw*' -print -quit | grep -q . || { echo "Missing LibRaw license" >&2; exit 1; }
 archive="$OUTPUT_DIR/imagemagick-$IMAGEMAGICK_VERSION-windows-x64.zip"
 (cd "$OUTPUT_DIR" && zip -qr "$(basename "$archive")" "$(basename "$BUNDLE")")
 verify_dir="$WORK_DIR/archive-verify"
 rm -rf "$verify_dir"; mkdir -p "$verify_dir"
 unzip -q "$archive" -d "$verify_dir"
 verify_bundle="$verify_dir/$(basename "$BUNDLE")"
-PATH="$verify_bundle:$PATH" "$verify_bundle/magick.exe" -version
+validate_bundle "$verify_bundle"
 rm -rf "$verify_dir"
 sha256sum "$archive" > "$archive.sha256"
+(cd "$OUTPUT_DIR" && sha256sum -c "$(basename "$archive.sha256")")

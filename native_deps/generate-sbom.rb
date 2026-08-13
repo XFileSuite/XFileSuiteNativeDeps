@@ -57,8 +57,9 @@ MEDIA_RUNTIME_PLATFORM_SUBCOMPONENTS = {
 # Sub-components bundled inside the FFmpeg standalone binary.
 FFMPEG_SUBCOMPONENTS = %w[lame libogg libvorbis libvpx libwebp libopus].freeze
 
-# Sub-components bundled inside the ImageMagick macOS runtime.
-IMAGEMAGICK_MACOS_SUBCOMPONENTS = %w[libraw mozjpeg libpng libwebp libtiff giflib].freeze
+# ImageMagick dynamically ships LibRaw and statically incorporates the pinned
+# image delegates on both supported platforms.
+IMAGEMAGICK_SUBCOMPONENTS = %w[libraw mozjpeg libpng libwebp libtiff giflib].freeze
 
 def subcomponents_for(name, platform)
   case name
@@ -69,10 +70,8 @@ def subcomponents_for(name, platform)
   when 'ffmpeg'
     FFMPEG_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
   when 'imagemagick'
-    if platform == 'macos'
-      IMAGEMAGICK_MACOS_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
-    elsif platform == 'windows'
-      [{ 'name' => 'libraw', 'license' => LICENSES.fetch('libraw') }]
+    if %w[macos windows].include?(platform)
+      IMAGEMAGICK_SUBCOMPONENTS.map { |s| { 'name' => s, 'license' => LICENSES.fetch(s, 'unknown') } }
     else
       []
     end
