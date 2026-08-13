@@ -13,9 +13,18 @@ $extract = Join-Path $distDir 'official'
 Remove-Item -Recurse -Force $distDir -ErrorAction SilentlyContinue
 Expand-Archive $archive $extract
 $root = Get-ChildItem $extract -Directory | Select-Object -First 1
+if (-not $root) { throw 'Official Oxipng archive has no top-level directory' }
+$officialBinary = Join-Path $root.FullName 'oxipng.exe'
+$officialLicense = Join-Path $root.FullName 'LICENSE.txt'
+if (-not (Test-Path -PathType Leaf $officialBinary)) { throw 'Official Oxipng archive is missing oxipng.exe' }
+if (-not (Test-Path -PathType Leaf $officialLicense)) { throw 'Official Oxipng archive is missing LICENSE.txt' }
 $bundle = Join-Path $distDir 'oxipng-windows-x64'
 New-Item -ItemType Directory -Force "$bundle/ThirdPartyLicenses/Oxipng" | Out-Null
-Copy-Item "$($root.FullName)/oxipng.exe" "$bundle/oxipng.exe"
-Copy-Item "$($root.FullName)/LICENSE" "$bundle/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt"
+Copy-Item $officialBinary "$bundle/oxipng.exe"
+Copy-Item $officialLicense "$bundle/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt"
 & "$bundle/oxipng.exe" --version | Select-String -SimpleMatch $version | Out-Null
 Compress-Archive -Path "$bundle/*" -DestinationPath "$distDir/oxipng-$version-windows-x64.zip"
+$verifyDir = Join-Path $distDir 'verify'
+Expand-Archive "$distDir/oxipng-$version-windows-x64.zip" $verifyDir
+if (-not (Test-Path -PathType Leaf "$verifyDir/oxipng.exe")) { throw 'Packaged Oxipng ZIP has the wrong executable layout' }
+if (-not (Test-Path -PathType Leaf "$verifyDir/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt")) { throw 'Packaged Oxipng ZIP has the wrong license layout' }
