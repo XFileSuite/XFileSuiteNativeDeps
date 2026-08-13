@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-13T03:33:17Z",
+  "generatedAt": "2026-08-13T13:13:00Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-f6d13ccb7c3d5e8bfc3d0e79fd5f0d849380642c4b21a83b44456842a61d3b80.zip",
+      "r2Key": "deps/imagemagick-windows-x64-bdb3edf71a8806cd5b282311812d637b29db4f06327cad9bfd4e590c5a1871d6.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,20 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "f6d13ccb7c3d5e8bfc3d0e79fd5f0d849380642c4b21a83b44456842a61d3b80"
+      "bundleSha256": "bdb3edf71a8806cd5b282311812d637b29db4f06327cad9bfd4e590c5a1871d6"
+    },
+    {
+      "name": "oxipng",
+      "version": "9.1.5",
+      "releaseRevision": 1,
+      "architecture": "x64",
+      "license": "MIT",
+      "r2Key": "pending",
+      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5",
+      "subComponents": [
+
+      ],
+      "bundleSha256": "pending"
     },
     {
       "name": "mediaRuntime",
