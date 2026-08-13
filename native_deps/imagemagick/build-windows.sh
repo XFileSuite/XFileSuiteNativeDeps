@@ -66,7 +66,7 @@ build_cmake_static "$WORK_DIR/sources/libwebp" \
 sed -i '/^Libs:/ s/$/ -lsharpyuv/' "$PREFIX/lib/pkgconfig/libwebp.pc"
 build_cmake_static "$WORK_DIR/sources/libtiff" \
   -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF \
-  -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
+  -Djpeg=OFF -Dwebp=OFF -Djbig=OFF -Dlerc=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
 (
   cd "$WORK_DIR/sources/giflib"
   make -j"$JOBS" libgif.a
@@ -107,6 +107,12 @@ echo "Building dynamic ImageMagick against the private prefix..."
   for delegate in JPEG PNG TIFF WEBP ZLIB; do
     grep -Eq "^#define ${delegate}_DELEGATE 1$" config/config.h || { echo "Missing $delegate delegate" >&2; exit 1; }
   done
+  # Libtool's MinGW shared-library link drops transitive static archives from
+  # pkg-config's private fields. Append the exact private-prefix archives at
+  # the end of LIBS, where GNU ld can resolve references from MagickCore's
+  # coder objects. Absolute paths also prevent similarly named MSYS2 import
+  # libraries from being selected.
+  sed -i "/^LIBS =/ s|$| $PREFIX/lib/libtiff.a $PREFIX/lib/libjpeg.a $PREFIX/lib/libpng16.a $PREFIX/lib/libwebpmux.a $PREFIX/lib/libwebpdemux.a $PREFIX/lib/libwebp.a $PREFIX/lib/libsharpyuv.a $PREFIX/lib/libgif.a -lz -lbz2|" Makefile
   make -j"$JOBS" && make install
 )
 
