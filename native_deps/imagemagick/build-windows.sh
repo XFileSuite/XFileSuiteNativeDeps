@@ -160,7 +160,12 @@ cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/colors.xml"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/ImageMagick-7/colors.xml"
 license_dir="$BUNDLE/ThirdPartyLicenses/ImageMagick"
 cp "$WORK_DIR/sources/imagemagick/LICENSE" "$license_dir/IMAGEMAGICK-LICENSE.txt"
-find "$WORK_DIR/sources/libraw" -maxdepth 1 -type f \( -iname 'license*' -o -iname 'copying*' \) -exec cp {} "$license_dir/" \;
+libraw_license_count=0
+while IFS= read -r -d '' license; do
+  cp "$license" "$license_dir/LIBRAW-$(basename "$license")"
+  libraw_license_count=$((libraw_license_count + 1))
+done < <(find "$WORK_DIR/sources/libraw" -maxdepth 1 -type f \( -iname 'license*' -o -iname 'copying*' \) -print0)
+[ "$libraw_license_count" -gt 0 ] || { echo "LibRaw source contains no distributable license files" >&2; exit 1; }
 cp "$WORK_DIR/sources/mozjpeg/LICENSE.md" "$license_dir/MOZJPEG-LICENSE.md"
 cp "$WORK_DIR/sources/libpng/LICENSE" "$license_dir/LIBPNG-LICENSE.txt"
 cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
@@ -181,10 +186,15 @@ while :; do
 done
 
 validate_bundle() {
-  local bundle="$1" unexpected formats coder test_dir
+  local bundle="$1" unexpected formats coder test_dir bundled_license_dir license
   unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libjpeg*.dll' -o -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
   find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit | grep -q . || { echo "Missing LibRaw DLL" >&2; return 1; }
+  bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
+  for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
+    test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }
+  done
+  find "$bundled_license_dir" -maxdepth 1 -type f -iname 'LIBRAW-*' -print -quit | grep -q . || { echo "Missing LibRaw license" >&2; return 1; }
   while IFS= read -r binary; do
     if ldd "$binary" | grep -q 'not found'; then
       echo "Unresolved DLL dependency in $binary:" >&2
@@ -220,10 +230,6 @@ validate_bundle() {
 }
 
 validate_bundle "$BUNDLE"
-for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
-  test -f "$license_dir/$license"
-done
-find "$license_dir" -maxdepth 1 -type f -iname '*libraw*' -print -quit | grep -q . || { echo "Missing LibRaw license" >&2; exit 1; }
 archive="$OUTPUT_DIR/imagemagick-$IMAGEMAGICK_VERSION-windows-x64.zip"
 (cd "$OUTPUT_DIR" && zip -qr "$(basename "$archive")" "$(basename "$BUNDLE")")
 verify_dir="$WORK_DIR/archive-verify"

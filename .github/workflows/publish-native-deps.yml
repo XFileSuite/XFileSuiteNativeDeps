@@ -498,6 +498,7 @@ jobs:
             $env:OUT_DIR = 'native_deps/imagemagick/dist-windows'
             $env:IMAGEMAGICK_BUILT_SOURCES_DIR = 'native_deps/imagemagick/work-windows/sources'
             bash native_deps/imagemagick/package-source.sh
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to create the Windows ImageMagick corresponding-source archive' }
           }
           if ($env:COMPONENT -in @('all', 'media-runtime')) {
             bash native_deps/media_runtime/package-windows-source.sh
@@ -521,6 +522,7 @@ jobs:
             $item.sourceRelease = "media-runtime-windows-$($item.version)-xfilesuite.$($item.releaseRevision)"
           }
           $data | ConvertTo-Json -Depth 8 | Set-Content $path
+          Get-Content $path -Raw | ConvertFrom-Json | Out-Null
       - name: Publish Windows source, notices and build records on GitHub
         shell: pwsh
         run: |
@@ -530,8 +532,12 @@ jobs:
           $env:GH_TOKEN = $env:SOURCE_WRITE_TOKEN
           try {
             gh release view $release --repo $releaseRepo 2>$null
-            if ($LASTEXITCODE -ne 0) { gh release create $release --repo $releaseRepo --title $release --notes 'Corresponding source, notices, build information, and checksums for XFileSuite Windows native dependencies.' }
+            if ($LASTEXITCODE -ne 0) {
+              gh release create $release --repo $releaseRepo --title $release --notes 'Corresponding source, notices, build information, and checksums for XFileSuite Windows native dependencies.'
+              if ($LASTEXITCODE -ne 0) { throw "Unable to create corresponding source release $release" }
+            }
             gh release upload $release $archive "$archive.sha256" --repo $releaseRepo --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Unable to upload corresponding source release $release" }
           } finally {
             $env:GH_TOKEN = $originalGhToken
           }
@@ -543,16 +549,22 @@ jobs:
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
-          if ($env:COMPONENT -in @('all', 'imagemagick')) { npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote }
+          if ($env:COMPONENT -in @('all', 'imagemagick')) {
+            npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.imagemagick.r2Key)" --file "native_deps/imagemagick/dist-windows/imagemagick-$($manifest.components.imagemagick.version)-windows-x64.zip" --remote
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to upload the Windows ImageMagick runtime to R2' }
+          }
           if ($env:COMPONENT -in @('all', 'media-runtime')) {
             $archive = Get-ChildItem "native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz" | Select-Object -First 1
             npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.mediaRuntime.r2Key)" --file $archive.FullName --remote
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to upload the Windows media runtime to R2' }
           }
       - name: Generate and upload Windows SBOM
         shell: pwsh
         run: |
           ruby native_deps/generate-sbom.rb native_deps/manifests/windows.json native_deps/sbom-windows.json
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to generate the Windows SBOM' }
           npx wrangler r2 object put "xfilesuite-releases/deps/sbom-windows.json" --file native_deps/sbom-windows.json --remote
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to upload the Windows SBOM to R2' }
       - name: Commit and mirror the Windows manifest
         shell: pwsh
         run: |
@@ -578,7 +590,12 @@ jobs:
           Copy-Item native_deps/sbom-windows.json "$env:RUNNER_TEMP/XFileSuiteSource/native_deps/sbom/sbom-windows.json"
           git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" config user.email 'release-bot@xfilesuite.com'
           git -C "$env:RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/windows.json native_deps/sbom/sbom-windows.json
-          git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest and SBOM'; git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main }
+          git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) {
+            git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest and SBOM'
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the Windows manifest in XFileSuiteSource' }
+            git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to push the Windows manifest to XFileSuiteSource' }
+          }
           gh repo clone XFileSuite/XFileSuite "$env:RUNNER_TEMP/XFileSuite" -- --depth 1
           git -C "$env:RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuite.git"
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/XFileSuite/native-deps" | Out-Null
@@ -586,4 +603,9 @@ jobs:
           Copy-Item native_deps/sbom-windows.json "$env:RUNNER_TEMP/XFileSuite/native-deps/sbom-windows.json"
           git -C "$env:RUNNER_TEMP/XFileSuite" config user.name 'xfilesuite-release-bot'; git -C "$env:RUNNER_TEMP/XFileSuite" config user.email 'release-bot@xfilesuite.com'
           git -C "$env:RUNNER_TEMP/XFileSuite" add native-deps/windows.json native-deps/sbom-windows.json
-          git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest and SBOM'; git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main }
+          git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) {
+            git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest and SBOM'
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the Windows manifest in XFileSuite' }
+            git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Unable to push the Windows manifest to XFileSuite' }
+          }
