@@ -202,12 +202,28 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/media-build-tools"
           "$RUNNER_TEMP/media-build-tools/bin/pip" install "meson==1.3.2"
           echo "$RUNNER_TEMP/media-build-tools/bin" >> "$GITHUB_PATH"
+      - name: Install Rosetta for universal ImageMagick
+        if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
+        run: |
+          if [ "$(uname -m)" = arm64 ] && ! arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+            sudo /usr/sbin/softwareupdate --install-rosetta --agree-to-license
+          fi
+          arch -x86_64 /usr/bin/true
       - name: Build shared media runtime when selected
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         run: native_deps/media_runtime/build-macos.sh
       - name: Build ImageMagick when selected
         if: ${{ inputs.component == 'all' || inputs.component == 'imagemagick' }}
-        run: native_deps/imagemagick/build-macos.sh
+        run: |
+          set -o pipefail
+          native_deps/imagemagick/build-macos.sh 2>&1 | tee imagemagick-macos-build.log
+      - name: Upload macOS ImageMagick build log
+        if: ${{ always() && (inputs.component == 'all' || inputs.component == 'imagemagick') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagemagick-macos-build-log-${{ github.run_attempt }}
+          path: imagemagick-macos-build.log
+          if-no-files-found: warn
       - name: Build resvg when selected
         if: ${{ inputs.component == 'all' || inputs.component == 'resvg' }}
         run: native_deps/resvg/build-macos.sh
