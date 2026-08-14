@@ -53,7 +53,7 @@ extract "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/sourc
 extract "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz" "$WORK_DIR/sources/giflib"
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-libraw-controls.patch"
-for control in bright auto_bright_thr highlight exp_shift exp_preser; do
+for control in half_size bright auto_bright_thr highlight exp_shift exp_preser; do
   grep -Fq "raw_info->params.$control=" "$WORK_DIR/sources/imagemagick/coders/dng.c" || {
     echo "ImageMagick DNG coder is missing LibRaw control: $control" >&2
     exit 1

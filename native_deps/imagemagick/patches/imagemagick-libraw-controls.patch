@@ -21,10 +21,15 @@
  #if LIBRAW_COMPILE_CHECK_VERSION_NOTLESS(0,20)
  #if LIBRAW_COMPILE_CHECK_VERSION_NOTLESS(0,21)
    raw_info->rawparams.max_raw_memory_mb=8192;
-@@ -306,6 +312,57 @@
+@@ -306,6 +312,62 @@
      option=GetImageOption(image_info,"dng:no_auto_bright");
    if (option != (const char *) NULL)
      raw_info->params.no_auto_bright=IsStringTrue(option) != MagickFalse ? 1 : 0;
++  option=GetImageOption(image_info,"dng:half-size");
++  if (option == (const char *) NULL)
++    option=GetImageOption(image_info,"dng:half_size");
++  if (option != (const char *) NULL)
++    raw_info->params.half_size=IsStringTrue(option) != MagickFalse ? 1 : 0;
 +  option=GetImageOption(image_info,"dng:bright");
 +  if (option != (const char *) NULL)
 +    raw_info->params.bright=(float) StringToDouble(option,(char **) NULL);
@@ -79,7 +84,7 @@
    option=GetImageOption(image_info,"dng:output-color");
    if (option == (const char *) NULL)
      option=GetImageOption(image_info,"dng:output_color");
-@@ -329,6 +386,7 @@
+@@ -329,6 +391,7 @@
          raw_info->params.user_qual=value;
      }
  #endif
@@ -87,7 +92,7 @@
  }
 
  static void LibRawDataError(void *data,const char *magick_unused(file),
-@@ -557,7 +615,12 @@
+@@ -557,7 +620,12 @@
          libraw_close(raw_info);
          return(DestroyImageList(image));
        }
