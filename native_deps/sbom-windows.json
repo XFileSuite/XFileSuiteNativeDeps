@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-16T14:45:21Z",
+  "generatedAt": "2026-08-16T15:21:53Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-fbc7958fc0c990689c9b99d8d719b687b1f3f1d7ca5a38c7b41e7806e032f2e4.zip",
+      "r2Key": "deps/imagemagick-windows-x64-389c17a70c158d439c722b879a234880e545738db557f8d921e2b8ec0ca5df8d.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "fbc7958fc0c990689c9b99d8d719b687b1f3f1d7ca5a38c7b41e7806e032f2e4"
+      "bundleSha256": "389c17a70c158d439c722b879a234880e545738db557f8d921e2b8ec0ca5df8d"
     },
     {
       "name": "oxipng",
@@ -59,7 +59,7 @@
       "releaseRevision": 3,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-b7980b5496e6286ad7f9c1c37461343059487a3370228e0d440257c96b8dc6e5",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-88c5dac90ae4b7b7808c5f5bf381c7b2bba72300bac50b6ff2a3bf7964ecc54a",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -147,7 +147,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "b7980b5496e6286ad7f9c1c37461343059487a3370228e0d440257c96b8dc6e5"
+      "bundleSha256": "88c5dac90ae4b7b7808c5f5bf381c7b2bba72300bac50b6ff2a3bf7964ecc54a"
     }
   ]
 }
