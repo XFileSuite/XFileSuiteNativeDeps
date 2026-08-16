@@ -21,7 +21,24 @@ JOBS="${JOBS:-$(nproc)}"
 BUNDLE="$OUTPUT_DIR/imagemagick-windows-x64"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
-for tool in autoreconf cmake curl find gcc g++ ldd make ninja pkg-config tar unzip zip; do need "$tool"; done
+# Prefer MinGW objdump for native PE files (MSYS /usr/bin/objdump is less reliable).
+if [[ -x /mingw64/bin/objdump ]]; then
+  OBJDUMP=/mingw64/bin/objdump
+else
+  OBJDUMP="$(command -v objdump)"
+fi
+export OBJDUMP
+# p7zip provides 7z (preferred) or 7za. Info-ZIP zip/unzip has corrupted large MinGW
+# DLLs on GHA (PE header becomes "MS-DOS MZ only" after round-trip).
+if command -v 7z >/dev/null 2>&1; then
+  SEVEN_ZIP=(7z)
+elif command -v 7za >/dev/null 2>&1; then
+  SEVEN_ZIP=(7za)
+else
+  echo "Missing required tool: 7z (p7zip)" >&2
+  exit 1
+fi
+for tool in autoreconf cmake curl find gcc g++ ldd make ninja pkg-config tar unzip; do need "$tool"; done
 download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 build_cmake_static() {
@@ -181,22 +198,88 @@ echo "Building dynamic ImageMagick against the private prefix..."
 
 echo "Assembling and verifying the Windows runtime..."
 mkdir -p "$BUNDLE/ThirdPartyLicenses/ImageMagick"
-cp "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/"
-# Copy DLLs as real files. Libtool leaves unversioned *.dll symlinks in PREFIX;
-# zip/unzip turns those into non-PE stubs ("not a PE file") and breaks validation.
-find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 \( -type f -o -type l \) -iname '*.dll' -print0 |
-  while IFS= read -r -d '' dll; do
-    cp -fL "$dll" "$BUNDLE/$(basename "$dll")"
-  done
-# Ship only the versioned thread-safe LibRaw runtime (matches macOS).
-rm -f "$BUNDLE"/libraw-[0-9]*.dll \
-  "$BUNDLE"/libraw.dll \
-  "$BUNDLE"/libraw_r.dll \
-  "$BUNDLE"/libjpeg.dll
-# Ensure MozJPEG is present even if ldd walking misses it under MSYS.
-if [[ -f "$PREFIX/bin/libjpeg-62.dll" ]]; then
-  cp -fL "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll"
-fi
+
+# True PE check via MZ + PE signature (does not depend on objdump).
+is_pe_file() {
+  local path="$1" pe_offset pe_magic
+  [[ -f "$path" && ! -L "$path" ]] || return 1
+  [[ "$(od -An -N2 -tx1 "$path" | tr -d ' \n')" == "4d5a" ]] || return 1
+  pe_offset="$(od -An -j60 -N4 -tu4 "$path" | tr -d ' ')"
+  [[ -n "$pe_offset" && "$pe_offset" -gt 0 && "$pe_offset" -lt 4096 ]] || return 1
+  pe_magic="$(od -An -j"$pe_offset" -N4 -tx1 "$path" | tr -d ' \n')"
+  [[ "$pe_magic" == "50450000" ]]
+}
+
+require_pe_dll() {
+  local path="$1"
+  local label="$2"
+  if [[ ! -f "$path" ]]; then
+    echo "Missing $label: $path" >&2
+    return 1
+  fi
+  if [[ -L "$path" ]]; then
+    echo "$label is a symlink (refusing to ship libtool link stubs): $path -> $(readlink "$path" 2>/dev/null || true)" >&2
+    return 1
+  fi
+  if ! is_pe_file "$path"; then
+    echo "$label is not a PE DLL: $path" >&2
+    ls -la "$path" >&2 || true
+    file "$path" >&2 || true
+    od -An -N64 -tx1 "$path" >&2 || true
+    return 1
+  fi
+  if ! "$OBJDUMP" -p "$path" >/dev/null 2>&1; then
+    echo "$label has a PE signature but $OBJDUMP cannot parse it: $path" >&2
+    return 1
+  fi
+}
+
+# Copy only real PE DLLs into the bundle (never libtool symlink stubs).
+install_pe_dll() {
+  local src="$1"
+  local dest="$2"
+  local label="${3:-$(basename "$dest")}"
+  [[ -e "$src" ]] || { echo "Missing source DLL for $label: $src" >&2; return 1; }
+  cp -fL "$src" "$dest"
+  require_pe_dll "$dest" "$label"
+}
+
+drop_unwanted_runtime_names() {
+  rm -f "$BUNDLE"/libraw-[0-9]*.dll \
+    "$BUNDLE"/libraw.dll \
+    "$BUNDLE"/libraw_r.dll \
+    "$BUNDLE"/libjpeg.dll
+}
+
+install_pe_dll "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/magick.exe" "magick.exe"
+
+# Prefer regular files from the install prefix. Follow links only when the
+# resolved target is itself a PE file.
+while IFS= read -r -d '' dll; do
+  name="$(basename "$dll")"
+  case "$name" in
+    libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll) continue ;;
+  esac
+  if [[ -L "$dll" ]]; then
+    target="$(readlink -f "$dll" 2>/dev/null || readlink "$dll" || true)"
+    [[ -n "$target" && -f "$target" ]] || continue
+    is_pe_file "$target" || continue
+    install_pe_dll "$target" "$BUNDLE/$name" "$name" || continue
+  else
+    is_pe_file "$dll" || continue
+    install_pe_dll "$dll" "$BUNDLE/$name" "$name" || continue
+  fi
+done < <(find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 \( -type f -o -type l \) -iname '*.dll' -print0)
+
+drop_unwanted_runtime_names
+
+# Force the versioned thread-safe LibRaw + MozJPEG sonames we validate against.
+raw_src="$(find "$PREFIX/bin" -maxdepth 1 -type f -iname 'libraw_r-[0-9]*.dll' -print -quit)"
+test -n "$raw_src" || { echo "PREFIX is missing versioned libraw_r-*.dll" >&2; exit 1; }
+install_pe_dll "$raw_src" "$BUNDLE/$(basename "$raw_src")" "LibRaw"
+test -f "$PREFIX/bin/libjpeg-62.dll" || { echo "PREFIX is missing libjpeg-62.dll" >&2; exit 1; }
+install_pe_dll "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll" "MozJPEG"
+
 cp -R "$PREFIX/imagemagick/etc/ImageMagick-7" "$BUNDLE/"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/colors.xml"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/ImageMagick-7/colors.xml"
@@ -216,9 +299,18 @@ cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
 copy_dlls() {
   local binary="$1"
+  local dll name
   while IFS= read -r dll; do
     [ -f "$dll" ] || continue
-    cp -fnL "$dll" "$BUNDLE/$(basename "$dll")"
+    name="$(basename "$dll")"
+    case "$name" in
+      libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll) continue ;;
+    esac
+    if [[ -f "$BUNDLE/$name" ]]; then
+      continue
+    fi
+    is_pe_file "$dll" || continue
+    install_pe_dll "$dll" "$BUNDLE/$name" "$name" || true
   done < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
 }
 while :; do
@@ -228,11 +320,18 @@ while :; do
   after="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
   [ "$before" = "$after" ] && break
 done
-# Drop non-thread-safe / unversioned LibRaw names again if copy_dlls reintroduced them.
-rm -f "$BUNDLE"/libraw-[0-9]*.dll \
-  "$BUNDLE"/libraw.dll \
-  "$BUNDLE"/libraw_r.dll \
-  "$BUNDLE"/libjpeg.dll
+drop_unwanted_runtime_names
+# Re-assert critical sonames after dependency walking.
+install_pe_dll "$raw_src" "$BUNDLE/$(basename "$raw_src")" "LibRaw"
+install_pe_dll "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll" "MozJPEG"
+
+# Drop any non-PE *.dll that slipped in (symlink stubs, import libs renamed, etc.).
+while IFS= read -r -d '' dll; do
+  if ! is_pe_file "$dll"; then
+    echo "Removing non-PE file from bundle: $dll" >&2
+    rm -f "$dll"
+  fi
+done < <(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' -print0)
 
 echo "Packaging MagickWand + LibRaw public headers..."
 headers_root="$BUNDLE/native-headers"
@@ -254,26 +353,11 @@ EOF
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
 
-require_pe_dll() {
-  local path="$1"
-  local label="$2"
-  if [[ ! -f "$path" ]]; then
-    echo "Missing $label: $path" >&2
-    return 1
-  fi
-  if ! objdump -p "$path" >/dev/null 2>&1; then
-    echo "$label is not a PE DLL (likely a libtool symlink stub after zip): $path" >&2
-    ls -la "$path" >&2 || true
-    file "$path" >&2 || true
-    return 1
-  fi
-}
-
 dll_depends_on() {
   local binary="$1"
   local needed="$2"
   # Prefer the import table — more stable than MSYS ldd path resolution after unzip.
-  objdump -p "$binary" 2>/dev/null | grep -Ei 'DLL Name:' | grep -Fqi "$needed" && return 0
+  "$OBJDUMP" -p "$binary" 2>/dev/null | grep -Ei 'DLL Name:' | grep -Fqi "$needed" && return 0
   ldd "$binary" 2>/dev/null | grep -Fqi "$needed"
 }
 
@@ -282,7 +366,7 @@ validate_bundle() {
   unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
   # Prefer the versioned soname (libraw_r-25.dll). Unversioned libraw_r.dll is a
-  # libtool development symlink and becomes a non-PE stub after zip/unzip.
+  # libtool development symlink / non-PE stub.
   raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libraw_r-[0-9]*.dll' -print -quit)"
   test -n "$raw_dll" || { echo "Missing LibRaw DLL (libraw_r-<ver>.dll)" >&2; return 1; }
   jpeg_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libjpeg-62.dll' -print -quit)"
@@ -305,7 +389,7 @@ validate_bundle() {
     echo "--- ldd ---" >&2
     ldd "$raw_dll" >&2 || true
     echo "--- objdump DLL Name ---" >&2
-    objdump -p "$raw_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
+    "$OBJDUMP" -p "$raw_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
     return 1
   fi
   if ! dll_depends_on "$core_dll" "$jpeg_dll_name"; then
@@ -313,7 +397,7 @@ validate_bundle() {
     echo "--- ldd ---" >&2
     ldd "$core_dll" >&2 || true
     echo "--- objdump DLL Name ---" >&2
-    objdump -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
+    "$OBJDUMP" -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
     return 1
   fi
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
@@ -364,6 +448,16 @@ validate_bundle() {
   PATH="$bundle:$PATH" "$bundle/magick.exe" -version
 }
 
+hash_runtime_binaries() {
+  local root="$1"
+  (
+    cd "$root"
+    find . -maxdepth 1 -type f \( -iname '*.dll' -o -iname '*.exe' \) -print | LC_ALL=C sort | while IFS= read -r rel; do
+      sha256sum "$rel"
+    done
+  )
+}
+
 validate_bundle "$BUNDLE"
 trellis_test_dir="$WORK_DIR/trellis-verify"
 rm -rf "$trellis_test_dir"; mkdir -p "$trellis_test_dir"
@@ -379,13 +473,65 @@ cmp -s "$trellis_test_dir/on.jpg" "$trellis_test_dir/off.jpg" && {
   exit 1
 }
 rm -rf "$trellis_test_dir"
+
+# Refresh critical DLLs from PREFIX after magick exercised them, then package.
+install_pe_dll "$raw_src" "$BUNDLE/$(basename "$raw_src")" "LibRaw"
+install_pe_dll "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll" "MozJPEG"
+core_src="$(find "$PREFIX/imagemagick/bin" -maxdepth 1 -type f -iname '*MagickCore-[0-9]*.dll' -print -quit)"
+if [[ -z "$core_src" ]]; then
+  core_src="$(find "$PREFIX/imagemagick/bin" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
+fi
+test -n "$core_src" || { echo "PREFIX is missing MagickCore DLL" >&2; exit 1; }
+install_pe_dll "$core_src" "$BUNDLE/$(basename "$core_src")" "MagickCore"
+install_pe_dll "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/magick.exe" "magick.exe"
+
+pre_archive_hashes="$WORK_DIR/pre-archive-binaries.sha256"
+hash_runtime_binaries "$BUNDLE" > "$pre_archive_hashes"
+echo "Pre-archive runtime binary hashes:"
+cat "$pre_archive_hashes"
+
 archive="$OUTPUT_DIR/imagemagick-$IMAGEMAGICK_VERSION-windows-x64.zip"
-(cd "$OUTPUT_DIR" && zip -qr "$(basename "$archive")" "$(basename "$BUNDLE")")
+rm -f "$archive"
+echo "Creating release zip with ${SEVEN_ZIP[*]} (avoiding Info-ZIP zip)..."
+(
+  cd "$OUTPUT_DIR"
+  "${SEVEN_ZIP[@]}" a -tzip -mx=5 -bd -y "$(basename "$archive")" "$(basename "$BUNDLE")" >/dev/null
+)
+test -f "$archive"
+
+# Extract with 7z (same tool family as create). MSYS Info-ZIP unzip has been
+# observed to yield non-PE "MZ-only" bytes for large MinGW DLLs even when the
+# zip payload is intact; do not gate release validation on that unzip.
 verify_dir="$WORK_DIR/archive-verify"
 rm -rf "$verify_dir"; mkdir -p "$verify_dir"
-unzip -q "$archive" -d "$verify_dir"
+"${SEVEN_ZIP[@]}" x -y "-o${verify_dir}" "$archive" >/dev/null
 verify_bundle="$verify_dir/$(basename "$BUNDLE")"
+test -d "$verify_bundle"
+post_archive_hashes="$WORK_DIR/post-archive-binaries.sha256"
+hash_runtime_binaries "$verify_bundle" > "$post_archive_hashes"
+if ! cmp -s "$pre_archive_hashes" "$post_archive_hashes"; then
+  echo "Archive round-trip changed runtime binary contents (7z extract):" >&2
+  diff -u "$pre_archive_hashes" "$post_archive_hashes" >&2 || true
+  exit 1
+fi
+echo "Archive round-trip preserved all top-level exe/dll SHA-256 digests."
 validate_bundle "$verify_bundle"
-rm -rf "$verify_dir"
+
+# Secondary check: Info-ZIP unzip must also preserve PE bytes (App fetch-deps).
+unzip_dir="$WORK_DIR/archive-verify-unzip"
+rm -rf "$unzip_dir"; mkdir -p "$unzip_dir"
+unzip -q "$archive" -d "$unzip_dir"
+unzip_bundle="$unzip_dir/$(basename "$BUNDLE")"
+unzip_hashes="$WORK_DIR/post-unzip-binaries.sha256"
+hash_runtime_binaries "$unzip_bundle" > "$unzip_hashes"
+if ! cmp -s "$pre_archive_hashes" "$unzip_hashes"; then
+  echo "WARNING: MSYS Info-ZIP unzip altered runtime binaries; 7z extract is intact." >&2
+  echo "Re-extracting with 7z into the unzip tree is required for local MSYS consumers." >&2
+  diff -u "$pre_archive_hashes" "$unzip_hashes" >&2 || true
+  # Fail hard: published zips must survive the unzip path used by fetch-deps.sh.
+  exit 1
+fi
+echo "Info-ZIP unzip also preserved runtime binary digests."
+rm -rf "$verify_dir" "$unzip_dir"
 sha256sum "$archive" > "$archive.sha256"
 (cd "$OUTPUT_DIR" && sha256sum -c "$(basename "$archive.sha256")")
