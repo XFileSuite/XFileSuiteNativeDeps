@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds a self-contained x64 Windows runtime. ImageMagick and LibRaw remain
 # dynamic; MozJPEG is shared by both, while PNG, WebP, TIFF and GIF are static.
+# Also ships native-headers/ (MagickWand + LibRaw public headers) for App-side
+# FFI packages; fetch-deps deploys then strips them from the runtime folder.
 set -euo pipefail
 trap 'status=$?; echo "Windows ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -198,6 +200,26 @@ cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
 cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
+echo "Packaging MagickWand + LibRaw public headers..."
+headers_root="$BUNDLE/native-headers"
+rm -rf "$headers_root"
+mkdir -p \
+  "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}" \
+  "$headers_root/libraw-${LIBRAW_VERSION}/libraw"
+im_include="$PREFIX/imagemagick/include/ImageMagick-7"
+libraw_include="$PREFIX/include/libraw"
+test -f "$im_include/MagickWand/MagickWand.h"
+test -f "$libraw_include/libraw.h"
+cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
+cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
+cp -R "$libraw_include/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+cat > "$headers_root/versions.env" <<EOF
+IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
+LIBRAW_VERSION=${LIBRAW_VERSION}
+EOF
+test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
+test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
+
 copy_dlls() {
   local binary="$1"
   while IFS= read -r dll; do [ -f "$dll" ] && cp -n "$dll" "$BUNDLE/"; done \
@@ -229,6 +251,15 @@ validate_bundle() {
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }
   done
   find "$bundled_license_dir" -maxdepth 1 -type f -iname 'LIBRAW-*' -print -quit | grep -q . || { echo "Missing LibRaw license" >&2; return 1; }
+  test -f "$bundle/native-headers/versions.env" || { echo "Missing native-headers/versions.env" >&2; return 1; }
+  test -f "$bundle/native-headers/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h" || {
+    echo "Missing MagickWand headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/libraw-${LIBRAW_VERSION}/libraw/libraw.h" || {
+    echo "Missing LibRaw headers in native-headers" >&2
+    return 1
+  }
   while IFS= read -r binary; do
     if ldd "$binary" | grep -q 'not found'; then
       echo "Unresolved DLL dependency in $binary:" >&2

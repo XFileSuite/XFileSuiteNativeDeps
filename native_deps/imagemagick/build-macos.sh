@@ -2,6 +2,9 @@
 # Builds a relocatable, dynamically linked universal ImageMagick runtime.
 # The resulting directory mirrors macos/Runner/Resources: magick, all dylibs,
 # and ImageMagick configuration files are direct Resources children.
+# Also ships native-headers/ (MagickWand + LibRaw public headers) for
+# packages/xf_magick and packages/xf_raw; fetch-deps deploys then strips them
+# from Resources so they never ship inside the app bundle.
 set -euo pipefail
 trap 'status=$?; echo "ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -256,6 +259,29 @@ cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
 cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
+# Public headers for App-side FFI packages (xf_raw / xf_magick). Staged under
+# native-headers/ so fetch-deps can deploy them into packages/*/native/vendor
+# and strip them out of Contents/Resources before shipping.
+echo "Packaging MagickWand + LibRaw public headers..."
+headers_root="$bundle/native-headers"
+rm -rf "$headers_root"
+mkdir -p \
+  "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}" \
+  "$headers_root/libraw-${LIBRAW_VERSION}/libraw"
+im_include="$WORK_DIR/prefix-arm64/imagemagick/include/ImageMagick-7"
+libraw_include="$WORK_DIR/prefix-arm64/include/libraw"
+test -f "$im_include/MagickWand/MagickWand.h"
+test -f "$libraw_include/libraw.h"
+cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
+cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
+cp -R "$libraw_include/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+cat > "$headers_root/versions.env" <<EOF
+IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
+LIBRAW_VERSION=${LIBRAW_VERSION}
+EOF
+test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
+test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
+
 # Remove build-machine absolute paths. The app stages this directory directly
 # into Contents/Resources, so both executable and dylibs resolve there.
 echo "Rewriting bundled Mach-O install names..."
@@ -352,6 +378,9 @@ trap 'rm -rf "$verify_dir"' EXIT
 tar -xzf "$archive" -C "$verify_dir"
 verify_bundle="$verify_dir/$BUNDLE_NAME"
 test -x "$verify_bundle/magick"
+test -f "$verify_bundle/native-headers/versions.env"
+test -f "$verify_bundle/native-headers/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
+test -f "$verify_bundle/native-headers/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
 MAGICK_CONFIGURE_PATH="$verify_bundle/ImageMagick-7" "$verify_bundle/magick" -version
 for arch in "${ARCHITECTURES[@]}"; do
   arch -"$arch" "$verify_bundle/magick" -version >/dev/null
