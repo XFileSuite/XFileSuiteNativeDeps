@@ -182,13 +182,20 @@ echo "Building dynamic ImageMagick against the private prefix..."
 echo "Assembling and verifying the Windows runtime..."
 mkdir -p "$BUNDLE/ThirdPartyLicenses/ImageMagick"
 cp "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/"
-find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 -type f -iname '*.dll' -exec cp {} "$BUNDLE/" \;
-# Ship only the thread-safe LibRaw runtime (matches macOS). The non-_r DLL
-# still gets pulled from PREFIX/bin and makes *raw*.dll checks ambiguous.
-rm -f "$BUNDLE"/libraw-[0-9]*.dll
+# Copy DLLs as real files. Libtool leaves unversioned *.dll symlinks in PREFIX;
+# zip/unzip turns those into non-PE stubs ("not a PE file") and breaks validation.
+find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 \( -type f -o -type l \) -iname '*.dll' -print0 |
+  while IFS= read -r -d '' dll; do
+    cp -fL "$dll" "$BUNDLE/$(basename "$dll")"
+  done
+# Ship only the versioned thread-safe LibRaw runtime (matches macOS).
+rm -f "$BUNDLE"/libraw-[0-9]*.dll \
+  "$BUNDLE"/libraw.dll \
+  "$BUNDLE"/libraw_r.dll \
+  "$BUNDLE"/libjpeg.dll
 # Ensure MozJPEG is present even if ldd walking misses it under MSYS.
 if [[ -f "$PREFIX/bin/libjpeg-62.dll" ]]; then
-  cp -f "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll"
+  cp -fL "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll"
 fi
 cp -R "$PREFIX/imagemagick/etc/ImageMagick-7" "$BUNDLE/"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/colors.xml"
@@ -209,8 +216,10 @@ cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
 copy_dlls() {
   local binary="$1"
-  while IFS= read -r dll; do [ -f "$dll" ] && cp -n "$dll" "$BUNDLE/"; done \
-    < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
+  while IFS= read -r dll; do
+    [ -f "$dll" ] || continue
+    cp -fnL "$dll" "$BUNDLE/$(basename "$dll")"
+  done < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
 }
 while :; do
   before="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
@@ -219,8 +228,11 @@ while :; do
   after="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
   [ "$before" = "$after" ] && break
 done
-# Drop non-thread-safe LibRaw again in case copy_dlls reintroduced it.
-rm -f "$BUNDLE"/libraw-[0-9]*.dll
+# Drop non-thread-safe / unversioned LibRaw names again if copy_dlls reintroduced them.
+rm -f "$BUNDLE"/libraw-[0-9]*.dll \
+  "$BUNDLE"/libraw.dll \
+  "$BUNDLE"/libraw_r.dll \
+  "$BUNDLE"/libjpeg.dll
 
 echo "Packaging MagickWand + LibRaw public headers..."
 headers_root="$BUNDLE/native-headers"
@@ -242,13 +254,26 @@ EOF
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
 
+require_pe_dll() {
+  local path="$1"
+  local label="$2"
+  if [[ ! -f "$path" ]]; then
+    echo "Missing $label: $path" >&2
+    return 1
+  fi
+  if ! objdump -p "$path" >/dev/null 2>&1; then
+    echo "$label is not a PE DLL (likely a libtool symlink stub after zip): $path" >&2
+    ls -la "$path" >&2 || true
+    file "$path" >&2 || true
+    return 1
+  fi
+}
+
 dll_depends_on() {
   local binary="$1"
   local needed="$2"
   # Prefer the import table — more stable than MSYS ldd path resolution after unzip.
-  if command -v objdump >/dev/null 2>&1; then
-    objdump -p "$binary" 2>/dev/null | grep -Ei 'DLL Name:' | grep -Fqi "$needed" && return 0
-  fi
+  objdump -p "$binary" 2>/dev/null | grep -Ei 'DLL Name:' | grep -Fqi "$needed" && return 0
   ldd "$binary" 2>/dev/null | grep -Fqi "$needed"
 }
 
@@ -256,13 +281,25 @@ validate_bundle() {
   local bundle="$1" unexpected formats coder test_dir bundled_license_dir license raw_dll core_dll jpeg_dll jpeg_dll_name
   unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
-  raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libraw_r*.dll' -print -quit)"
-  test -n "$raw_dll" || { echo "Missing LibRaw DLL (libraw_r*.dll)" >&2; return 1; }
-  jpeg_dll="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libjpeg-62.dll' -o -iname 'libjpeg*.dll' \) -print -quit)"
+  # Prefer the versioned soname (libraw_r-25.dll). Unversioned libraw_r.dll is a
+  # libtool development symlink and becomes a non-PE stub after zip/unzip.
+  raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libraw_r-[0-9]*.dll' -print -quit)"
+  test -n "$raw_dll" || { echo "Missing LibRaw DLL (libraw_r-<ver>.dll)" >&2; return 1; }
+  jpeg_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libjpeg-62.dll' -print -quit)"
+  if [[ -z "$jpeg_dll" ]]; then
+    jpeg_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libjpeg-[0-9]*.dll' -print -quit)"
+  fi
   test -n "$jpeg_dll" || { echo "Missing shared MozJPEG DLL" >&2; return 1; }
-  core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
+  core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore-[0-9]*.dll' -print -quit)"
+  if [[ -z "$core_dll" ]]; then
+    core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
+  fi
   test -n "$core_dll" || { echo "Missing MagickCore DLL" >&2; return 1; }
+  require_pe_dll "$raw_dll" "LibRaw" || return 1
+  require_pe_dll "$jpeg_dll" "MozJPEG" || return 1
+  require_pe_dll "$core_dll" "MagickCore" || return 1
   jpeg_dll_name="$(basename "$jpeg_dll")"
+  echo "Checking PE imports: $(basename "$raw_dll") → $jpeg_dll_name"
   if ! dll_depends_on "$raw_dll" "$jpeg_dll_name"; then
     echo "LibRaw is not dynamically linked to MozJPEG $jpeg_dll_name" >&2
     echo "--- ldd ---" >&2
