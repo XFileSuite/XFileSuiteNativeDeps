@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-16T08:08:04Z",
+  "generatedAt": "2026-08-16T13:08:26Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "universal",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-macos-universal-1afc8b97d81cd4107ada15c2fbe69206714c82efad99b4bcc2cdb1701e29d129.tar.gz",
+      "r2Key": "deps/imagemagick-macos-universal-ce9e2221123de54670b7c15214ec04149179c2a992239372c471ec308460eeba.tar.gz",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "1afc8b97d81cd4107ada15c2fbe69206714c82efad99b4bcc2cdb1701e29d129"
+      "bundleSha256": "ce9e2221123de54670b7c15214ec04149179c2a992239372c471ec308460eeba"
     },
     {
       "name": "resvg",
@@ -59,12 +59,12 @@
       "releaseRevision": 1,
       "architecture": "universal",
       "license": "MIT",
-      "r2Key": "deps/oxipng-macos-universal-571b19c586711aefbae26f87f7bbc133931e0bb8d2b6672b44f1cecd0ca1b968.tar.gz",
+      "r2Key": "deps/oxipng-macos-universal-8c4e6d502fe7c1de186e39f7bbf1064964453b4f42c6767a0cbedd9a9ba217e2.tar.gz",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5",
       "subComponents": [
 
       ],
-      "bundleSha256": "571b19c586711aefbae26f87f7bbc133931e0bb8d2b6672b44f1cecd0ca1b968"
+      "bundleSha256": "8c4e6d502fe7c1de186e39f7bbf1064964453b4f42c6767a0cbedd9a9ba217e2"
     },
     {
       "name": "mediaRuntime",
@@ -72,7 +72,7 @@
       "releaseRevision": 3,
       "architecture": "universal",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-09274855997b5763b3fef108d0037982136db0313507fe4056fa02053af28231",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-0343696fe52471802fca6d3b7c4afa070e5bd3f077af8e5f7659394f05d1320a",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -144,7 +144,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "09274855997b5763b3fef108d0037982136db0313507fe4056fa02053af28231"
+      "bundleSha256": "0343696fe52471802fca6d3b7c4afa070e5bd3f077af8e5f7659394f05d1320a"
     }
   ]
 }
