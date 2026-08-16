@@ -183,6 +183,13 @@ echo "Assembling and verifying the Windows runtime..."
 mkdir -p "$BUNDLE/ThirdPartyLicenses/ImageMagick"
 cp "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/"
 find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 -type f -iname '*.dll' -exec cp {} "$BUNDLE/" \;
+# Ship only the thread-safe LibRaw runtime (matches macOS). The non-_r DLL
+# still gets pulled from PREFIX/bin and makes *raw*.dll checks ambiguous.
+rm -f "$BUNDLE"/libraw-[0-9]*.dll
+# Ensure MozJPEG is present even if ldd walking misses it under MSYS.
+if [[ -f "$PREFIX/bin/libjpeg-62.dll" ]]; then
+  cp -f "$PREFIX/bin/libjpeg-62.dll" "$BUNDLE/libjpeg-62.dll"
+fi
 cp -R "$PREFIX/imagemagick/etc/ImageMagick-7" "$BUNDLE/"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/colors.xml"
 cp "$SCRIPT_DIR/colors.xml" "$BUNDLE/ImageMagick-7/colors.xml"
@@ -199,6 +206,21 @@ cp "$WORK_DIR/sources/libpng/LICENSE" "$license_dir/LIBPNG-LICENSE.txt"
 cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
 cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
+
+copy_dlls() {
+  local binary="$1"
+  while IFS= read -r dll; do [ -f "$dll" ] && cp -n "$dll" "$BUNDLE/"; done \
+    < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
+}
+while :; do
+  before="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
+  copy_dlls "$BUNDLE/magick.exe"
+  while IFS= read -r dll; do copy_dlls "$dll"; done < <(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll')
+  after="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
+  [ "$before" = "$after" ] && break
+done
+# Drop non-thread-safe LibRaw again in case copy_dlls reintroduced it.
+rm -f "$BUNDLE"/libraw-[0-9]*.dll
 
 echo "Packaging MagickWand + LibRaw public headers..."
 headers_root="$BUNDLE/native-headers"
@@ -220,32 +242,43 @@ EOF
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
 
-copy_dlls() {
+dll_depends_on() {
   local binary="$1"
-  while IFS= read -r dll; do [ -f "$dll" ] && cp -n "$dll" "$BUNDLE/"; done \
-    < <(ldd "$binary" | awk '/=> \/mingw64\// {print $3}')
+  local needed="$2"
+  # Prefer the import table — more stable than MSYS ldd path resolution after unzip.
+  if command -v objdump >/dev/null 2>&1; then
+    objdump -p "$binary" 2>/dev/null | grep -Ei 'DLL Name:' | grep -Fqi "$needed" && return 0
+  fi
+  ldd "$binary" 2>/dev/null | grep -Fqi "$needed"
 }
-while :; do
-  before="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
-  copy_dlls "$BUNDLE/magick.exe"
-  while IFS= read -r dll; do copy_dlls "$dll"; done < <(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll')
-  after="$(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' | wc -l)"
-  [ "$before" = "$after" ] && break
-done
 
 validate_bundle() {
   local bundle="$1" unexpected formats coder test_dir bundled_license_dir license raw_dll core_dll jpeg_dll jpeg_dll_name
   unexpected="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libpng*.dll' -o -iname 'libwebp*.dll' -o -iname 'libtiff*.dll' -o -iname 'libgif*.dll' \) -print)"
   [ -z "$unexpected" ] || { echo "Delegates that must be static were packaged as DLLs:" >&2; echo "$unexpected" >&2; return 1; }
-  raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit)"
-  test -n "$raw_dll" || { echo "Missing LibRaw DLL" >&2; return 1; }
-  jpeg_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*jpeg*.dll' -print -quit)"
+  raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libraw_r*.dll' -print -quit)"
+  test -n "$raw_dll" || { echo "Missing LibRaw DLL (libraw_r*.dll)" >&2; return 1; }
+  jpeg_dll="$(find "$bundle" -maxdepth 1 -type f \( -iname 'libjpeg-62.dll' -o -iname 'libjpeg*.dll' \) -print -quit)"
   test -n "$jpeg_dll" || { echo "Missing shared MozJPEG DLL" >&2; return 1; }
   core_dll="$(find "$bundle" -maxdepth 1 -type f -iname '*MagickCore*.dll' -print -quit)"
   test -n "$core_dll" || { echo "Missing MagickCore DLL" >&2; return 1; }
   jpeg_dll_name="$(basename "$jpeg_dll")"
-  ldd "$raw_dll" | grep -Fqi "$jpeg_dll_name" || { echo "LibRaw is not dynamically linked to MozJPEG $jpeg_dll_name" >&2; return 1; }
-  ldd "$core_dll" | grep -Fqi "$jpeg_dll_name" || { echo "MagickCore is not dynamically linked to MozJPEG $jpeg_dll_name" >&2; return 1; }
+  if ! dll_depends_on "$raw_dll" "$jpeg_dll_name"; then
+    echo "LibRaw is not dynamically linked to MozJPEG $jpeg_dll_name" >&2
+    echo "--- ldd ---" >&2
+    ldd "$raw_dll" >&2 || true
+    echo "--- objdump DLL Name ---" >&2
+    objdump -p "$raw_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
+    return 1
+  fi
+  if ! dll_depends_on "$core_dll" "$jpeg_dll_name"; then
+    echo "MagickCore is not dynamically linked to MozJPEG $jpeg_dll_name" >&2
+    echo "--- ldd ---" >&2
+    ldd "$core_dll" >&2 || true
+    echo "--- objdump DLL Name ---" >&2
+    objdump -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
+    return 1
+  fi
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
   for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }
