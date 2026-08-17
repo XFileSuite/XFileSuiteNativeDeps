@@ -2,8 +2,9 @@
 # Builds a self-contained x64 Windows runtime. ImageMagick, LibRaw, and all
 # pinned image delegates (MozJPEG, PNG, WebP, TIFF, GIF) are shared DLLs so
 # App-side FFI can load them independently. zlib/bzip2 come from MinGW.
-# Also ships native-headers/ (MagickWand + LibRaw public headers) for App-side
-# FFI packages; fetch-deps deploys then strips them from the runtime folder.
+# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF,
+# GIF public headers) for App-side FFI; fetch-deps can deploy selected trees
+# later and strips them from the runtime folder.
 set -euo pipefail
 trap 'status=$?; echo "Windows ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -341,25 +342,64 @@ while IFS= read -r -d '' dll; do
   fi
 done < <(find "$BUNDLE" -maxdepth 1 -type f -iname '*.dll' -print0)
 
-echo "Packaging MagickWand + LibRaw public headers..."
+echo "Packaging MagickWand + shared-delegate public headers..."
 headers_root="$BUNDLE/native-headers"
 rm -rf "$headers_root"
+prefix_include="$PREFIX/include"
+im_include="$PREFIX/imagemagick/include/ImageMagick-7"
 mkdir -p \
   "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}" \
-  "$headers_root/libraw-${LIBRAW_VERSION}/libraw"
-im_include="$PREFIX/imagemagick/include/ImageMagick-7"
-libraw_include="$PREFIX/include/libraw"
+  "$headers_root/libraw-${LIBRAW_VERSION}/libraw" \
+  "$headers_root/mozjpeg-${MOZJPEG_VERSION}" \
+  "$headers_root/libpng-${LIBPNG_VERSION}" \
+  "$headers_root/libwebp-${LIBWEBP_VERSION}/webp" \
+  "$headers_root/libtiff-${LIBTIFF_VERSION}" \
+  "$headers_root/giflib-${GIFLIB_VERSION}"
+
 test -f "$im_include/MagickWand/MagickWand.h"
-test -f "$libraw_include/libraw.h"
+test -f "$prefix_include/libraw/libraw.h"
+test -f "$prefix_include/jpeglib.h"
+test -f "$prefix_include/png.h"
+test -f "$prefix_include/webp/decode.h"
+test -f "$prefix_include/tiffio.h"
+test -f "$prefix_include/gif_lib.h"
+
 cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
 cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
-cp -R "$libraw_include/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+cp -R "$prefix_include/libraw/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+for hdr in jpeglib.h jconfig.h jerror.h jmorecfg.h; do
+  test -f "$prefix_include/$hdr"
+  cp "$prefix_include/$hdr" "$headers_root/mozjpeg-${MOZJPEG_VERSION}/"
+done
+for hdr in png.h pngconf.h pnglibconf.h; do
+  test -f "$prefix_include/$hdr"
+  cp "$prefix_include/$hdr" "$headers_root/libpng-${LIBPNG_VERSION}/"
+done
+cp -R "$prefix_include/webp/." "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/"
+find "$prefix_include" -maxdepth 1 -type f \( -name 'tiff*.h' -o -name 'tiffconf.h' \) -print0 |
+  while IFS= read -r -d '' hdr; do
+    cp "$hdr" "$headers_root/libtiff-${LIBTIFF_VERSION}/"
+  done
+test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
+cp "$prefix_include/gif_lib.h" "$headers_root/giflib-${GIFLIB_VERSION}/"
+
 cat > "$headers_root/versions.env" <<EOF
 IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
 LIBRAW_VERSION=${LIBRAW_VERSION}
+MOZJPEG_VERSION=${MOZJPEG_VERSION}
+LIBPNG_VERSION=${LIBPNG_VERSION}
+LIBWEBP_VERSION=${LIBWEBP_VERSION}
+LIBTIFF_VERSION=${LIBTIFF_VERSION}
+GIFLIB_VERSION=${GIFLIB_VERSION}
 EOF
+
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
+test -f "$headers_root/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
+test -f "$headers_root/libpng-${LIBPNG_VERSION}/png.h"
+test -f "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
+test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
+test -f "$headers_root/giflib-${GIFLIB_VERSION}/gif_lib.h"
 
 dll_depends_on() {
   local binary="$1"
@@ -449,6 +489,26 @@ validate_bundle() {
   }
   test -f "$bundle/native-headers/libraw-${LIBRAW_VERSION}/libraw/libraw.h" || {
     echo "Missing LibRaw headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h" || {
+    echo "Missing MozJPEG headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/libpng-${LIBPNG_VERSION}/png.h" || {
+    echo "Missing libpng headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/libwebp-${LIBWEBP_VERSION}/webp/decode.h" || {
+    echo "Missing libwebp headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/libtiff-${LIBTIFF_VERSION}/tiffio.h" || {
+    echo "Missing libtiff headers in native-headers" >&2
+    return 1
+  }
+  test -f "$bundle/native-headers/giflib-${GIFLIB_VERSION}/gif_lib.h" || {
+    echo "Missing giflib headers in native-headers" >&2
     return 1
   }
   while IFS= read -r binary; do

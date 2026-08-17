@@ -2,9 +2,9 @@
 # Builds a relocatable, dynamically linked universal ImageMagick runtime.
 # The resulting directory mirrors macos/Runner/Resources: magick, all dylibs,
 # and ImageMagick configuration files are direct Resources children.
-# Also ships native-headers/ (MagickWand + LibRaw public headers) for
-# packages/xf_magick and packages/xf_raw; fetch-deps deploys then strips them
-# from Resources so they never ship inside the app bundle.
+# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF,
+# GIF public headers) for App-side FFI; fetch-deps can deploy selected trees
+# later and strips the folder from Resources / runtime before shipping.
 set -euo pipefail
 trap 'status=$?; echo "ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -315,28 +315,70 @@ cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
 cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
-# Public headers for App-side FFI packages (xf_raw / xf_magick). Staged under
-# native-headers/ so fetch-deps can deploy them into packages/*/native/vendor
-# and strip them out of Contents/Resources before shipping.
-echo "Packaging MagickWand + LibRaw public headers..."
+# Public headers for App-side FFI. Staged under native-headers/ so fetch-deps
+# can deploy selected trees into packages/*/native/vendor later. Runtime
+# dylibs stay at the bundle root; headers never need to ship in Resources.
+echo "Packaging MagickWand + shared-delegate public headers..."
 headers_root="$bundle/native-headers"
 rm -rf "$headers_root"
+prefix_include="$WORK_DIR/prefix-arm64/include"
+im_include="$WORK_DIR/prefix-arm64/imagemagick/include/ImageMagick-7"
 mkdir -p \
   "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}" \
-  "$headers_root/libraw-${LIBRAW_VERSION}/libraw"
-im_include="$WORK_DIR/prefix-arm64/imagemagick/include/ImageMagick-7"
-libraw_include="$WORK_DIR/prefix-arm64/include/libraw"
+  "$headers_root/libraw-${LIBRAW_VERSION}/libraw" \
+  "$headers_root/mozjpeg-${MOZJPEG_VERSION}" \
+  "$headers_root/libpng-${LIBPNG_VERSION}" \
+  "$headers_root/libwebp-${LIBWEBP_VERSION}/webp" \
+  "$headers_root/libtiff-${LIBTIFF_VERSION}" \
+  "$headers_root/giflib-${GIFLIB_VERSION}"
+
 test -f "$im_include/MagickWand/MagickWand.h"
-test -f "$libraw_include/libraw.h"
+test -f "$prefix_include/libraw/libraw.h"
+test -f "$prefix_include/jpeglib.h"
+test -f "$prefix_include/png.h"
+test -f "$prefix_include/webp/decode.h"
+test -f "$prefix_include/tiffio.h"
+test -f "$prefix_include/gif_lib.h"
+
 cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
 cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
-cp -R "$libraw_include/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+cp -R "$prefix_include/libraw/." "$headers_root/libraw-${LIBRAW_VERSION}/libraw/"
+# MozJPEG public C API (same set LibRaw / Magick consumers need).
+for hdr in jpeglib.h jconfig.h jerror.h jmorecfg.h; do
+  test -f "$prefix_include/$hdr"
+  cp "$prefix_include/$hdr" "$headers_root/mozjpeg-${MOZJPEG_VERSION}/"
+done
+# libpng public headers (pnglibconf.h is generated at build time).
+for hdr in png.h pngconf.h pnglibconf.h; do
+  test -f "$prefix_include/$hdr"
+  cp "$prefix_include/$hdr" "$headers_root/libpng-${LIBPNG_VERSION}/"
+done
+cp -R "$prefix_include/webp/." "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/"
+# libtiff public headers (skip private tif_*.h if any landed in include/).
+find "$prefix_include" -maxdepth 1 -type f \( -name 'tiff*.h' -o -name 'tiffconf.h' \) -print0 |
+  while IFS= read -r -d '' hdr; do
+    cp "$hdr" "$headers_root/libtiff-${LIBTIFF_VERSION}/"
+  done
+test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
+cp "$prefix_include/gif_lib.h" "$headers_root/giflib-${GIFLIB_VERSION}/"
+
 cat > "$headers_root/versions.env" <<EOF
 IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
 LIBRAW_VERSION=${LIBRAW_VERSION}
+MOZJPEG_VERSION=${MOZJPEG_VERSION}
+LIBPNG_VERSION=${LIBPNG_VERSION}
+LIBWEBP_VERSION=${LIBWEBP_VERSION}
+LIBTIFF_VERSION=${LIBTIFF_VERSION}
+GIFLIB_VERSION=${GIFLIB_VERSION}
 EOF
+
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$headers_root/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
+test -f "$headers_root/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
+test -f "$headers_root/libpng-${LIBPNG_VERSION}/png.h"
+test -f "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
+test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
+test -f "$headers_root/giflib-${GIFLIB_VERSION}/gif_lib.h"
 
 # Remove build-machine absolute paths. The app stages this directory directly
 # into Contents/Resources, so both executable and dylibs resolve there.
@@ -457,6 +499,11 @@ test -x "$verify_bundle/magick"
 test -f "$verify_bundle/native-headers/versions.env"
 test -f "$verify_bundle/native-headers/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
 test -f "$verify_bundle/native-headers/libraw-${LIBRAW_VERSION}/libraw/libraw.h"
+test -f "$verify_bundle/native-headers/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
+test -f "$verify_bundle/native-headers/libpng-${LIBPNG_VERSION}/png.h"
+test -f "$verify_bundle/native-headers/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
+test -f "$verify_bundle/native-headers/libtiff-${LIBTIFF_VERSION}/tiffio.h"
+test -f "$verify_bundle/native-headers/giflib-${GIFLIB_VERSION}/gif_lib.h"
 MAGICK_CONFIGURE_PATH="$verify_bundle/ImageMagick-7" "$verify_bundle/magick" -version
 for arch in "${ARCHITECTURES[@]}"; do
   arch -"$arch" "$verify_bundle/magick" -version >/dev/null
