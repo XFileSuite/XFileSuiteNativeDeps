@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-17T13:32:29Z",
+  "generatedAt": "2026-08-17T14:26:24Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -46,12 +46,12 @@
       "releaseRevision": 1,
       "architecture": "x64",
       "license": "MIT",
-      "r2Key": "deps/oxipng-windows-x64-91e3837418b79ffbd7892191f1003baf64d5cc2c0cbd52e59f19e657520f34c3.zip",
+      "r2Key": "deps/oxipng-windows-x64-c95e15b73abf1688aed7f67551f6f208b2c87b76bec38865aeb6b949983e07d2.zip",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0",
       "subComponents": [
 
       ],
-      "bundleSha256": "91e3837418b79ffbd7892191f1003baf64d5cc2c0cbd52e59f19e657520f34c3"
+      "bundleSha256": "c95e15b73abf1688aed7f67551f6f208b2c87b76bec38865aeb6b949983e07d2"
     },
     {
       "name": "mediaRuntime",
