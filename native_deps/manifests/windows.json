@@ -15,8 +15,8 @@
       "version": "10.2.0",
       "releaseRevision": 1,
       "architecture": "x64",
-      "r2Key": "deps/oxipng-windows-x64-fa32908df7a1bd93d4d6059c9a55f97206b7d9a5438175b6f59bc472bd784cc8.zip",
-      "bundleSha256": "fa32908df7a1bd93d4d6059c9a55f97206b7d9a5438175b6f59bc472bd784cc8",
+      "r2Key": "deps/oxipng-windows-x64-91e3837418b79ffbd7892191f1003baf64d5cc2c0cbd52e59f19e657520f34c3.zip",
+      "bundleSha256": "91e3837418b79ffbd7892191f1003baf64d5cc2c0cbd52e59f19e657520f34c3",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0"
     },
     "mediaRuntime": {
