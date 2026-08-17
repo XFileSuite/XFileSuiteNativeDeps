@@ -270,29 +270,62 @@ lipo_shared_abi "$raw_name"
 # while consumers record libjpeg.62.dylib as the install name.
 lipo_shared_abi "libjpeg.62.dylib"
 
+# Ship a prefix dylib under the ABI basename Magick / dyld will look up.
+# MagickCore may already record @rpath/<soname>.dylib (not an absolute
+# prefix path), so absolute-path collection alone misses versioned names
+# such as libwebpmux.3.dylib / libwebp.7.dylib / libsharpyuv.0.dylib.
+package_prefix_dylib() {
+  local abi_name="$1"
+  case "$abi_name" in
+    libraw*.dylib|libjpeg*.dylib) return 0 ;; # already packaged above
+  esac
+  [[ -f "$bundle/$abi_name" ]] && return 0
+  [[ -e "$WORK_DIR/prefix-arm64/lib/$abi_name" ]] || return 0
+  lipo_shared_abi "$abi_name"
+}
+
 # Collect every private shared library MagickCore was linked against and ship it.
 arm_core="$(find "$WORK_DIR/prefix-arm64/imagemagick/lib" -maxdepth 1 -type f -name 'libMagickCore*.dylib' -print -quit)"
 test -n "$arm_core"
 while IFS= read -r dep; do
   case "$dep" in
     "$WORK_DIR/prefix-arm64/lib/"*)
-      abi_name="$(basename "$dep")"
-      case "$abi_name" in
-        libraw*.dylib|libjpeg*.dylib) continue ;; # already packaged above
-      esac
-      if [[ ! -f "$bundle/$abi_name" ]]; then
-        lipo_shared_abi "$abi_name"
-      fi
+      package_prefix_dylib "$(basename "$dep")"
+      ;;
+    @rpath/*)
+      package_prefix_dylib "${dep#@rpath/}"
       ;;
   esac
 done < <(otool -L "$arm_core" | tail -n +2 | awk '{print $1}')
 
+# Close the transitive dependency graph (e.g. libwebp → libsharpyuv.0).
+# Walk bundled dylibs until no new prefix libraries appear.
+changed=1
+while [[ "$changed" -eq 1 ]]; do
+  changed=0
+  while IFS= read -r -d '' bundled; do
+    while IFS= read -r dep; do
+      case "$dep" in
+        @rpath/*|"$WORK_DIR/prefix-"*/lib/*)
+          abi_name="$(basename "$dep")"
+          if [[ ! -f "$bundle/$abi_name" && -e "$WORK_DIR/prefix-arm64/lib/$abi_name" ]]; then
+            package_prefix_dylib "$abi_name"
+            changed=1
+          fi
+          ;;
+      esac
+    done < <(otool -L "$bundled" | tail -n +2 | awk '{print $1}')
+  done < <(find "$bundle" -maxdepth 1 -type f -name '*.dylib' -print0)
+done
+
 # Also ship common ABI aliases Magick / App tooling may dlopen by short name.
+# Prefer versioned install names first — those are what LC_LOAD_DYLIB records.
 for abi_name in \
-  libpng16.dylib libpng.dylib \
+  libpng16.16.dylib libpng16.dylib libpng.dylib \
+  libwebp.7.dylib libwebpmux.3.dylib libwebpdemux.2.dylib libsharpyuv.0.dylib \
   libwebp.dylib libwebpmux.dylib libwebpdemux.dylib libsharpyuv.dylib \
-  libtiff.dylib libtiff.6.dylib \
-  libgif.dylib libgif.7.dylib
+  libtiff.6.dylib libtiff.dylib \
+  libgif.7.dylib libgif.dylib
 do
   if [[ -e "$WORK_DIR/prefix-arm64/lib/$abi_name" && ! -f "$bundle/$abi_name" ]]; then
     lipo_shared_abi "$abi_name" || true
@@ -400,7 +433,17 @@ chmod +x "$bundle/magick"
 echo "Verifying universal runtime formats and delegates..."
 for arch in "${ARCHITECTURES[@]}"; do
   lipo "$bundle/magick" -verify_arch "$arch"
-  formats="$(arch -"$arch" "$bundle/magick" -list format)"
+  if ! formats="$(arch -"$arch" "$bundle/magick" -list format 2>"$bundle/.magick-list-format.$arch.err")"; then
+    echo "magick -list format failed for $arch (exit $?)." >&2
+    cat "$bundle/.magick-list-format.$arch.err" >&2 || true
+    echo "--- bundle root ---" >&2
+    ls -la "$bundle" >&2 || true
+    echo "--- magick / MagickCore load commands ---" >&2
+    otool -L "$bundle/magick" >&2 || true
+    otool -L "$bundle"/libMagickCore*.dylib >&2 || true
+    exit 1
+  fi
+  rm -f "$bundle/.magick-list-format.$arch.err"
   for coder in GIF JPEG PNG WEBP TIFF BMP ICO PSD DNG CR2 NEF ARW; do
     grep -Eq "^[[:space:]]*$coder\\*?[[:space:]]+r[w-]" <<<"$formats" || { echo "Missing required $coder coder for $arch" >&2; exit 1; }
   done
@@ -445,7 +488,12 @@ require_shared_delegate() {
 require_shared_delegate 'libpng*.dylib' PNG
 require_shared_delegate 'libwebp*.dylib' WebP
 require_shared_delegate 'libtiff*.dylib' TIFF
-require_shared_delegate 'libgif*.dylib' GIF
+# giflib is shipped for App FFI. ImageMagick 7 uses its built-in GIF coder and
+# does not put gif in DELEGATES / does not LC_LOAD external libgif — so only
+# require the dylib to be present, not referenced by MagickCore.
+gif_library="$(find "$bundle" -maxdepth 1 -type f -name 'libgif*.dylib' -print -quit)"
+test -n "$gif_library" || { echo "Missing shared giflib runtime library." >&2; exit 1; }
+echo "  ✓ shared giflib (standalone FFI) → $(basename "$gif_library")"
 # SharpYUV is part of the WebP shared runtime.
 if ! find "$bundle" -maxdepth 1 -type f -name 'libsharpyuv*.dylib' -print -quit | grep -q .; then
   echo "Missing shared SharpYUV (libwebp dependency)." >&2

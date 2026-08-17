@@ -469,7 +469,10 @@ validate_bundle() {
     "$OBJDUMP" -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
     return 1
   fi
-  for needed in "$(basename "$png_dll")" "$(basename "$webp_dll")" "$(basename "$tiff_dll")" "$(basename "$gif_dll")"; do
+  # PNG/WebP/TIFF must be dynamically imported by MagickCore. giflib is shipped
+  # for App FFI only: ImageMagick 7 uses its built-in GIF coder and does not
+  # import libgif-*.dll (GIF is absent from Magick's DELEGATES / LIBS).
+  for needed in "$(basename "$png_dll")" "$(basename "$webp_dll")" "$(basename "$tiff_dll")"; do
     if ! dll_depends_on "$core_dll" "$needed"; then
       echo "MagickCore is not dynamically linked to $needed" >&2
       "$OBJDUMP" -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
@@ -477,6 +480,7 @@ validate_bundle() {
     fi
     echo "Checking PE imports: $(basename "$core_dll") → $needed"
   done
+  echo "Checking PE presence: standalone giflib → $(basename "$gif_dll")"
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
   for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }
