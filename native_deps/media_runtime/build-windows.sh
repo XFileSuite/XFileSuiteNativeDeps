@@ -55,6 +55,16 @@ for tool in pacman curl tar make pkg-config meson ninja git patch python3; do
   need "$tool"
 done
 
+# Unauthenticated GitHub downloads from Actions IPs regularly return HTTP 429.
+github_curl() {
+  extra=()
+  token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  if [[ -n "$token" ]]; then
+    extra+=(-H "Authorization: Bearer $token" -H "User-Agent: XFileSuiteNativeDeps")
+  fi
+  curl -fL --retry 8 --retry-all-errors --retry-delay 2 --connect-timeout 30 "${extra[@]}" "$@"
+}
+
 # Reuse compiler objects across Actions runs while always rebuilding and
 # re-verifying the final runtime. ccache hashes the compiler command and source
 # contents, so stale objects are not accepted when flags or inputs change.
@@ -123,7 +133,7 @@ current_phase="mpv source preparation"
 mpv_src="$WORK_DIR/mpv-${MPV_VERSION}"
 mpv_archive="$WORK_DIR/mpv-${MPV_VERSION}.tar.gz"
 if [[ ! -f "$mpv_archive" ]]; then
-  curl -fL --retry 3 -o "$mpv_archive" \
+  github_curl -o "$mpv_archive" \
     "https://github.com/mpv-player/mpv/archive/refs/tags/v${MPV_VERSION}.tar.gz"
 fi
 echo "$MPV_SHA256  $mpv_archive" | sha256sum -c -
@@ -216,7 +226,7 @@ current_phase="ANGLE download and extraction"
 angle_archive="$WORK_DIR/ANGLE.7z"
 angle_dir="$WORK_DIR/ANGLE"
 if [[ ! -f "$angle_archive" ]] || [[ "$(md5sum "$angle_archive" | awk '{print $1}')" != "$ANGLE_MD5" ]]; then
-  curl -fL --retry 3 -o "$angle_archive" "$ANGLE_URL"
+  github_curl -o "$angle_archive" "$ANGLE_URL"
 fi
 echo "$ANGLE_MD5  $angle_archive" | md5sum -c -
 rm -rf "$angle_dir"

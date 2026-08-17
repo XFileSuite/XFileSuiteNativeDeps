@@ -5,7 +5,7 @@ $distDir = Join-Path $scriptDir 'dist-windows'
 $ffiDir = Join-Path $scriptDir 'ffi'
 $workDir = Join-Path $scriptDir 'work\ffi-windows'
 $target = 'x86_64-pc-windows-msvc'
-$licenseUrl = "https://raw.githubusercontent.com/oxipng/oxipng/v$version/LICENSE"
+$licenseFile = Join-Path $scriptDir 'LICENSE'
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
   throw 'Rust cargo is required to build oxipng.dll'
@@ -35,12 +35,12 @@ if (-not $libCandidate) {
 }
 
 $bundle = Join-Path $distDir 'oxipng-windows-x64'
+if (-not (Test-Path -PathType Leaf $licenseFile)) {
+  throw "Missing vendored Oxipng LICENSE at $licenseFile"
+}
 New-Item -ItemType Directory -Force "$bundle\ThirdPartyLicenses\Oxipng" | Out-Null
 New-Item -ItemType Directory -Force "$bundle\native-headers\oxipng-$version" | Out-Null
-Invoke-WebRequest -Uri $licenseUrl -OutFile "$bundle\ThirdPartyLicenses\Oxipng\OXIPNG-LICENSE.txt"
-if (-not (Test-Path -PathType Leaf "$bundle\ThirdPartyLicenses\Oxipng\OXIPNG-LICENSE.txt")) {
-  throw 'Failed to download Oxipng LICENSE'
-}
+Copy-Item $licenseFile "$bundle\ThirdPartyLicenses\Oxipng\OXIPNG-LICENSE.txt"
 Copy-Item $dllPath "$bundle\oxipng.dll"
 Copy-Item $libCandidate "$bundle\oxipng.lib"
 Copy-Item (Join-Path $ffiDir 'include\oxipng.h') "$bundle\native-headers\oxipng-$version\oxipng.h"

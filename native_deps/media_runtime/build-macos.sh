@@ -59,6 +59,12 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   scripts/pkg-config/meson.build \
   scripts/uchardet/build.sh \
   scripts/uchardet/meson.build
+# GitHub archive URLs (harfbuzz, mpv, fribidi, libass) return HTTP 429 from
+# shared Actions IPs unless the request is authenticated. The retry patch
+# sends GITHUB_TOKEN/GH_TOKEN and backs off on 429/403.
+if [[ -z "${GITHUB_TOKEN:-}" && -n "${GH_TOKEN:-}" ]]; then
+  export GITHUB_TOKEN="$GH_TOKEN"
+fi
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
@@ -246,8 +252,13 @@ extract_license "$downloads/uchardet-0.0.8.tar.xz" '/COPYING$' uchardet-COPYING.
 # libplacebo is cloned directly by the mpv build script (not through
 # downloads.lock) and its source tree is cleaned up after the build.
 # Fetch the LICENSE from the pinned tag to avoid depending on tmp dirs.
+# Authenticate GitHub downloads: unauthenticated Actions IPs get HTTP 429.
 libplacebo_version="6.338.2"
-curl --fail --location --retry 3 \
+github_curl=(curl --fail --location --retry 8 --retry-all-errors --retry-delay 2 --connect-timeout 30)
+if [[ -n "${GITHUB_TOKEN:-${GH_TOKEN:-}}" ]]; then
+  github_curl+=(-H "Authorization: Bearer ${GITHUB_TOKEN:-$GH_TOKEN}" -H "User-Agent: XFileSuiteNativeDeps")
+fi
+"${github_curl[@]}" \
   "https://raw.githubusercontent.com/haasn/libplacebo/v${libplacebo_version}/LICENSE" \
   --output "$licenses/libplacebo-LICENSE.txt"
 

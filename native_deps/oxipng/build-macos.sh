@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_DIR="$SCRIPT_DIR/dist"
 FFI_DIR="$SCRIPT_DIR/ffi"
 WORK_DIR="$SCRIPT_DIR/work/ffi"
-LICENSE_URL="https://raw.githubusercontent.com/oxipng/oxipng/v${VERSION}/LICENSE"
+LICENSE_FILE="$SCRIPT_DIR/LICENSE"
 TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
@@ -18,7 +18,7 @@ command -v cargo >/dev/null || { echo 'Rust cargo is required to build liboxipng
 command -v rustup >/dev/null || { echo 'rustup is required to build liboxipng.' >&2; exit 1; }
 command -v lipo >/dev/null || { echo 'Xcode lipo is required.' >&2; exit 1; }
 command -v install_name_tool >/dev/null || { echo 'install_name_tool is required.' >&2; exit 1; }
-command -v curl >/dev/null || { echo 'curl is required.' >&2; exit 1; }
+test -s "$LICENSE_FILE" || { echo "Missing vendored Oxipng LICENSE at $LICENSE_FILE" >&2; exit 1; }
 
 stage="$OUTPUT_DIR/oxipng-macos-universal"
 rm -rf "$OUTPUT_DIR"
@@ -26,9 +26,7 @@ mkdir -p "$stage/ThirdPartyLicenses/Oxipng" \
   "$stage/native-headers/oxipng-$VERSION" \
   "$WORK_DIR"
 
-curl -fL --retry 5 --retry-all-errors -o \
-  "$stage/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt" \
-  "$LICENSE_URL"
+cp "$LICENSE_FILE" "$stage/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt"
 test -s "$stage/ThirdPartyLicenses/Oxipng/OXIPNG-LICENSE.txt"
 
 echo "Building liboxipng.dylib (C FFI)..."

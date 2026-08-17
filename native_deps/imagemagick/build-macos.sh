@@ -24,7 +24,15 @@ BUNDLE_NAME="imagemagick-macos-universal"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
 for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
-download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
+download() {
+  [ -f "$2" ] && return 0
+  extra=()
+  token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  if [[ -n "$token" && "$1" == *github.com* ]]; then
+    extra+=(-H "Authorization: Bearer $token" -H "User-Agent: XFileSuiteNativeDeps")
+  fi
+  curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 "${extra[@]}" -o "$2" "$1"
+}
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
 build_cmake_shared() {
