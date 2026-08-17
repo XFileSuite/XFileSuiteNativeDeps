@@ -1,12 +1,12 @@
 $ErrorActionPreference = 'Stop'
-$version = '9.1.5'
+$version = '10.2.0'
 $scriptDir = $PSScriptRoot
 $downloads = Join-Path $scriptDir 'downloads'
 $distDir = Join-Path $scriptDir 'dist-windows'
 $ffiDir = Join-Path $scriptDir 'ffi'
 $workDir = Join-Path $scriptDir 'work\ffi-windows'
 $name = "oxipng-$version-x86_64-pc-windows-msvc.zip"
-$expected = 'd53981683d8b76f3f3e45410158b4bc3bd78f7d936e3620de4b1ea56c9dffa38'
+$expected = 'a5ad52c9c288dc99c2eae90dcad73dee64e39bf3f5aa5303c0fb55ac9c5f069b'
 $target = 'x86_64-pc-windows-msvc'
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {

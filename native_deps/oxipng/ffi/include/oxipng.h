@@ -40,7 +40,7 @@ typedef struct OxipngOptionsV1 {
   uint32_t timeout_ms;
 } OxipngOptionsV1;
 
-/// Upstream oxipng crate / CLI version string, e.g. "9.1.5".
+/// Upstream oxipng crate / CLI version string, e.g. "10.2.0".
 OXIPNG_API const char *oxipng_version(void);
 
 /// Thread-local last error message after a failed call; empty string on success.

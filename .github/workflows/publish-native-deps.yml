@@ -498,7 +498,7 @@ jobs:
           path: |
             native_deps/oxipng/downloads
             native_deps/oxipng/work/ffi-windows
-          key: windows-oxipng-9.1.5-ffi-v1-${{ hashFiles('native_deps/oxipng/**') }}
+          key: windows-oxipng-10.2.0-ffi-v1-${{ hashFiles('native_deps/oxipng/**') }}
       - name: Set up Rust for Oxipng FFI (Windows)
         if: ${{ inputs.component == 'all' || inputs.component == 'oxipng' }}
         uses: dtolnay/rust-toolchain@stable

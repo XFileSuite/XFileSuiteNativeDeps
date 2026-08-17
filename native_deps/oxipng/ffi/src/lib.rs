@@ -150,6 +150,7 @@ pub extern "C" fn oxipng_optimize_file(
             },
             &opts,
         )
+        .map(|_| ())
         .map_err(|e| e.to_string())
     })();
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Packages Oxipng 9.1.5 for macOS:
+# Packages Oxipng 10.2.0 for macOS:
 #   - official universal CLI (lipo of arm64 + x86_64 release binaries)
 #   - C FFI library (liboxipng.dylib) + public header under native-headers/
 set -euo pipefail
 
-VERSION=9.1.5
+VERSION=10.2.0
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOWNLOAD_DIR="$SCRIPT_DIR/downloads"
 OUTPUT_DIR="$SCRIPT_DIR/dist"
@@ -13,8 +13,8 @@ WORK_DIR="$SCRIPT_DIR/work/ffi"
 BASE_URL="https://github.com/oxipng/oxipng/releases/download/v$VERSION"
 ARM_ARCHIVE="oxipng-$VERSION-aarch64-apple-darwin.tar.gz"
 X64_ARCHIVE="oxipng-$VERSION-x86_64-apple-darwin.tar.gz"
-ARM_SHA256="a3fbb890c934ca785302d8533d5f076c053cc61946d52b728bca5df7f47cb2e8"
-X64_SHA256="c59ca46fe281e95ca2728ca9950096f1099f0776ff4c7eeafae84fdedb26f737"
+ARM_SHA256="9aad3927d095b6ade2aacb92b89ebaca442483c1f7cde5d7a2486b283c2ed5f9"
+X64_SHA256="c45acf40a70cc02539c55555ac240bf5ef24544b7ea9959d22da19f606cec205"
 TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 

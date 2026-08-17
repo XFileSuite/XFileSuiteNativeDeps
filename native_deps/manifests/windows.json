@@ -12,12 +12,12 @@
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2"
     },
     "oxipng": {
-      "version": "9.1.5",
-      "releaseRevision": 2,
+      "version": "10.2.0",
+      "releaseRevision": 1,
       "architecture": "x64",
       "r2Key": "deps/oxipng-windows-x64-fa32908df7a1bd93d4d6059c9a55f97206b7d9a5438175b6f59bc472bd784cc8.zip",
       "bundleSha256": "fa32908df7a1bd93d4d6059c9a55f97206b7d9a5438175b6f59bc472bd784cc8",
-      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5"
+      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",

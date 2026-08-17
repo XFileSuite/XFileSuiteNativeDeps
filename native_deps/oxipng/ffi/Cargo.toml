@@ -1,6 +1,6 @@
 [package]
 name = "oxipng-c"
-version = "9.1.5"
+version = "10.2.0"
 edition = "2021"
 publish = false
 description = "C ABI facade over oxipng for XFileSuite FFI"
@@ -12,7 +12,7 @@ crate-type = ["cdylib", "staticlib"]
 path = "src/lib.rs"
 
 [dependencies]
-oxipng = { version = "=9.1.5", default-features = false, features = ["parallel", "zopfli"] }
+oxipng = { version = "=10.2.0", default-features = false, features = ["parallel", "zopfli"] }
 
 [profile.release]
 lto = "thin"
