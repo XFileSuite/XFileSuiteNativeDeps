@@ -21,7 +21,7 @@
     },
     "oxipng": {
       "version": "9.1.5",
-      "releaseRevision": 1,
+      "releaseRevision": 2,
       "architecture": "universal",
       "r2Key": "deps/oxipng-macos-universal-bd02fbbf0bface0763a4527be0853d58d26dc21055ca4c4e0644cfbbd254dbc3.tar.gz",
       "bundleSha256": "bd02fbbf0bface0763a4527be0853d58d26dc21055ca4c4e0644cfbbd254dbc3",

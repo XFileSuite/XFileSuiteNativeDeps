@@ -167,9 +167,11 @@ jobs:
           ref: main
       - name: Require the canonical source branch
         run: test "$GITHUB_REF" = "refs/heads/main"
-      - name: Set up Rust for resvg
-        if: ${{ inputs.component == 'all' || inputs.component == 'resvg' }}
+      - name: Set up Rust for resvg / oxipng FFI
+        if: ${{ inputs.component == 'all' || inputs.component == 'resvg' || inputs.component == 'oxipng' }}
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Set up Go for the media runtime
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' }}
         uses: actions/setup-go@v5
@@ -189,11 +191,12 @@ jobs:
             native_deps/imagemagick/work/downloads
             native_deps/resvg/target
             native_deps/oxipng/downloads
+            native_deps/oxipng/work/ffi
             native_deps/media_runtime/work
-          key: macos-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/imagemagick/build-macos.sh', 'native_deps/resvg/build-macos.sh', 'native_deps/oxipng/*.sh', 'native_deps/oxipng/*.rb', 'native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/build-macos.sh') }}
+          key: macos-src-v4-${{ inputs.component }}-${{ hashFiles('native_deps/imagemagick/build-macos.sh', 'native_deps/resvg/build-macos.sh', 'native_deps/oxipng/**', 'native_deps/ffmpeg/build.sh', 'native_deps/media_runtime/build-macos.sh') }}
           restore-keys: |
-            macos-src-v3-${{ inputs.component }}-
-            macos-src-v3-
+            macos-src-v4-${{ inputs.component }}-
+            macos-src-v4-
       - name: Install native build tools
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' || inputs.component == 'imagemagick' }}
         run: |
@@ -494,7 +497,13 @@ jobs:
         with:
           path: |
             native_deps/oxipng/downloads
-          key: windows-oxipng-9.1.5-${{ hashFiles('native_deps/oxipng/**') }}
+            native_deps/oxipng/work/ffi-windows
+          key: windows-oxipng-9.1.5-ffi-v1-${{ hashFiles('native_deps/oxipng/**') }}
+      - name: Set up Rust for Oxipng FFI (Windows)
+        if: ${{ inputs.component == 'all' || inputs.component == 'oxipng' }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
       - name: Build Oxipng for Windows x64
         if: ${{ inputs.component == 'all' || inputs.component == 'oxipng' }}
         shell: pwsh
