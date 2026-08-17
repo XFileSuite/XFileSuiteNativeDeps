@@ -101,7 +101,7 @@ runtime directory containing magick, its dylibs and configuration files as
 direct macOS Resources children, including ThirdPartyLicenses/ImageMagick. This
 archive also includes the exact LibRaw source tree and license. The macOS and
 Windows archives additionally include MozJPEG, libpng, libwebp,
-libtiff and giflib, which are statically linked into MagickCore.
+libtiff and giflib as shared libraries co-located with MagickCore.
 XFileSuite is proprietary software and does not claim ownership of any of these
 components.
 EOF

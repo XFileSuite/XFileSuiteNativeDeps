@@ -27,12 +27,12 @@ for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need
 download() { [ -f "$2" ] || curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -o "$2" "$1"; }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
-build_cmake_static() {
+build_cmake_shared() {
   local arch="$1" prefix="$2" source="$3"; shift 3
   cmake -S "$source" -B "$source/build-$arch" -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_OSX_ARCHITECTURES="$arch" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF "$@"
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=ON "$@"
   cmake --build "$source/build-$arch" --parallel "$JOBS"
   cmake --install "$source/build-$arch"
 }
@@ -101,8 +101,8 @@ Description: macOS SDK zlib
 Version: 1.2.12
 Libs: -lz
 EOF
-  # MozJPEG is the single shared JPEG implementation used by both LibRaw and
-  # ImageMagick. Other image delegates remain static.
+  # All pinned image delegates are shared so MagickCore, LibRaw, and future
+  # App-side FFI can load the same runtime libraries independently.
   cmake -S "$WORK_DIR/sources/mozjpeg" -B "$WORK_DIR/sources/mozjpeg/build-$arch" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
     -DCMAKE_OSX_ARCHITECTURES="$arch" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
@@ -114,24 +114,43 @@ EOF
     cd "$WORK_DIR/sources/libpng"
     make distclean >/dev/null 2>&1 || true
     CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -fPIC" \
-      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" ./configure --prefix="$prefix" --disable-shared --enable-static
+      LDFLAGS="-arch $arch -mmacosx-version-min=11.0" \
+      ./configure --prefix="$prefix" --enable-shared --disable-static
     make -j"$JOBS" && make install
   )
-  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/libwebp" \
+  build_cmake_shared "$arch" "$prefix" "$WORK_DIR/sources/libwebp" \
     -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF \
     -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF -DWEBP_BUILD_VWEBP=OFF \
     -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF
-  # ImageMagick asks for libwebp without pkg-config's --static flag. Promote
-  # SharpYUV from Libs.private so the static archive is linked into MagickCore
-  # without contaminating Autoconf's global LIBS compiler probes.
-  sed -i '' '/^Libs:/ s/$/ -lsharpyuv/' "$prefix/lib/pkgconfig/libwebp.pc"
-  build_cmake_static "$arch" "$prefix" "$WORK_DIR/sources/libtiff" \
-    -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
+  build_cmake_shared "$arch" "$prefix" "$WORK_DIR/sources/libtiff" \
+    -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF \
+    -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
   (
     cd "$WORK_DIR/sources/giflib"
     make clean >/dev/null 2>&1 || true
-    make -j"$JOBS" CC="clang -arch $arch -mmacosx-version-min=11.0 -fPIC" libgif.a
-    mkdir -p "$prefix/lib" "$prefix/include"; cp libgif.a "$prefix/lib/"; cp gif_lib.h "$prefix/include/"
+    # giflib's Makefile only emits a static archive; build a proper dylib by hand.
+    make -j"$JOBS" CC="clang -arch $arch -mmacosx-version-min=11.0" \
+      CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -fPIC" libgif.a
+    clang -arch "$arch" -mmacosx-version-min=11.0 -dynamiclib \
+      -install_name "$prefix/lib/libgif.7.dylib" \
+      -current_version 7.2.0 -compatibility_version 7.0.0 \
+      -o libgif.7.dylib *.o
+    mkdir -p "$prefix/lib" "$prefix/include"
+    cp libgif.7.dylib "$prefix/lib/"
+    ln -sfn libgif.7.dylib "$prefix/lib/libgif.dylib"
+    cp gif_lib.h "$prefix/include/"
+    cat > "$prefix/lib/pkgconfig/giflib.pc" <<EOF
+prefix=$prefix
+exec_prefix=\${prefix}
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: giflib
+Description: GIF library
+Version: ${GIFLIB_VERSION}
+Libs: -L\${libdir} -lgif
+Cflags: -I\${includedir}
+EOF
   )
   (
     cd "$WORK_DIR/sources/libraw"
@@ -177,8 +196,8 @@ EOF
     # can link for the current target before running ImageMagick configure.
     printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
     "$CC" $CFLAGS .xfilesuite-delegate-smoke.c \
-      $(pkg-config --libs libjpeg) \
-      $(pkg-config --static --libs libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+      $(pkg-config --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
+      -lgif \
       $LDFLAGS -o .xfilesuite-delegate-smoke
     rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke
     printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
@@ -212,8 +231,7 @@ done
 
 bundle="$OUTPUT_DIR/$BUNDLE_NAME"; mkdir -p "$bundle"
 echo "Assembling universal ImageMagick runtime..."
-# Merge the shared ImageMagick runtime. PNG, WebP, TIFF and GIF are already
-# incorporated into libMagickCore; MozJPEG remains shared with LibRaw.
+# Merge the shared ImageMagick runtime and every shared image delegate.
 while IFS= read -r -d '' arm_file; do
   relative="${arm_file#"$WORK_DIR/prefix-arm64/imagemagick/"}"
   x86_file="$WORK_DIR/prefix-x86_64/imagemagick/$relative"
@@ -225,6 +243,21 @@ while IFS= read -r -d '' arm_file; do
   esac
   lipo -create "$arm_file" "$x86_file" -output "$destination"
 done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/imagemagick/lib" -type f -print0)
+
+# Lipo a shared library under the basename Magick records as its install name.
+# Symlinks are resolved for lipo input but published under the ABI name.
+lipo_shared_abi() {
+  local abi_name="$1"
+  local arm_path="$WORK_DIR/prefix-arm64/lib/$abi_name"
+  local x86_path="$WORK_DIR/prefix-x86_64/lib/$abi_name"
+  local arm_real x86_real
+  test -e "$arm_path" || { echo "Missing arm64 shared library: $abi_name" >&2; return 1; }
+  test -e "$x86_path" || { echo "Missing x86_64 shared library: $abi_name" >&2; return 1; }
+  arm_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$arm_path")"
+  x86_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$x86_path")"
+  lipo -create "$arm_real" "$x86_real" -output "$bundle/$abi_name"
+}
+
 # ImageMagick links to LibRaw's thread-safe, versioned install name.  The
 # unversioned files installed by LibRaw are development symlinks; feeding them
 # through lipo would turn them into full duplicate files.  The non-thread-safe
@@ -232,17 +265,40 @@ done < <(find "$WORK_DIR/prefix-arm64/imagemagick/bin" "$WORK_DIR/prefix-arm64/i
 raw_versioned_arm="$(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type f -name 'libraw_r.*.dylib' -print -quit)"
 test -n "$raw_versioned_arm"
 raw_name="$(basename "$raw_versioned_arm")"
-raw_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$raw_name"
-test -f "$raw_versioned_x86"
-lipo -create "$raw_versioned_arm" "$raw_versioned_x86" -output "$bundle/$raw_name"
+lipo_shared_abi "$raw_name"
 # MozJPEG installs a real libjpeg.62.3.0.dylib plus ABI/development symlinks,
-# while consumers record libjpeg.62.dylib as the install name. Resolve the ABI
-# symlink for lipo input but publish it under the exact recorded install name.
-jpeg_name="libjpeg.62.dylib"
-jpeg_versioned_arm="$WORK_DIR/prefix-arm64/lib/$jpeg_name"
-jpeg_versioned_x86="$WORK_DIR/prefix-x86_64/lib/$jpeg_name"
-test -e "$jpeg_versioned_arm"; test -e "$jpeg_versioned_x86"
-lipo -create "$jpeg_versioned_arm" "$jpeg_versioned_x86" -output "$bundle/$jpeg_name"
+# while consumers record libjpeg.62.dylib as the install name.
+lipo_shared_abi "libjpeg.62.dylib"
+
+# Collect every private shared library MagickCore was linked against and ship it.
+arm_core="$(find "$WORK_DIR/prefix-arm64/imagemagick/lib" -maxdepth 1 -type f -name 'libMagickCore*.dylib' -print -quit)"
+test -n "$arm_core"
+while IFS= read -r dep; do
+  case "$dep" in
+    "$WORK_DIR/prefix-arm64/lib/"*)
+      abi_name="$(basename "$dep")"
+      case "$abi_name" in
+        libraw*.dylib|libjpeg*.dylib) continue ;; # already packaged above
+      esac
+      if [[ ! -f "$bundle/$abi_name" ]]; then
+        lipo_shared_abi "$abi_name"
+      fi
+      ;;
+  esac
+done < <(otool -L "$arm_core" | tail -n +2 | awk '{print $1}')
+
+# Also ship common ABI aliases Magick / App tooling may dlopen by short name.
+for abi_name in \
+  libpng16.dylib libpng.dylib \
+  libwebp.dylib libwebpmux.dylib libwebpdemux.dylib libsharpyuv.dylib \
+  libtiff.dylib libtiff.6.dylib \
+  libgif.dylib libgif.7.dylib
+do
+  if [[ -e "$WORK_DIR/prefix-arm64/lib/$abi_name" && ! -f "$bundle/$abi_name" ]]; then
+    lipo_shared_abi "$abi_name" || true
+  fi
+done
+
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
 # MAGICK_CONFIGURE_PATH points at ImageMagick-7 in the App Resources folder.
@@ -328,12 +384,32 @@ otool -L "$bundle/libMagickCore-7.Q16HDRI.10.dylib" | grep -q '@rpath/libjpeg\..
   exit 1
 }
 nm "$jpeg_library" | grep -q '[[:space:]]_jpeg_mem_src$' || { echo "Bundled MozJPEG decoder is invalid." >&2; exit 1; }
-unexpected_delegates="$(find "$bundle" -maxdepth 1 -type f \( -name 'libpng*.dylib' -o -name 'libwebp*.dylib' -o -name 'libtiff*.dylib' -o -name 'libgif*.dylib' \) -print)"
-test -z "$unexpected_delegates" || {
-  echo "Delegates that must be static were packaged as dylibs:" >&2
-  echo "$unexpected_delegates" >&2
-  exit 1
+
+# Shared image delegates must be present and referenced by MagickCore.
+require_shared_delegate() {
+  local pattern="$1"
+  local label="$2"
+  local lib regex
+  lib="$(find "$bundle" -maxdepth 1 -type f -name "$pattern" -print -quit)"
+  test -n "$lib" || { echo "Missing shared $label runtime library ($pattern)." >&2; return 1; }
+  regex="@rpath/${pattern//\*/.*}"
+  otool -L "$bundle/libMagickCore-7.Q16HDRI.10.dylib" | grep -Eq "$regex" || {
+    echo "MagickCore is not dynamically linked to bundled $label ($regex)." >&2
+    otool -L "$bundle/libMagickCore-7.Q16HDRI.10.dylib" >&2
+    return 1
+  }
+  echo "  ✓ shared $label → $(basename "$lib")"
 }
+require_shared_delegate 'libpng*.dylib' PNG
+require_shared_delegate 'libwebp*.dylib' WebP
+require_shared_delegate 'libtiff*.dylib' TIFF
+require_shared_delegate 'libgif*.dylib' GIF
+# SharpYUV is part of the WebP shared runtime.
+if ! find "$bundle" -maxdepth 1 -type f -name 'libsharpyuv*.dylib' -print -quit | grep -q .; then
+  echo "Missing shared SharpYUV (libwebp dependency)." >&2
+  exit 1
+fi
+
 while IFS= read -r binary; do
   absolute_dependencies="$(otool -L "$binary" | awk '/^[[:space:]]/ {print $1}' | grep -E '^/' | grep -Ev '^(/usr/lib/|/System/Library/)' || true)"
   test -z "$absolute_dependencies" || { echo "$binary contains non-system absolute dependencies:" >&2; echo "$absolute_dependencies" >&2; exit 1; }
