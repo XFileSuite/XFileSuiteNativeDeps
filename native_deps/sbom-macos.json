@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-17T11:39:02Z",
+  "generatedAt": "2026-08-17T13:31:29Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -55,16 +55,16 @@
     },
     {
       "name": "oxipng",
-      "version": "9.1.5",
-      "releaseRevision": 2,
+      "version": "10.2.0",
+      "releaseRevision": 1,
       "architecture": "universal",
       "license": "MIT",
-      "r2Key": "deps/oxipng-macos-universal-871a1232bd022ed164b40d47eb4b1da0d2028975764767d5edfd168049fc9bcb.tar.gz",
-      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5",
+      "r2Key": "deps/oxipng-macos-universal-f22d69e2d797420ccb8e578e0c6e85745444549a6bfccc484b483ded11998e7c.tar.gz",
+      "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0",
       "subComponents": [
 
       ],
-      "bundleSha256": "871a1232bd022ed164b40d47eb4b1da0d2028975764767d5edfd168049fc9bcb"
+      "bundleSha256": "f22d69e2d797420ccb8e578e0c6e85745444549a6bfccc484b483ded11998e7c"
     },
     {
       "name": "mediaRuntime",
