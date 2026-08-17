@@ -23,8 +23,8 @@
       "version": "9.1.5",
       "releaseRevision": 2,
       "architecture": "universal",
-      "r2Key": "deps/oxipng-macos-universal-bd02fbbf0bface0763a4527be0853d58d26dc21055ca4c4e0644cfbbd254dbc3.tar.gz",
-      "bundleSha256": "bd02fbbf0bface0763a4527be0853d58d26dc21055ca4c4e0644cfbbd254dbc3",
+      "r2Key": "deps/oxipng-macos-universal-871a1232bd022ed164b40d47eb4b1da0d2028975764767d5edfd168049fc9bcb.tar.gz",
+      "bundleSha256": "871a1232bd022ed164b40d47eb4b1da0d2028975764767d5edfd168049fc9bcb",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v9.1.5"
     },
     "mediaRuntime": {
