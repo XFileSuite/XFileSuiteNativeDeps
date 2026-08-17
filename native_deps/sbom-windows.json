@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-16T15:21:53Z",
+  "generatedAt": "2026-08-17T06:32:15Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-389c17a70c158d439c722b879a234880e545738db557f8d921e2b8ec0ca5df8d.zip",
+      "r2Key": "deps/imagemagick-windows-x64-61f42582397877be5eddc4d20d52a384a64b3eec35296e663a39b03a6463be0f.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "389c17a70c158d439c722b879a234880e545738db557f8d921e2b8ec0ca5df8d"
+      "bundleSha256": "61f42582397877be5eddc4d20d52a384a64b3eec35296e663a39b03a6463be0f"
     },
     {
       "name": "oxipng",
