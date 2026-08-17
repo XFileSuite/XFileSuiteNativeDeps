@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-16T15:17:24Z",
+  "generatedAt": "2026-08-17T06:21:01Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 2,
       "architecture": "universal",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-macos-universal-02bb1c066c68ee439da8bfe2f4c88c8ddddb6308fbd8cba10db04078ffdbb7f3.tar.gz",
+      "r2Key": "deps/imagemagick-macos-universal-c6b29407603f717e9817b9086aa1e444a2417719f3470bb52ee6ab96ed548b89.tar.gz",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2",
       "subComponents": [
         {
@@ -38,7 +38,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "02bb1c066c68ee439da8bfe2f4c88c8ddddb6308fbd8cba10db04078ffdbb7f3"
+      "bundleSha256": "c6b29407603f717e9817b9086aa1e444a2417719f3470bb52ee6ab96ed548b89"
     },
     {
       "name": "resvg",
