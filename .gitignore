@@ -3,3 +3,6 @@ native_deps/*/work-windows/
 native_deps/*/dist/
 native_deps/*/dist-windows/
 
+# Local Cloudflare Wrangler cache (may contain account id / email).
+.wrangler/
+
