@@ -58,9 +58,9 @@ MEDIA_RUNTIME_PLATFORM_SUBCOMPONENTS = {
 # Sub-components bundled inside the FFmpeg standalone binary.
 FFMPEG_SUBCOMPONENTS = %w[lame libogg libvorbis libvpx libwebp libopus].freeze
 
-# ImageMagick dynamically ships LibRaw and statically incorporates the pinned
-# image delegates on both supported platforms.
-IMAGEMAGICK_SUBCOMPONENTS = %w[libraw mozjpeg libpng libwebp libtiff giflib].freeze
+# ImageMagick dynamically ships LibRaw plus shared image delegates
+# (MozJPEG, libpng, libwebp, libtiff) on both supported platforms.
+IMAGEMAGICK_SUBCOMPONENTS = %w[libraw mozjpeg libpng libwebp libtiff].freeze
 
 def subcomponents_for(name, platform)
   case name

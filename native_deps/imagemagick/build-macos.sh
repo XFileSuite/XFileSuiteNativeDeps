@@ -2,9 +2,11 @@
 # Builds a relocatable, dynamically linked universal ImageMagick runtime.
 # The resulting directory mirrors macos/Runner/Resources: magick, all dylibs,
 # and ImageMagick configuration files are direct Resources children.
-# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF,
-# GIF public headers) for App-side FFI; fetch-deps can deploy selected trees
+# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF
+# public headers) for App-side FFI; fetch-deps can deploy selected trees
 # later and strips the folder from Resources / runtime before shipping.
+# Magick++ and giflib are not shipped: the App uses Wand/Core FFI and Magick's
+# built-in GIF coder.
 set -euo pipefail
 trap 'status=$?; echo "ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -15,7 +17,6 @@ MOZJPEG_VERSION="${MOZJPEG_VERSION:-4.1.1}"
 LIBPNG_VERSION="${LIBPNG_VERSION:-1.6.58}"
 LIBWEBP_VERSION="${LIBWEBP_VERSION:-1.6.0}"
 LIBTIFF_VERSION="${LIBTIFF_VERSION:-4.7.2}"
-GIFLIB_VERSION="${GIFLIB_VERSION:-5.2.2}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
@@ -27,7 +28,7 @@ for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need
 download() {
   [ -f "$2" ] && return 0
   # Bash 3.2 (macOS) treats an empty "${arr[@]}" as unbound under `set -u`.
-  # Keep the argument list non-empty so libwebp/libtiff/giflib still download.
+  # Keep the argument list non-empty so libwebp/libtiff still download.
   token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
   curl_args=(-fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -H "User-Agent: XFileSuiteNativeDeps")
   if [[ -n "$token" && "$1" == *github.com* ]]; then
@@ -56,14 +57,12 @@ download "https://github.com/mozilla/mozjpeg/archive/refs/tags/v${MOZJPEG_VERSIO
 download "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz"
 download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz"
 download "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz"
-download "https://sourceforge.net/projects/giflib/files/giflib-${GIFLIB_VERSION}.tar.gz/download" "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz"
 extract "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz" "$WORK_DIR/sources/imagemagick"
 extract "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz" "$WORK_DIR/sources/libraw"
 extract "$WORK_DIR/downloads/mozjpeg-${MOZJPEG_VERSION}.tar.gz" "$WORK_DIR/sources/mozjpeg"
 extract "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/sources/libpng"
 extract "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/sources/libwebp"
 extract "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/sources/libtiff"
-extract "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz" "$WORK_DIR/sources/giflib"
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-mozjpeg-options.patch"
 patch -d "$WORK_DIR/sources/imagemagick" -p1 < "$SCRIPT_DIR/patches/imagemagick-libraw-controls.patch"
 for control in half_size bright auto_bright_thr highlight exp_shift exp_preser; do
@@ -136,33 +135,6 @@ EOF
     -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF \
     -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
   (
-    cd "$WORK_DIR/sources/giflib"
-    make clean >/dev/null 2>&1 || true
-    # giflib's Makefile only emits a static archive; build a proper dylib by hand.
-    make -j"$JOBS" CC="clang -arch $arch -mmacosx-version-min=11.0" \
-      CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -fPIC" libgif.a
-    clang -arch "$arch" -mmacosx-version-min=11.0 -dynamiclib \
-      -install_name "$prefix/lib/libgif.7.dylib" \
-      -current_version 7.2.0 -compatibility_version 7.0.0 \
-      -o libgif.7.dylib *.o
-    mkdir -p "$prefix/lib" "$prefix/include"
-    cp libgif.7.dylib "$prefix/lib/"
-    ln -sfn libgif.7.dylib "$prefix/lib/libgif.dylib"
-    cp gif_lib.h "$prefix/include/"
-    cat > "$prefix/lib/pkgconfig/giflib.pc" <<EOF
-prefix=$prefix
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
-
-Name: giflib
-Description: GIF library
-Version: ${GIFLIB_VERSION}
-Libs: -L\${libdir} -lgif
-Cflags: -I\${includedir}
-EOF
-  )
-  (
     cd "$WORK_DIR/sources/libraw"
     # GitHub tag archives do not ship the generated Autotools configure script.
     autoreconf -fi
@@ -207,7 +179,6 @@ EOF
     printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
     "$CC" $CFLAGS .xfilesuite-delegate-smoke.c \
       $(pkg-config --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
-      -lgif \
       $LDFLAGS -o .xfilesuite-delegate-smoke
     rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke
     printf 'int main(void) { return 0; }\n' > .xfilesuite-compiler-smoke.c
@@ -223,7 +194,8 @@ EOF
       --without-perl --without-x --without-fontconfig --without-freetype --without-heic \
       --without-xml --without-openexr --without-lcms --without-lqr --with-raw --without-rsvg --without-gslib \
       --without-djvu --without-fftw --without-pango --without-gvc \
-      --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
+      --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs \
+      --without-magick-plus-plus
     trap - EXIT
     # These are the actual symbols emitted by ImageMagick's config.h.  RAW
     # intentionally has no RAW_DELEGATE symbol in 7.1.2; its availability is
@@ -248,6 +220,7 @@ while IFS= read -r -d '' arm_file; do
   test -f "$x86_file" || continue
   case "$relative" in
     bin/magick) destination="$bundle/magick" ;;
+    lib/*Magick++*) continue ;;
     lib/*.dylib) destination="$bundle/$(basename "$relative")" ;;
     *) continue ;;
   esac
@@ -327,20 +300,7 @@ while [[ "$changed" -eq 1 ]]; do
     done < <(otool -L "$bundled" | tail -n +2 | awk '{print $1}')
   done < <(find "$bundle" -maxdepth 1 -type f -name '*.dylib' -print0)
 done
-
-# Also ship common ABI aliases Magick / App tooling may dlopen by short name.
-# Prefer versioned install names first — those are what LC_LOAD_DYLIB records.
-for abi_name in \
-  libpng16.16.dylib libpng16.dylib libpng.dylib \
-  libwebp.7.dylib libwebpmux.3.dylib libwebpdemux.2.dylib libsharpyuv.0.dylib \
-  libwebp.dylib libwebpmux.dylib libwebpdemux.dylib libsharpyuv.dylib \
-  libtiff.6.dylib libtiff.dylib \
-  libgif.7.dylib libgif.dylib
-do
-  if [[ -e "$WORK_DIR/prefix-arm64/lib/$abi_name" && ! -f "$bundle/$abi_name" ]]; then
-    lipo_shared_abi "$abi_name" || true
-  fi
-done
+rm -f "$bundle"/libMagick++*.dylib "$bundle"/libgif*.dylib
 
 cp -R "$WORK_DIR/prefix-arm64/imagemagick/etc/ImageMagick-7" "$bundle/"
 cp "$SCRIPT_DIR/colors.xml" "$bundle/colors.xml"
@@ -356,7 +316,6 @@ cp "$WORK_DIR/sources/mozjpeg/LICENSE.md" "$license_dir/MOZJPEG-LICENSE.md"
 cp "$WORK_DIR/sources/libpng/LICENSE" "$license_dir/LIBPNG-LICENSE.txt"
 cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
-cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
 # Public headers for App-side FFI. Staged under native-headers/ so fetch-deps
 # can deploy selected trees into packages/*/native/vendor later. Runtime
@@ -372,8 +331,7 @@ mkdir -p \
   "$headers_root/mozjpeg-${MOZJPEG_VERSION}" \
   "$headers_root/libpng-${LIBPNG_VERSION}" \
   "$headers_root/libwebp-${LIBWEBP_VERSION}/webp" \
-  "$headers_root/libtiff-${LIBTIFF_VERSION}" \
-  "$headers_root/giflib-${GIFLIB_VERSION}"
+  "$headers_root/libtiff-${LIBTIFF_VERSION}"
 
 test -f "$im_include/MagickWand/MagickWand.h"
 test -f "$prefix_include/libraw/libraw.h"
@@ -381,7 +339,6 @@ test -f "$prefix_include/jpeglib.h"
 test -f "$prefix_include/png.h"
 test -f "$prefix_include/webp/decode.h"
 test -f "$prefix_include/tiffio.h"
-test -f "$prefix_include/gif_lib.h"
 
 cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
 cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
@@ -403,7 +360,6 @@ find "$prefix_include" -maxdepth 1 -type f \( -name 'tiff*.h' -o -name 'tiffconf
     cp "$hdr" "$headers_root/libtiff-${LIBTIFF_VERSION}/"
   done
 test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
-cp "$prefix_include/gif_lib.h" "$headers_root/giflib-${GIFLIB_VERSION}/"
 
 cat > "$headers_root/versions.env" <<EOF
 IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
@@ -412,7 +368,6 @@ MOZJPEG_VERSION=${MOZJPEG_VERSION}
 LIBPNG_VERSION=${LIBPNG_VERSION}
 LIBWEBP_VERSION=${LIBWEBP_VERSION}
 LIBTIFF_VERSION=${LIBTIFF_VERSION}
-GIFLIB_VERSION=${GIFLIB_VERSION}
 EOF
 
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
@@ -421,7 +376,6 @@ test -f "$headers_root/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
 test -f "$headers_root/libpng-${LIBPNG_VERSION}/png.h"
 test -f "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
 test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
-test -f "$headers_root/giflib-${GIFLIB_VERSION}/gif_lib.h"
 
 # Remove build-machine absolute paths. The app stages this directory directly
 # into Contents/Resources, so both executable and dylibs resolve there.
@@ -438,6 +392,41 @@ find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print0
     install_name_tool -add_rpath '@loader_path' "$file" 2>/dev/null || true
   fi
 done
+
+# Development / dlopen short names must be relative symlinks to the ABI file
+# already lipo'd into the bundle. Feeding prefix symlinks through lipo would
+# ship duplicate Mach-O copies with different LC_ID_DYLIB names.
+publish_alias_symlink() {
+  local alias_name="$1"
+  local alias_arm="$WORK_DIR/prefix-arm64/lib/$alias_name"
+  local alias_real bundled name prefix_abi prefix_real bundled_abi=""
+  [[ -e "$alias_arm" ]] || return 0
+  if [[ -e "$bundle/$alias_name" && ! -L "$bundle/$alias_name" ]]; then
+    return 0
+  fi
+  alias_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$alias_arm")"
+  while IFS= read -r -d '' bundled; do
+    name="$(basename "$bundled")"
+    prefix_abi="$WORK_DIR/prefix-arm64/lib/$name"
+    [[ -e "$prefix_abi" ]] || continue
+    prefix_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$prefix_abi")"
+    if [[ "$prefix_real" == "$alias_real" ]]; then
+      bundled_abi="$name"
+      break
+    fi
+  done < <(find "$bundle" -maxdepth 1 -type f -name '*.dylib' -print0)
+  [[ -n "$bundled_abi" ]] || return 0
+  rm -f "$bundle/$alias_name"
+  ln -sfn "$bundled_abi" "$bundle/$alias_name"
+}
+
+while IFS= read -r -d '' link; do
+  alias_name="$(basename "$link")"
+  case "$alias_name" in
+    libraw*.dylib|libjpeg.dylib) continue ;;
+  esac
+  publish_alias_symlink "$alias_name"
+done < <(find "$WORK_DIR/prefix-arm64/lib" -maxdepth 1 -type l -name '*.dylib' -print0)
 
 chmod +x "$bundle/magick"
 echo "Verifying universal runtime formats and delegates..."
@@ -498,12 +487,11 @@ require_shared_delegate() {
 require_shared_delegate 'libpng*.dylib' PNG
 require_shared_delegate 'libwebp*.dylib' WebP
 require_shared_delegate 'libtiff*.dylib' TIFF
-# giflib is shipped for App FFI. ImageMagick 7 uses its built-in GIF coder and
-# does not put gif in DELEGATES / does not LC_LOAD external libgif — so only
-# require the dylib to be present, not referenced by MagickCore.
-gif_library="$(find "$bundle" -maxdepth 1 -type f -name 'libgif*.dylib' -print -quit)"
-test -n "$gif_library" || { echo "Missing shared giflib runtime library." >&2; exit 1; }
-echo "  ✓ shared giflib (standalone FFI) → $(basename "$gif_library")"
+if compgen -G "$bundle/libgif*" >/dev/null || compgen -G "$bundle/libMagick++*" >/dev/null; then
+  echo "Runtime must not ship giflib or Magick++:" >&2
+  ls -la "$bundle"/libgif* "$bundle"/libMagick++* 2>/dev/null || true
+  exit 1
+fi
 # SharpYUV is part of the WebP shared runtime.
 if ! find "$bundle" -maxdepth 1 -type f -name 'libsharpyuv*.dylib' -print -quit | grep -q .; then
   echo "Missing shared SharpYUV (libwebp dependency)." >&2
@@ -525,9 +513,32 @@ while IFS= read -r binary; do
     esac
   done < <(otool -L "$binary" | tail -n +2 | awk '{print $1}')
 done < <(find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print)
-for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
+for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md; do
   test -f "$license_dir/$license"
 done
+while IFS= read -r -d '' alias; do
+  [[ -L "$alias" ]] || {
+    echo "Compatibility name must be a symlink, not a duplicate dylib: $alias" >&2
+    ls -la "$alias" >&2
+    exit 1
+  }
+  alias_target="$(readlink "$alias")"
+  case "$alias_target" in
+    /*)
+      echo "Compatibility symlink must be relative: $alias -> $alias_target" >&2
+      exit 1
+      ;;
+  esac
+  test -f "$bundle/$alias_target" || {
+    echo "Broken compatibility symlink: $alias -> $alias_target" >&2
+    exit 1
+  }
+  echo "  ✓ alias $(basename "$alias") → $alias_target"
+done < <(find "$bundle" -maxdepth 1 -type l -name '*.dylib' -print0)
+test -n "$(find "$bundle" -maxdepth 1 -type l -name 'libpng*.dylib' -print -quit)" || {
+  echo "Expected libpng development aliases as relative symlinks." >&2
+  exit 1
+}
 test -n "$(find "$license_dir" -maxdepth 1 -type f -name 'LIBRAW-*' -print -quit)"
 "$bundle/magick" -version
 trellis_test_dir="$(mktemp -d "$WORK_DIR/trellis-verify.XXXXXX")"
@@ -561,7 +572,18 @@ test -f "$verify_bundle/native-headers/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
 test -f "$verify_bundle/native-headers/libpng-${LIBPNG_VERSION}/png.h"
 test -f "$verify_bundle/native-headers/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
 test -f "$verify_bundle/native-headers/libtiff-${LIBTIFF_VERSION}/tiffio.h"
-test -f "$verify_bundle/native-headers/giflib-${GIFLIB_VERSION}/gif_lib.h"
+if find "$verify_bundle/native-headers" -maxdepth 1 -type d -name 'giflib-*' | grep -q .; then
+  echo "Extracted archive still contains giflib headers." >&2
+  exit 1
+fi
+if compgen -G "$verify_bundle/libgif*" >/dev/null || compgen -G "$verify_bundle/libMagick++*" >/dev/null; then
+  echo "Extracted archive still contains giflib or Magick++." >&2
+  exit 1
+fi
+test -L "$verify_bundle/libpng.dylib" || {
+  echo "Extracted archive lost libpng.dylib symlink." >&2
+  exit 1
+}
 MAGICK_CONFIGURE_PATH="$verify_bundle/ImageMagick-7" "$verify_bundle/magick" -version
 for arch in "${ARCHITECTURES[@]}"; do
   arch -"$arch" "$verify_bundle/magick" -version >/dev/null

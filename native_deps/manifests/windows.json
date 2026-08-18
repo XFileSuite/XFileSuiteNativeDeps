@@ -5,7 +5,7 @@
   "components": {
     "imagemagick": {
       "version": "7.1.2-29",
-      "releaseRevision": 2,
+      "releaseRevision": 3,
       "architecture": "x64",
       "r2Key": "deps/imagemagick-windows-x64-89be8823d0e07fbe35726e7c2418bcc1649d62afb746a6288408e693a83a24a9.zip",
       "bundleSha256": "89be8823d0e07fbe35726e7c2418bcc1649d62afb746a6288408e693a83a24a9",

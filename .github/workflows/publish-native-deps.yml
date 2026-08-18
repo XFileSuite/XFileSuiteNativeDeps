@@ -445,7 +445,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: native_deps/imagemagick/work-windows/delegate-prefix
-          key: windows-imagemagick-delegates-jpegraw-v2-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2-5.2.2
+          key: windows-imagemagick-delegates-jpegraw-v3-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2
       - name: Set up MSYS2 toolchain for LGPL FFmpeg and libmpv
         if: ${{ inputs.component == 'all' || inputs.component == 'media-runtime' || inputs.component == 'imagemagick' }}
         uses: msys2/setup-msys2@v2
@@ -537,7 +537,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: native_deps/imagemagick/work-windows/delegate-prefix
-          key: windows-imagemagick-delegates-jpegraw-v2-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2-5.2.2
+          key: windows-imagemagick-delegates-jpegraw-v3-0.22.2-4.1.1-1.6.58-1.6.0-4.7.2
       - name: Create Windows corresponding-source archives
         shell: pwsh
         run: |

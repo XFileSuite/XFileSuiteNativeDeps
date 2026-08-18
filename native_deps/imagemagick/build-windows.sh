@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Builds a self-contained x64 Windows runtime. ImageMagick, LibRaw, and all
-# pinned image delegates (MozJPEG, PNG, WebP, TIFF, GIF) are shared DLLs so
+# pinned image delegates (MozJPEG, PNG, WebP, TIFF) are shared DLLs so
 # App-side FFI can load them independently. zlib/bzip2 come from MinGW.
-# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF,
-# GIF public headers) for App-side FFI; fetch-deps can deploy selected trees
+# Also ships native-headers/ (MagickWand, LibRaw, MozJPEG, PNG, WebP, TIFF
+# public headers) for App-side FFI; fetch-deps can deploy selected trees
 # later and strips them from the runtime folder.
+# Magick++ and giflib are not shipped: the App uses Wand/Core FFI and Magick's
+# built-in GIF coder.
 set -euo pipefail
 trap 'status=$?; echo "Windows ImageMagick build failed at line ${BASH_LINENO[0]}: ${BASH_COMMAND} (exit ${status})" >&2; exit "$status"' ERR
 
@@ -15,7 +17,6 @@ MOZJPEG_VERSION="${MOZJPEG_VERSION:-4.1.1}"
 LIBPNG_VERSION="${LIBPNG_VERSION:-1.6.58}"
 LIBWEBP_VERSION="${LIBWEBP_VERSION:-1.6.0}"
 LIBTIFF_VERSION="${LIBTIFF_VERSION:-4.7.2}"
-GIFLIB_VERSION="${GIFLIB_VERSION:-5.2.2}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work-windows}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist-windows}"
 PREFIX="$WORK_DIR/delegate-prefix"
@@ -70,8 +71,7 @@ download "https://github.com/mozilla/mozjpeg/archive/refs/tags/v${MOZJPEG_VERSIO
 download "https://github.com/pnggroup/libpng/archive/refs/tags/v${LIBPNG_VERSION}.tar.gz" "$WORK_DIR/downloads/libpng-${LIBPNG_VERSION}.tar.gz"
 download "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${LIBWEBP_VERSION}.tar.gz" "$WORK_DIR/downloads/libwebp-${LIBWEBP_VERSION}.tar.gz"
 download "https://download.osgeo.org/libtiff/tiff-${LIBTIFF_VERSION}.tar.gz" "$WORK_DIR/downloads/libtiff-${LIBTIFF_VERSION}.tar.gz"
-download "https://sourceforge.net/projects/giflib/files/giflib-${GIFLIB_VERSION}.tar.gz/download" "$WORK_DIR/downloads/giflib-${GIFLIB_VERSION}.tar.gz"
-for component in imagemagick libraw mozjpeg libpng libwebp libtiff giflib; do
+for component in imagemagick libraw mozjpeg libpng libwebp libtiff; do
   version_var="$(tr '[:lower:]' '[:upper:]' <<<"$component")_VERSION"
   [ "$component" = imagemagick ] && version_var=IMAGEMAGICK_VERSION
   tarball="$WORK_DIR/downloads/$component-${!version_var}.tar.gz"
@@ -95,7 +95,7 @@ test "$(grep -c 'exposure_correction=MagickTrue;' "$WORK_DIR/sources/imagemagick
 }
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
-delegate_stamp="$PREFIX/.xfilesuite-delegates-shared-v4-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}-${GIFLIB_VERSION}"
+delegate_stamp="$PREFIX/.xfilesuite-delegates-shared-v5-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}"
 delegate_cache_valid=true
 for cached_file in \
   lib/libjpeg.dll.a lib/libpng.dll.a lib/libwebp.dll.a lib/libtiff.dll.a \
@@ -111,7 +111,6 @@ find "$PREFIX/bin" -maxdepth 1 -type f -iname '*jpeg*.dll' -print -quit 2>/dev/n
 find "$PREFIX/bin" -maxdepth 1 -type f -iname '*png*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/bin" -maxdepth 1 -type f -iname '*webp*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/bin" -maxdepth 1 -type f -iname '*tiff*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
-find "$PREFIX/bin" -maxdepth 1 -type f -iname '*gif*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/bin" -maxdepth 1 -type f -iname '*raw*.dll' -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 find "$PREFIX/lib" -maxdepth 1 -type f \( -iname '*raw*.dll.a' -o -iname '*raw*.a' \) -print -quit 2>/dev/null | grep -q . || delegate_cache_valid=false
 test -f "$delegate_stamp" || delegate_cache_valid=false
@@ -140,29 +139,6 @@ build_cmake_shared "$WORK_DIR/sources/libwebp" \
 build_cmake_shared "$WORK_DIR/sources/libtiff" \
   -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF \
   -Djpeg=OFF -Dwebp=OFF -Djbig=OFF -Dlerc=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
-(
-  cd "$WORK_DIR/sources/giflib"
-  make clean >/dev/null 2>&1 || true
-  make -j"$JOBS" libgif.a
-  # giflib only ships a static archive; emit a MinGW DLL + import library.
-  gcc -shared -o libgif-7.dll *.o -Wl,--out-implib,libgif.dll.a
-  mkdir -p "$PREFIX/bin" "$PREFIX/lib" "$PREFIX/include" "$PREFIX/lib/pkgconfig"
-  cp libgif-7.dll "$PREFIX/bin/"
-  cp libgif.dll.a "$PREFIX/lib/"
-  cp gif_lib.h "$PREFIX/include/"
-  cat > "$PREFIX/lib/pkgconfig/giflib.pc" <<EOF
-prefix=$PREFIX
-exec_prefix=\${prefix}
-libdir=\${exec_prefix}/lib
-includedir=\${prefix}/include
-
-Name: giflib
-Description: GIF library
-Version: ${GIFLIB_VERSION}
-Libs: -L\${libdir} -lgif
-Cflags: -I\${includedir}
-EOF
-)
 
 echo "Building dynamic LibRaw..."
 (
@@ -195,7 +171,6 @@ echo "Building dynamic ImageMagick against the private prefix..."
   printf 'int main(void) { return 0; }\n' > .xfilesuite-delegate-smoke.c
   gcc .xfilesuite-delegate-smoke.c \
     $(pkg-config --libs libjpeg libpng libraw_r libtiff-4 libwebp libwebpmux libwebpdemux) \
-    -lgif \
     -L"$PREFIX/lib" -o .xfilesuite-delegate-smoke.exe
   ./.xfilesuite-delegate-smoke.exe
   rm -f .xfilesuite-delegate-smoke.c .xfilesuite-delegate-smoke.exe
@@ -203,7 +178,8 @@ echo "Building dynamic ImageMagick against the private prefix..."
     --without-perl --without-x --without-fontconfig --without-freetype --without-heic \
     --without-xml --without-openexr --without-lcms --without-lqr --with-raw --without-rsvg --without-gslib \
     --without-djvu --without-fftw --disable-openmp --without-pango --without-gvc --without-jbig \
-    --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs
+    --without-jxl --without-openjp2 --without-zip --without-lzma --without-zstd --disable-docs \
+    --without-magick-plus-plus
   for delegate in JPEG PNG TIFF WEBP ZLIB; do
     grep -Eq "^#define ${delegate}_DELEGATE 1$" config/config.h || { echo "Missing $delegate delegate" >&2; exit 1; }
   done
@@ -265,7 +241,9 @@ drop_unwanted_runtime_names() {
   rm -f "$BUNDLE"/libraw-[0-9]*.dll \
     "$BUNDLE"/libraw.dll \
     "$BUNDLE"/libraw_r.dll \
-    "$BUNDLE"/libjpeg.dll
+    "$BUNDLE"/libjpeg.dll \
+    "$BUNDLE"/libgif*.dll \
+    "$BUNDLE"/*Magick++*.dll
 }
 
 install_pe_dll "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/magick.exe" "magick.exe"
@@ -275,17 +253,14 @@ install_pe_dll "$PREFIX/imagemagick/bin/magick.exe" "$BUNDLE/magick.exe" "magick
 while IFS= read -r -d '' dll; do
   name="$(basename "$dll")"
   case "$name" in
-    libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll) continue ;;
+    libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll|libgif*.dll|*Magick++*) continue ;;
   esac
   if [[ -L "$dll" ]]; then
-    target="$(readlink -f "$dll" 2>/dev/null || readlink "$dll" || true)"
-    [[ -n "$target" && -f "$target" ]] || continue
-    is_pe_file "$target" || continue
-    install_pe_dll "$target" "$BUNDLE/$name" "$name" || continue
-  else
-    is_pe_file "$dll" || continue
-    install_pe_dll "$dll" "$BUNDLE/$name" "$name" || continue
+    # Never materialize prefix symlinks as extra PE copies under the alias name.
+    continue
   fi
+  is_pe_file "$dll" || continue
+  install_pe_dll "$dll" "$BUNDLE/$name" "$name" || continue
 done < <(find "$PREFIX/imagemagick/bin" "$PREFIX/bin" -maxdepth 1 \( -type f -o -type l \) -iname '*.dll' -print0)
 
 drop_unwanted_runtime_names
@@ -312,7 +287,6 @@ cp "$WORK_DIR/sources/mozjpeg/LICENSE.md" "$license_dir/MOZJPEG-LICENSE.md"
 cp "$WORK_DIR/sources/libpng/LICENSE" "$license_dir/LIBPNG-LICENSE.txt"
 cp "$WORK_DIR/sources/libwebp/COPYING" "$license_dir/LIBWEBP-LICENSE.txt"
 cp "$WORK_DIR/sources/libtiff/LICENSE.md" "$license_dir/LIBTIFF-LICENSE.md"
-cp "$WORK_DIR/sources/giflib/COPYING" "$license_dir/GIFLIB-LICENSE.txt"
 
 copy_dlls() {
   local binary="$1"
@@ -321,7 +295,7 @@ copy_dlls() {
     [ -f "$dll" ] || continue
     name="$(basename "$dll")"
     case "$name" in
-      libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll) continue ;;
+      libraw.dll|libraw_r.dll|libjpeg.dll|libraw-[0-9]*.dll|libgif*.dll|*Magick++*) continue ;;
     esac
     if [[ -f "$BUNDLE/$name" ]]; then
       continue
@@ -361,8 +335,7 @@ mkdir -p \
   "$headers_root/mozjpeg-${MOZJPEG_VERSION}" \
   "$headers_root/libpng-${LIBPNG_VERSION}" \
   "$headers_root/libwebp-${LIBWEBP_VERSION}/webp" \
-  "$headers_root/libtiff-${LIBTIFF_VERSION}" \
-  "$headers_root/giflib-${GIFLIB_VERSION}"
+  "$headers_root/libtiff-${LIBTIFF_VERSION}"
 
 test -f "$im_include/MagickWand/MagickWand.h"
 test -f "$prefix_include/libraw/libraw.h"
@@ -370,7 +343,6 @@ test -f "$prefix_include/jpeglib.h"
 test -f "$prefix_include/png.h"
 test -f "$prefix_include/webp/decode.h"
 test -f "$prefix_include/tiffio.h"
-test -f "$prefix_include/gif_lib.h"
 
 cp -R "$im_include/MagickWand" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
 cp -R "$im_include/MagickCore" "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/"
@@ -389,7 +361,6 @@ find "$prefix_include" -maxdepth 1 -type f \( -name 'tiff*.h' -o -name 'tiffconf
     cp "$hdr" "$headers_root/libtiff-${LIBTIFF_VERSION}/"
   done
 test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
-cp "$prefix_include/gif_lib.h" "$headers_root/giflib-${GIFLIB_VERSION}/"
 
 cat > "$headers_root/versions.env" <<EOF
 IMAGEMAGICK_VERSION=${IMAGEMAGICK_VERSION}
@@ -398,7 +369,6 @@ MOZJPEG_VERSION=${MOZJPEG_VERSION}
 LIBPNG_VERSION=${LIBPNG_VERSION}
 LIBWEBP_VERSION=${LIBWEBP_VERSION}
 LIBTIFF_VERSION=${LIBTIFF_VERSION}
-GIFLIB_VERSION=${GIFLIB_VERSION}
 EOF
 
 test -f "$headers_root/imagemagick-${IMAGEMAGICK_VERSION}/MagickWand/MagickWand.h"
@@ -407,7 +377,6 @@ test -f "$headers_root/mozjpeg-${MOZJPEG_VERSION}/jpeglib.h"
 test -f "$headers_root/libpng-${LIBPNG_VERSION}/png.h"
 test -f "$headers_root/libwebp-${LIBWEBP_VERSION}/webp/decode.h"
 test -f "$headers_root/libtiff-${LIBTIFF_VERSION}/tiffio.h"
-test -f "$headers_root/giflib-${GIFLIB_VERSION}/gif_lib.h"
 
 dll_depends_on() {
   local binary="$1"
@@ -419,7 +388,7 @@ dll_depends_on() {
 
 validate_bundle() {
   local bundle="$1" formats coder test_dir bundled_license_dir license raw_dll core_dll jpeg_dll jpeg_dll_name
-  local png_dll webp_dll tiff_dll gif_dll
+  local png_dll webp_dll tiff_dll
   # Prefer the versioned soname (libraw_r-25.dll). Unversioned libraw_r.dll is a
   # libtool development symlink / non-PE stub.
   raw_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libraw_r-[0-9]*.dll' -print -quit)"
@@ -443,11 +412,14 @@ validate_bundle() {
   if [[ -z "$tiff_dll" ]]; then
     tiff_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libtiff.dll' -print -quit)"
   fi
-  gif_dll="$(find "$bundle" -maxdepth 1 -type f -iname 'libgif*.dll' -print -quit)"
   test -n "$png_dll" || { echo "Missing shared libpng DLL" >&2; return 1; }
   test -n "$webp_dll" || { echo "Missing shared libwebp DLL" >&2; return 1; }
   test -n "$tiff_dll" || { echo "Missing shared libtiff DLL" >&2; return 1; }
-  test -n "$gif_dll" || { echo "Missing shared libgif DLL" >&2; return 1; }
+  if find "$bundle" -maxdepth 1 -type f \( -iname 'libgif*.dll' -o -iname '*Magick++*.dll' \) | grep -q .; then
+    echo "Runtime must not ship giflib or Magick++:" >&2
+    find "$bundle" -maxdepth 1 -type f \( -iname 'libgif*.dll' -o -iname '*Magick++*.dll' \) -print >&2
+    return 1
+  fi
   find "$bundle" -maxdepth 1 -type f -iname 'libsharpyuv*.dll' -print -quit | grep -q . || {
     echo "Missing shared SharpYUV DLL (libwebp dependency)" >&2
     return 1
@@ -458,7 +430,6 @@ validate_bundle() {
   require_pe_dll "$png_dll" "libpng" || return 1
   require_pe_dll "$webp_dll" "libwebp" || return 1
   require_pe_dll "$tiff_dll" "libtiff" || return 1
-  require_pe_dll "$gif_dll" "libgif" || return 1
   jpeg_dll_name="$(basename "$jpeg_dll")"
   echo "Checking PE imports: $(basename "$raw_dll") → $jpeg_dll_name"
   if ! dll_depends_on "$raw_dll" "$jpeg_dll_name"; then
@@ -477,9 +448,7 @@ validate_bundle() {
     "$OBJDUMP" -p "$core_dll" 2>/dev/null | grep -Ei 'DLL Name:' >&2 || true
     return 1
   fi
-  # PNG/WebP/TIFF must be dynamically imported by MagickCore. giflib is shipped
-  # for App FFI only: ImageMagick 7 uses its built-in GIF coder and does not
-  # import libgif-*.dll (GIF is absent from Magick's DELEGATES / LIBS).
+  # PNG/WebP/TIFF must be dynamically imported by MagickCore.
   for needed in "$(basename "$png_dll")" "$(basename "$webp_dll")" "$(basename "$tiff_dll")"; do
     if ! dll_depends_on "$core_dll" "$needed"; then
       echo "MagickCore is not dynamically linked to $needed" >&2
@@ -488,9 +457,8 @@ validate_bundle() {
     fi
     echo "Checking PE imports: $(basename "$core_dll") → $needed"
   done
-  echo "Checking PE presence: standalone giflib → $(basename "$gif_dll")"
   bundled_license_dir="$bundle/ThirdPartyLicenses/ImageMagick"
-  for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md GIFLIB-LICENSE.txt; do
+  for license in IMAGEMAGICK-LICENSE.txt MOZJPEG-LICENSE.md LIBPNG-LICENSE.txt LIBWEBP-LICENSE.txt LIBTIFF-LICENSE.md; do
     test -f "$bundled_license_dir/$license" || { echo "Missing bundled license: $license" >&2; return 1; }
   done
   find "$bundled_license_dir" -maxdepth 1 -type f -iname 'LIBRAW-*' -print -quit | grep -q . || { echo "Missing LibRaw license" >&2; return 1; }
@@ -519,10 +487,10 @@ validate_bundle() {
     echo "Missing libtiff headers in native-headers" >&2
     return 1
   }
-  test -f "$bundle/native-headers/giflib-${GIFLIB_VERSION}/gif_lib.h" || {
-    echo "Missing giflib headers in native-headers" >&2
+  if find "$bundle/native-headers" -maxdepth 1 -type d -name 'giflib-*' | grep -q .; then
+    echo "native-headers must not include giflib" >&2
     return 1
-  }
+  fi
   while IFS= read -r binary; do
     if ldd "$binary" | grep -q 'not found'; then
       echo "Unresolved DLL dependency in $binary:" >&2

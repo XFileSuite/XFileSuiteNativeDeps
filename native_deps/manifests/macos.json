@@ -5,7 +5,7 @@
   "components": {
     "imagemagick": {
       "version": "7.1.2-29",
-      "releaseRevision": 2,
+      "releaseRevision": 3,
       "architecture": "universal",
       "r2Key": "deps/imagemagick-macos-universal-f0f66f9ff75b02437e263ab4f63571d16db2fe9e475d36d0bf88faacd379d19e.tar.gz",
       "bundleSha256": "f0f66f9ff75b02437e263ab4f63571d16db2fe9e475d36d0bf88faacd379d19e",

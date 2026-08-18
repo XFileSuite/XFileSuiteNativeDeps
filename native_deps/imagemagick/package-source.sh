@@ -44,7 +44,7 @@ fi
 # publish flow runs build-macos.sh first, so include their exact source and
 # licenses in the public archive.
 if [ "$PLATFORM" = macos ] || [ "$PLATFORM" = windows ]; then
-  components=(libraw mozjpeg libpng libwebp libtiff giflib)
+  components=(libraw mozjpeg libpng libwebp libtiff)
   for component in "${components[@]}"; do
     test -d "$BUILT_SOURCES_DIR/$component" || {
       echo "Missing built dependency source: $BUILT_SOURCES_DIR/$component" >&2
@@ -59,7 +59,6 @@ if [ "$PLATFORM" = macos ] || [ "$PLATFORM" = windows ]; then
   cp "$BUILT_SOURCES_DIR/libpng/LICENSE" "$WORK_DIR/licenses/LIBPNG-LICENSE.txt"
   cp "$BUILT_SOURCES_DIR/libwebp/COPYING" "$WORK_DIR/licenses/LIBWEBP-LICENSE.txt"
   cp "$BUILT_SOURCES_DIR/libtiff/LICENSE.md" "$WORK_DIR/licenses/LIBTIFF-LICENSE.md"
-  cp "$BUILT_SOURCES_DIR/giflib/COPYING" "$WORK_DIR/licenses/GIFLIB-LICENSE.txt"
 fi
 if [ "$PLATFORM" = windows ]; then
   cp "$SCRIPT_DIR/build-windows.sh" "$WORK_DIR/build-windows.sh"
@@ -101,7 +100,7 @@ runtime directory containing magick, its dylibs and configuration files as
 direct macOS Resources children, including ThirdPartyLicenses/ImageMagick. This
 archive also includes the exact LibRaw source tree and license. The macOS and
 Windows archives additionally include MozJPEG, libpng, libwebp,
-libtiff and giflib as shared libraries co-located with MagickCore.
+and libtiff as shared libraries co-located with MagickCore.
 XFileSuite is proprietary software and does not claim ownership of any of these
 components.
 EOF

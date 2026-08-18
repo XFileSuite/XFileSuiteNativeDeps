@@ -47,9 +47,8 @@ The bundled third-party components are:
 | Little CMS | MIT | Windows |
 | ANGLE | BSD-3-Clause | Windows |
 | ImageMagick | ImageMagick License (Apache-2.0 derivative) | macOS, Windows |
-| MozJPEG | BSD-3-Clause | macOS |
-| libtiff | MIT-like | macOS |
-| giflib | MIT-like | macOS |
+| MozJPEG | BSD-3-Clause | macOS, Windows |
+| libtiff | MIT-like | macOS, Windows |
 | resvg | Apache-2.0 OR MIT | macOS |
 
 THE XFILESUITE MATERIALS ARE PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND,
