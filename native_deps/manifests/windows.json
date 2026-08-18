@@ -7,24 +7,24 @@
       "version": "7.1.2-29",
       "releaseRevision": 3,
       "architecture": "x64",
-      "r2Key": "deps/imagemagick-windows-x64-89be8823d0e07fbe35726e7c2418bcc1649d62afb746a6288408e693a83a24a9.zip",
-      "bundleSha256": "89be8823d0e07fbe35726e7c2418bcc1649d62afb746a6288408e693a83a24a9",
-      "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.2"
+      "r2Key": "deps/imagemagick-windows-x64-3277005dbc56d02c26857ead45531e88ad0b7ac8a1612fcd0875484c311fbcd2.zip",
+      "bundleSha256": "3277005dbc56d02c26857ead45531e88ad0b7ac8a1612fcd0875484c311fbcd2",
+      "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.3"
     },
     "oxipng": {
       "version": "10.2.0",
       "releaseRevision": 1,
       "architecture": "x64",
-      "r2Key": "deps/oxipng-windows-x64-662e6581313112ca301625811b5286193a26808d50de4d65d871cef1bdd2e370.zip",
-      "bundleSha256": "662e6581313112ca301625811b5286193a26808d50de4d65d871cef1bdd2e370",
+      "r2Key": "deps/oxipng-windows-x64-006ea029a8f965910e36191c8954a1a8ec6dc88b3af2c07e0dc2d6e82ac11dad.zip",
+      "bundleSha256": "006ea029a8f965910e36191c8954a1a8ec6dc88b3af2c07e0dc2d6e82ac11dad",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,
       "architecture": "x64",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-f6c8c573d2c2e3e988f1605c3a380eee1e5555b2784b506b2b6daff7f2391464",
-      "bundleSha256": "f6c8c573d2c2e3e988f1605c3a380eee1e5555b2784b506b2b6daff7f2391464",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-d986f93bebfd7911c61a8aca0c625fa94fd2dec883cf2efddb438ead0440323d",
+      "bundleSha256": "d986f93bebfd7911c61a8aca0c625fa94fd2dec883cf2efddb438ead0440323d",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.3"
     }
   }
