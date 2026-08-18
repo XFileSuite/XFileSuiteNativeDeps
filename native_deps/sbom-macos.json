@@ -1,17 +1,17 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-08-18T01:45:50Z",
+  "generatedAt": "2026-08-18T05:19:27Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
     {
       "name": "imagemagick",
       "version": "7.1.2-29",
-      "releaseRevision": 2,
+      "releaseRevision": 3,
       "architecture": "universal",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-macos-universal-f0f66f9ff75b02437e263ab4f63571d16db2fe9e475d36d0bf88faacd379d19e.tar.gz",
-      "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.2",
+      "r2Key": "deps/imagemagick-macos-universal-2792235b13a3a4b2da38b3c366c20babbbbf5af8d3e1cd415c69bc62baf185ae.tar.gz",
+      "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.3",
       "subComponents": [
         {
           "name": "libraw",
@@ -32,13 +32,9 @@
         {
           "name": "libtiff",
           "license": "MIT"
-        },
-        {
-          "name": "giflib",
-          "license": "MIT"
         }
       ],
-      "bundleSha256": "f0f66f9ff75b02437e263ab4f63571d16db2fe9e475d36d0bf88faacd379d19e"
+      "bundleSha256": "2792235b13a3a4b2da38b3c366c20babbbbf5af8d3e1cd415c69bc62baf185ae"
     },
     {
       "name": "resvg",
@@ -59,12 +55,12 @@
       "releaseRevision": 1,
       "architecture": "universal",
       "license": "MIT",
-      "r2Key": "deps/oxipng-macos-universal-c5bbddc329d36027b266d50eeb661eae41ebc9fed31dab145494f69ec12a7ade.tar.gz",
+      "r2Key": "deps/oxipng-macos-universal-4b1a16f4c905a7ae7143aca5a9490770379814aef023d57d6b9361f61c668a0b.tar.gz",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0",
       "subComponents": [
 
       ],
-      "bundleSha256": "c5bbddc329d36027b266d50eeb661eae41ebc9fed31dab145494f69ec12a7ade"
+      "bundleSha256": "4b1a16f4c905a7ae7143aca5a9490770379814aef023d57d6b9361f61c668a0b"
     },
     {
       "name": "mediaRuntime",
@@ -72,7 +68,7 @@
       "releaseRevision": 3,
       "architecture": "universal",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-1087a4279a7d76087910c5aea09c664debf0b1e597898c3a3eaf8f875467a1f3",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-1d5e955f3a745677a2586dbc16cb2b8890c9e627a525e463630747bfa3e636b2",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -144,7 +140,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "1087a4279a7d76087910c5aea09c664debf0b1e597898c3a3eaf8f875467a1f3"
+      "bundleSha256": "1d5e955f3a745677a2586dbc16cb2b8890c9e627a525e463630747bfa3e636b2"
     }
   ]
 }
