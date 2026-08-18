@@ -43,12 +43,12 @@ fi
 for tool in autoreconf cmake curl find gcc g++ ldd make ninja pkg-config tar unzip; do need "$tool"; done
 download() {
   [ -f "$2" ] && return 0
-  extra=()
   token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  curl_args=(-fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -H "User-Agent: XFileSuiteNativeDeps")
   if [[ -n "$token" && "$1" == *github.com* ]]; then
-    extra+=(-H "Authorization: Bearer $token" -H "User-Agent: XFileSuiteNativeDeps")
+    curl_args+=(-H "Authorization: Bearer $token")
   fi
-  curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 "${extra[@]}" -o "$2" "$1"
+  curl "${curl_args[@]}" -o "$2" "$1"
 }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 build_cmake_shared() {

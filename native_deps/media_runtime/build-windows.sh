@@ -57,12 +57,12 @@ done
 
 # Unauthenticated GitHub downloads from Actions IPs regularly return HTTP 429.
 github_curl() {
-  extra=()
   token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  curl_args=(-fL --retry 8 --retry-all-errors --retry-delay 2 --connect-timeout 30 -H "User-Agent: XFileSuiteNativeDeps")
   if [[ -n "$token" ]]; then
-    extra+=(-H "Authorization: Bearer $token" -H "User-Agent: XFileSuiteNativeDeps")
+    curl_args+=(-H "Authorization: Bearer $token")
   fi
-  curl -fL --retry 8 --retry-all-errors --retry-delay 2 --connect-timeout 30 "${extra[@]}" "$@"
+  curl "${curl_args[@]}" "$@"
 }
 
 # Reuse compiler objects across Actions runs while always rebuilding and

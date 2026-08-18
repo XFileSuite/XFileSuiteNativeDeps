@@ -26,12 +26,14 @@ need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >
 for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
 download() {
   [ -f "$2" ] && return 0
-  extra=()
+  # Bash 3.2 (macOS) treats an empty "${arr[@]}" as unbound under `set -u`.
+  # Keep the argument list non-empty so libwebp/libtiff/giflib still download.
   token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  curl_args=(-fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 -H "User-Agent: XFileSuiteNativeDeps")
   if [[ -n "$token" && "$1" == *github.com* ]]; then
-    extra+=(-H "Authorization: Bearer $token" -H "User-Agent: XFileSuiteNativeDeps")
+    curl_args+=(-H "Authorization: Bearer $token")
   fi
-  curl -fL --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 "${extra[@]}" -o "$2" "$1"
+  curl "${curl_args[@]}" -o "$2" "$1"
 }
 extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
