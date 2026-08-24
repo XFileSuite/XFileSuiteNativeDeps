@@ -1,0 +1,145 @@
+name: Build macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Source release tag, for example v1.0.0.1002"
+        required: true
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: XFileSuite/XFileSuiteSource
+          token: ${{ secrets.FILEPEEK_REPO_TOKEN }}
+          lfs: false
+          ref: ${{ github.event.inputs.tag }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.2"
+          channel: stable
+      - name: Restore staged native runtime dependencies
+        id: cache-native-runtime-macos
+        uses: actions/cache@v4
+        with:
+          path: |
+            macos/Runner/Resources
+            packages/media_kit/media_kit_libs_macos_video/macos/Frameworks
+            packages/xf_magick/native/vendor
+            packages/xf_raw/native/vendor
+            packages/xf_oxipng/native/vendor
+          key: native-runtime-macos-${{ hashFiles('native_deps/manifests/macos.json', 'scripts/fetch-deps.sh', 'packages/xf_magick/tool/build_macos.sh', 'packages/xf_raw/tool/build_macos.sh', 'packages/xf_oxipng/**') }}
+      - name: Fetch native runtime dependencies
+        if: steps.cache-native-runtime-macos.outputs.cache-hit != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bash scripts/fetch-deps.sh macos
+      - run: flutter pub get
+      - run: pod install
+        working-directory: macos
+      - name: Disable sandbox for non-App Store build
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/Runner/DebugProfile.entitlements
+          /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/Runner/Release.entitlements
+      - name: Override code signing for CI (ad-hoc)
+        run: |
+          PBXPROJ="macos/Runner.xcodeproj/project.pbxproj"
+          # Replace Apple Development / Automatic signing with ad-hoc / Manual for Release & Profile targets
+          sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = "-"/g' "$PBXPROJ"
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
+          sed -i '' '/DEVELOPMENT_TEAM = JJ8T5Y738R/d' "$PBXPROJ"
+      - run: flutter build macos --release --obfuscate --split-debug-info=symbols --dart-define=IS_SANDBOX=false
+      - name: Verify bundled third-party license notices
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$APP_PATH"
+          LICENSE_DIR="$APP_PATH/Contents/Resources/ThirdPartyLicenses"
+          test -d "$LICENSE_DIR"
+          for file in NOTICE.md sbom-macos.json FlutterDart/README.md ImageMagick/IMAGEMAGICK-LICENSE.txt ImageMagick/LIBRAW-LICENSE.LGPL Oxipng/OXIPNG-LICENSE.txt MediaRuntime/NOTICE.md MediaRuntime/FFmpeg-LGPL-2.1.txt MediaRuntime/mpv-Copyright.txt; do
+            test -s "$LICENSE_DIR/$file"
+          done
+      - name: Rename app bundle
+        run: |
+          cd build/macos/Build/Products/Release
+          if [ -d "FilePeek.app" ] && [ ! -d "XFileSuite.app" ]; then
+            mv FilePeek.app XFileSuite.app
+          fi
+      - name: Ad-hoc sign app bundle
+        run: |
+          APP_PATH="build/macos/Build/Products/Release/XFileSuite.app"
+          xattr -cr "$APP_PATH" || true
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+      - run: brew install create-dmg
+      - name: Create DMG
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          DMG_DIR="dist/macos-dmg"
+          rm -rf "$DMG_DIR"
+          mkdir -p "$DMG_DIR"
+          cp -R "build/macos/Build/Products/Release/XFileSuite.app" "$DMG_DIR/"
+          cat > "$DMG_DIR/打开说明.txt" <<'EOF'
+          XFileSuite 打开说明
+
+          如果 macOS 提示“无法验证开发者”，请使用下面任意一种方式打开：
+
+          方式一：推荐
+          右键或 Control + 点按 XFileSuite.app，选择“打开”，再点击“仍要打开”。
+          这会对当前 App 永久生效，下次可以直接双击打开。
+
+          方式二：高级用户
+          如果已经把 App 拖到“应用程序”，可在终端执行：
+
+          xattr -r -d com.apple.quarantine /Applications/XFileSuite.app
+
+          然后重新打开 XFileSuite。
+          EOF
+          create-dmg --volname "XFileSuite" --window-pos 200 120 --window-size 720 400 --icon-size 100 --icon "XFileSuite.app" 160 170 --hide-extension "XFileSuite.app" --icon "打开说明.txt" 360 170 --app-drop-link 560 170 "XFileSuite-${TAG}.dmg" "$DMG_DIR"
+      - name: Create ZIP for auto-update
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          cd build/macos/Build/Products/Release
+          ditto -c -k --keepParent XFileSuite.app "$GITHUB_WORKSPACE/XFileSuite-${TAG}-macos.zip"
+          test -f "$GITHUB_WORKSPACE/XFileSuite-${TAG}-macos.zip"
+      - name: Upload DMG to Cloudflare R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets are required"
+            exit 1
+          fi
+          TAG="${{ github.event.inputs.tag }}"
+          FILE="XFileSuite-${TAG}.dmg"
+          npx wrangler r2 object put "xfilesuite-releases/staging/${TAG}/XFileSuite-${TAG}.dmg" --file "$FILE" --content-type "application/x-apple-diskimage" --remote
+      - name: Upload ZIP to Cloudflare R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          FILE="XFileSuite-${TAG}-macos.zip"
+          npx wrangler r2 object put "xfilesuite-releases/staging/${TAG}/XFileSuite-${TAG}-macos.zip" --file "$FILE" --content-type "application/zip" --remote
+      - name: Mark macOS assets ready in R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          printf '%s\n' "$TAG" > "$RUNNER_TEMP/macos-ready"
+          npx wrangler r2 object put "xfilesuite-releases/staging/${TAG}/macos-ready" --file "$RUNNER_TEMP/macos-ready" --content-type "text/plain" --remote
+      - name: Start the serial Cloudflare sync workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          gh workflow run sync-cloudflare.yml --repo XFileSuite/XFileSuiteNativeDeps --ref main -f tag="$TAG"

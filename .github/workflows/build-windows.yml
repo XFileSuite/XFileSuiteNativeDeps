@@ -1,0 +1,151 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Source release tag, for example v1.0.0.1002"
+        required: true
+
+jobs:
+  build-windows:
+    # Temporarily disabled while releases are macOS-only.
+    if: ${{ false }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: XFileSuite/XFileSuiteSource
+          token: ${{ secrets.FILEPEEK_REPO_TOKEN }}
+          lfs: false
+          ref: ${{ github.event.inputs.tag }}
+      - name: Prepare deps cache dir
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path ".deps" | Out-Null
+      - name: Restore ffmpeg from cache
+        id: cache-ffmpeg-windows
+        uses: actions/cache@v4
+        with:
+          path: .deps/ffmpeg-windows-x64.exe
+          key: ffmpeg-windows-x64-c47e9e15e76897778915ba16e36c8002b0a3f2f9e7c0a71aa1d41459ac1d02d1
+      - name: Download ffmpeg from R2
+        if: steps.cache-ffmpeg-windows.outputs.cache-hit != 'true'
+        shell: pwsh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler r2 object get "xfilesuite-releases/deps/ffmpeg-windows-x64.exe" --file ".deps\ffmpeg-windows-x64.exe" --remote
+      - name: Restore ironpress from cache
+        id: cache-ironpress-windows
+        uses: actions/cache@v4
+        with:
+          path: .deps/ironpress.dll
+          key: ironpress-windows-7dffd6aa78f807ef6882e3fd7c6187bdf4562db0a074f626b2362f426c0102e6
+      - name: Download ironpress from R2
+        if: steps.cache-ironpress-windows.outputs.cache-hit != 'true'
+        shell: pwsh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler r2 object get "xfilesuite-releases/deps/ironpress/windows/ironpress.dll" --file ".deps\ironpress.dll" --remote
+      - name: Place native deps into project
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "windows\runner\resources" | Out-Null
+          Copy-Item ".deps\ffmpeg-windows-x64.exe" "windows\runner\resources\ffmpeg.exe" -Force
+          New-Item -ItemType Directory -Force -Path "packages\ironpress_local\windows\libs" | Out-Null
+          Copy-Item ".deps\ironpress.dll" "packages\ironpress_local\windows\libs\ironpress.dll" -Force
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.2"
+          channel: stable
+          cache: true
+      - run: flutter config --enable-windows-desktop
+      - run: flutter pub get
+      - run: flutter build windows --release --obfuscate --split-debug-info=symbols
+      - name: Bundle FFmpeg
+        shell: pwsh
+        run: |
+          $releaseDir = "build\windows\x64\runner\Release"
+          $dataDir = Join-Path $releaseDir "data"
+          New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+          $repoFfmpeg = "windows\runner\resources\ffmpeg.exe"
+          if (-not (Test-Path $repoFfmpeg)) { throw "ffmpeg.exe not found at $repoFfmpeg" }
+          Copy-Item $repoFfmpeg (Join-Path $dataDir "ffmpeg.exe") -Force
+      - name: Resolve app version
+        id: resolve_version
+        shell: pwsh
+        run: |
+          $pubspec = Get-Content pubspec.yaml -Raw
+          $flutterVersion = "1.0.0+1"
+          $buildNumber = "1"
+          if ($pubspec -match 'version:\s*([0-9]+\.[0-9]+\.[0-9]+)(?:\+([0-9]+))?') {
+            $baseVersion = $Matches[1]
+            $buildNumber = if ($Matches[2]) { $Matches[2] } else { "1" }
+            $flutterVersion = "$baseVersion+$buildNumber"
+          }
+          $appVersion = "$baseVersion.$buildNumber"
+          $releaseNotes = ""
+          if (Test-Path release.md) {
+            $content = Get-Content release.md -Raw
+            $parts = $content -split '(?m)^\s*---\s*$'
+            if ($parts.Length -gt 1) {
+              $releaseNotes = $parts[-1].Trim()
+            } else {
+              $releaseNotes = $content.Trim()
+            }
+          }
+          $releaseNotesB64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($releaseNotes))
+          Set-Content -Path release-notes.md -Value $releaseNotes -Encoding UTF8
+          "app_version=$appVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "flutter_version=$flutterVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "release_notes_b64=$releaseNotesB64" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Build EXE installer
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.resolve_version.outputs.app_version }}
+        run: |
+          choco install innosetup --no-progress -y
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $appVer = $env:APP_VERSION
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$appVer" "windows\installer\xfilesuite.iss"
+          $setup = Get-ChildItem -Path "dist" -Filter "XFileSuite-*-windows-x64-setup.exe" | Select-Object -First 1
+          if ($null -eq $setup) { throw "EXE installer was not created." }
+          $tag = "${{ github.event.inputs.tag }}"
+          Copy-Item $setup.FullName "XFileSuite-$tag-windows-x64-setup.exe" -Force
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          $releaseDir = "build\windows\x64\runner\Release"
+          $zipFile = "XFileSuite-$tag-windows-x64.zip"
+          if (-not (Test-Path $releaseDir)) { throw "Windows release directory not found at $releaseDir" }
+          Compress-Archive -Path "$releaseDir\*" -DestinationPath $zipFile -CompressionLevel Optimal -Force
+          if (-not (Test-Path $zipFile)) { throw "Portable ZIP was not created." }
+      - name: Upload installer to Cloudflare R2
+        shell: pwsh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if (-not $env:CLOUDFLARE_API_TOKEN -or -not $env:CLOUDFLARE_ACCOUNT_ID) {
+            throw "CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets are required"
+          }
+          $tag = "${{ github.event.inputs.tag }}"
+          $file = "XFileSuite-$tag-windows-x64-setup.exe"
+          npx wrangler r2 object put "xfilesuite-releases/staging/$tag/$file" --file "$file" --content-type "application/vnd.microsoft.portable-executable" --remote
+      - uses: softprops/action-gh-release@v2
+        with:
+          repository: XFileSuite/XFileSuite
+          token: ${{ secrets.XFILESUITE_SOURCE_WRITE_TOKEN }}
+          tag_name: ${{ github.event.inputs.tag }}
+          body_path: release-notes.md
+          files: |
+            XFileSuite-${{ github.event.inputs.tag }}-windows-x64-setup.exe
+            XFileSuite-${{ github.event.inputs.tag }}-windows-x64.zip

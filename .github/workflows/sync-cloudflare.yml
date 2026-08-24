@@ -1,0 +1,72 @@
+name: Sync Cloudflare Latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v1.0.0.1002"
+        required: true
+
+jobs:
+  sync-cloudflare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Wait for macOS assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+
+          cleanup() {
+            echo "Cleaning up staging files..."
+            npx wrangler r2 object delete "xfilesuite-releases/staging/${TAG}/XFileSuite-${TAG}.dmg" --remote || true
+            npx wrangler r2 object delete "xfilesuite-releases/staging/${TAG}/XFileSuite-${TAG}-macos.zip" --remote || true
+            npx wrangler r2 object delete "xfilesuite-releases/staging/${TAG}/macos-ready" --remote || true
+          }
+
+          START_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # 最多等 30 分钟（90 次 × 20 秒）
+          for attempt in $(seq 1 90); do
+            # 只检查本 workflow 启动之后新产生的失败 run
+            failed="$(gh run list --repo XFileSuite/XFileSuiteNativeDeps \
+              --event workflow_dispatch --limit 10 \
+              --json name,status,conclusion,createdAt \
+              --jq ".[] | select(.name==\"Build macOS\") | select(.createdAt >= \"$START_TIME\") | select(.conclusion==\"failure\")" \
+              2>/dev/null || true)"
+            if [ -n "$failed" ]; then
+              echo "::error::The macOS build failed. Aborting sync."
+              echo "$failed"
+              cleanup
+              exit 1
+            fi
+
+            if npx wrangler r2 object get "xfilesuite-releases/staging/${TAG}/macos-ready" --file "$RUNNER_TEMP/macos-ready" --remote >/dev/null 2>&1; then
+              echo "All macOS assets are ready in R2 staging."
+              exit 0
+            fi
+
+            echo "Waiting for assets ($attempt/90)..."
+            sleep 20
+          done
+
+          echo "::error::Timed out waiting for macOS assets"
+          cleanup
+          exit 1
+
+      - name: Sync latest release to Cloudflare
+        env:
+          GH_TOKEN: ${{ secrets.XFILESUITECLOUD_DISPATCH_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::XFILESUITECLOUD_DISPATCH_TOKEN secret is required"
+            exit 1
+          fi
+          gh api repos/XFileSuite/XFileSuiteCloud/dispatches \
+            -f event_type=xfilesuite_release_ready \
+            -f client_payload[tag]="$TAG"
