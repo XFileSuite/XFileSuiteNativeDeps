@@ -139,15 +139,36 @@ EOF
     # GitHub tag archives do not ship the generated Autotools configure script.
     autoreconf -fi
     make distclean >/dev/null 2>&1 || true
+    # LibRaw disables the imported X3F parser unless USE_X3FTOOLS is set.
+    # XFileSuite advertises Sigma X3F support, so keep this capability on.
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
       CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
-      CPPFLAGS="-I$prefix/include" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib" \
+      CPPFLAGS="-I$prefix/include -DUSE_X3FTOOLS" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib" \
       ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
     grep -Eq '(^|[[:space:]])-DUSE_JPEG([[:space:]]|$)' Makefile || {
       echo "LibRaw did not enable MozJPEG support for lossy DNG on $arch." >&2
       exit 1
     }
+    grep -Eq '(^|[[:space:]])-DUSE_X3FTOOLS([[:space:]]|$)' Makefile || {
+      echo "LibRaw did not enable Sigma X3F support on $arch." >&2
+      exit 1
+    }
     make -j"$JOBS" && make install
+    cat > .xfilesuite-x3f-capability.cpp <<'EOF'
+#include <libraw/libraw.h>
+int main() {
+  return (LibRaw::capabilities() & LIBRAW_CAPS_X3FTOOLS) ? 0 : 1;
+}
+EOF
+    clang++ -arch "$arch" -mmacosx-version-min=11.0 \
+      -I"$prefix/include" .xfilesuite-x3f-capability.cpp \
+      -L"$prefix/lib" -lraw_r -Wl,-rpath,"$prefix/lib" \
+      -o .xfilesuite-x3f-capability
+    arch -"$arch" ./.xfilesuite-x3f-capability || {
+      echo "Installed LibRaw lacks Sigma X3F runtime capability on $arch." >&2
+      exit 1
+    }
+    rm -f .xfilesuite-x3f-capability.cpp .xfilesuite-x3f-capability
   )
   build_dir="$WORK_DIR/build-imagemagick-$arch"; cp -R "$WORK_DIR/sources/imagemagick" "$build_dir"
   (

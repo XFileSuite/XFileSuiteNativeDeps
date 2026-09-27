@@ -95,7 +95,7 @@ test "$(grep -c 'exposure_correction=MagickTrue;' "$WORK_DIR/sources/imagemagick
 }
 grep -Fq "PACKAGE_VERSION='${IMAGEMAGICK_VERSION}'" "$WORK_DIR/sources/imagemagick/configure"
 
-delegate_stamp="$PREFIX/.xfilesuite-delegates-shared-v5-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}"
+delegate_stamp="$PREFIX/.xfilesuite-delegates-shared-v6-x3f-${LIBRAW_VERSION}-${MOZJPEG_VERSION}-${LIBPNG_VERSION}-${LIBWEBP_VERSION}-${LIBTIFF_VERSION}"
 delegate_cache_valid=true
 for cached_file in \
   lib/libjpeg.dll.a lib/libpng.dll.a lib/libwebp.dll.a lib/libtiff.dll.a \
@@ -145,10 +145,14 @@ echo "Building dynamic LibRaw..."
   cd "$WORK_DIR/sources/libraw"
   autoreconf -fi
   export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:/mingw64/lib/pkgconfig"
-  CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib" \
+  CPPFLAGS="-I$PREFIX/include -DUSE_X3FTOOLS" LDFLAGS="-L$PREFIX/lib" \
     ./configure --prefix="$PREFIX" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
   grep -Eq '(^|[[:space:]])-DUSE_JPEG([[:space:]]|$)' Makefile || {
     echo "LibRaw did not enable MozJPEG support for lossy DNG." >&2
+    exit 1
+  }
+  grep -Eq '(^|[[:space:]])-DUSE_X3FTOOLS([[:space:]]|$)' Makefile || {
+    echo "LibRaw did not enable Sigma X3F support." >&2
     exit 1
   }
   make -j"$JOBS" && make install
