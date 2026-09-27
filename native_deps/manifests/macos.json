@@ -7,32 +7,32 @@
       "version": "7.1.2-29",
       "releaseRevision": 3,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-2792235b13a3a4b2da38b3c366c20babbbbf5af8d3e1cd415c69bc62baf185ae.tar.gz",
-      "bundleSha256": "2792235b13a3a4b2da38b3c366c20babbbbf5af8d3e1cd415c69bc62baf185ae",
+      "r2Key": "deps/imagemagick-macos-universal-3efa836b601242f8b8ca5e52497ac55db099ad2fda6b8b0c69db644764b34640.tar.gz",
+      "bundleSha256": "3efa836b601242f8b8ca5e52497ac55db099ad2fda6b8b0c69db644764b34640",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.3"
     },
     "resvg": {
       "version": "0.47.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/resvg-macos-universal-ca81ac10a44e3d3770d28cb19333e491392008aa6c1ec77a2a83868189a7114c",
-      "binarySha256": "ca81ac10a44e3d3770d28cb19333e491392008aa6c1ec77a2a83868189a7114c",
+      "r2Key": "deps/resvg-macos-universal-49debf619f7fdb87ee82cf79f45c8473d7cfe75bd499bda6a5dccf834e11c3e1",
+      "binarySha256": "49debf619f7fdb87ee82cf79f45c8473d7cfe75bd499bda6a5dccf834e11c3e1",
       "sourceRelease": "resvg-macos-0.47.0-xfilesuite.1"
     },
     "oxipng": {
       "version": "10.2.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/oxipng-macos-universal-4b1a16f4c905a7ae7143aca5a9490770379814aef023d57d6b9361f61c668a0b.tar.gz",
-      "bundleSha256": "4b1a16f4c905a7ae7143aca5a9490770379814aef023d57d6b9361f61c668a0b",
+      "r2Key": "deps/oxipng-macos-universal-a854e3908797a65b7c0256dddef705c3408bf20d448e01380d6d70e7ffc2c2b9.tar.gz",
+      "bundleSha256": "a854e3908797a65b7c0256dddef705c3408bf20d448e01380d6d70e7ffc2c2b9",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,
       "architecture": "universal",
-      "bundleSha256": "1d5e955f3a745677a2586dbc16cb2b8890c9e627a525e463630747bfa3e636b2",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-1d5e955f3a745677a2586dbc16cb2b8890c9e627a525e463630747bfa3e636b2",
+      "bundleSha256": "127551a0af70ed2eb3315b5e03dd0f3363fefe644b9ef771413b7297a4fd9f75",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-127551a0af70ed2eb3315b5e03dd0f3363fefe644b9ef771413b7297a4fd9f75",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3"
     }
   }
