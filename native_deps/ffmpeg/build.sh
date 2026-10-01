@@ -32,6 +32,9 @@ MACOS_RESOURCES="$PROJECT_ROOT/macos/Runner/Resources"
 
 MIN_MACOS="${MIN_MACOS:-11.0}"
 FFMPEG_LINKAGE="${FFMPEG_LINKAGE:-static}"
+# The shared media runtime publishes UUID-matched dSYMs after relocation.
+# Preserve compile-time DWARF and the binary's symbol table until then.
+FFMPEG_KEEP_DWARF="${FFMPEG_KEEP_DWARF:-0}"
 # Optional per-architecture prefixes containing libass, FreeType, HarfBuzz
 # and FriBidi.  The media-runtime builder supplies these from its pinned mpv
 # dependency build.  Keep this explicit: --disable-autodetect must never pull
@@ -630,6 +633,12 @@ build_one_arch() {
   local CFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O3"
   local LDFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS"
 
+  local DEBUG_CONFIG=(--disable-debug)
+  if [[ "$FFMPEG_KEEP_DWARF" == "1" ]]; then
+    CFLAGS+=" -g"
+    DEBUG_CONFIG=(--enable-debug=1 --disable-stripping)
+  fi
+
   # Point FFmpeg at all the static libs we just built
   local LIB_CFLAGS="-I$PREFIX/include"
   local LIB_LDFLAGS="-L$PREFIX/lib -lvorbisenc -lvorbis -logg -lvpx -lwebp -lsharpyuv -lmp3lame -lopus -lm"
@@ -673,7 +682,7 @@ build_one_arch() {
     --extra-ldflags="$LDFLAGS $LIB_LDFLAGS" \
     ${CROSS_CONFIG[@]+"${CROSS_CONFIG[@]}"} \
     \
-    --disable-debug \
+    "${DEBUG_CONFIG[@]}" \
     --disable-doc \
     \
     "${LINKAGE_CONFIG[@]}" \
@@ -775,7 +784,7 @@ make_universal() {
 
     chmod +x "$OUT/bin/ffmpeg" "$OUT/bin/ffprobe"
 
-    if command -v strip >/dev/null 2>&1; then
+    if [[ "$FFMPEG_KEEP_DWARF" != "1" ]] && command -v strip >/dev/null 2>&1; then
       strip -x "$OUT/bin/ffmpeg" "$OUT/bin/ffprobe" || true
     fi
 

@@ -32,6 +32,7 @@ fi
 ffmpeg_work="$WORK_DIR/ffmpeg"
 ffmpeg_dist="$WORK_DIR/ffmpeg-dist"
 FFMPEG_LINKAGE=shared \
+FFMPEG_KEEP_DWARF=1 \
 WORK_DIR="$ffmpeg_work" \
 DIST_DIR="$ffmpeg_dist" \
 JOBS="$JOBS" \
@@ -135,6 +136,7 @@ done
 
 echo "==> Rebuilding shared FFmpeg with the pinned libass subtitle renderer"
 FFMPEG_LINKAGE=shared \
+FFMPEG_KEEP_DWARF=1 \
 LIBASS_PREFIX_ROOT="$subtitle_prefix_root" \
 WORK_DIR="$ffmpeg_work" \
 DIST_DIR="$ffmpeg_dist" \

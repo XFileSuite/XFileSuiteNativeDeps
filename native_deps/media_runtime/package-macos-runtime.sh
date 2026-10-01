@@ -47,6 +47,42 @@ cat > "$STAGE_DIR/metadata/BUILDINFO.md" <<EOF
 - mpv is built with \`-Dgpl=false\`.
 EOF
 
+# XCFrameworks contain the same universal framework binaries that CocoaPods
+# embeds in Contents/Frameworks.  Generate dSYMs from this final, relocated
+# runtime (after all lipo/install-name changes) and keep them out of ARCHIVE.
+symbol_mappings=("Contents/Resources/ffmpeg=$STAGE_DIR/Tools/ffmpeg")
+while IFS= read -r -d '' binary; do
+  name="$(basename "$binary")"
+  symbol_mappings+=("Contents/Frameworks/${name}.framework/Versions/A/${name}=$binary")
+done < <(find "$STAGE_DIR/Frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print0 | sort -z)
+"$SCRIPT_DIR/../macos-symbols.sh" "$DIST_DIR/$RELEASE_ID.symbols.tar.gz" "${symbol_mappings[@]}"
+
+# The dSYM helper has already checked every dSYM against these unstripped
+# binaries. Strip only after that check, then require the UUID to remain
+# identical so the private dSYM continues to match the shipped Release file.
+uuid_set() {
+  dwarfdump --uuid "$1" | awk '$1 == "UUID:" { gsub(/[()]/, "", $3); print $2 ":" $3 }' | sort
+}
+
+command -v strip >/dev/null || { echo 'strip is required for the release runtime.' >&2; exit 1; }
+for mapping in "${symbol_mappings[@]}"; do
+  binary="${mapping#*=}"
+  before_uuid="$(uuid_set "$binary")"
+  test -n "$before_uuid"
+  strip -S "$binary"
+  test "$(uuid_set "$binary")" = "$before_uuid" || {
+    echo "Stripping changed the UUID for $binary; refusing a mismatched dSYM." >&2
+    exit 1
+  }
+done
+
+# Stripping invalidates the earlier ad-hoc signatures. Re-sign the staged
+# runtime; the final App packaging performs its own Developer ID signing.
+while IFS= read -r framework; do
+  codesign --force --sign - --timestamp=none "$framework"
+done < <(find "$STAGE_DIR/Frameworks" -type d -name '*.framework' -print)
+codesign --force --sign - --timestamp=none "$STAGE_DIR/Tools/ffmpeg"
+
 (
   cd "$STAGE_DIR"
   {
@@ -63,14 +99,4 @@ EOF
 rm -f "$ARCHIVE" "$ARCHIVE.sha256"
 tar -czf "$ARCHIVE" -C "$WORK_DIR" "$RELEASE_ID"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
-
-# XCFrameworks contain the same universal framework binaries that CocoaPods
-# embeds in Contents/Frameworks.  Generate dSYMs from this final, relocated
-# runtime (after all lipo/install-name changes) and keep them out of ARCHIVE.
-symbol_mappings=("Contents/Resources/ffmpeg=$STAGE_DIR/Tools/ffmpeg")
-while IFS= read -r -d '' binary; do
-  name="$(basename "$binary")"
-  symbol_mappings+=("Contents/Frameworks/${name}.framework/Versions/A/${name}=$binary")
-done < <(find "$STAGE_DIR/Frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print0 | sort -z)
-"$SCRIPT_DIR/../macos-symbols.sh" "$DIST_DIR/$RELEASE_ID.symbols.tar.gz" "${symbol_mappings[@]}"
 echo "$ARCHIVE"
