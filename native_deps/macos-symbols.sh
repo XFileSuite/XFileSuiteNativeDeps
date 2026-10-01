@@ -37,7 +37,11 @@ for mapping in "$@"; do
   destination="$stage/dSYMs/$relative.dSYM"
   mkdir -p "$(dirname "$destination")"
   stderr="$stage/metadata/$(basename "$binary").stderr"
-  dsymutil "$binary" -o "$destination" 2>"$stderr"
+  if ! dsymutil "$binary" -o "$destination" 2>"$stderr"; then
+    echo "dSYM generation failed for $binary:" >&2
+    cat "$stderr" >&2
+    exit 1
+  fi
   if grep -q 'no debug symbols in executable' "$stderr"; then
     echo "Missing DWARF debug information in $binary; refusing an empty dSYM." >&2
     exit 1
