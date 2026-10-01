@@ -54,6 +54,7 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cross-files/macos-amd64.ini \
   cross-files/macos-arm64.ini \
   downloads.lock \
+  scripts/libass/build.sh \
   scripts/libs-arch/relink-dylibs.sh \
   scripts/mpv/build.sh \
   scripts/pkg-config/build.sh \
@@ -69,6 +70,29 @@ fi
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
+# dsymutil resolves Mach-O debug maps through the original object files.
+# Upstream removes each build directory immediately after copying the dylib,
+# leaving the final framework with an empty dSYM. Keep objects until runtime
+# packaging has produced its symbol archive.
+python3 - "$upstream/Makefile" "$upstream/scripts/libass/build.sh" <<'PY'
+from pathlib import Path
+import sys
+
+makefile = Path(sys.argv[1])
+source = makefile.read_text()
+cleanup = "\trm -rf ${TARGET_TMP_DIR}\n"
+count = source.count(cleanup)
+if count < 8:
+    raise SystemExit(f"Upstream temporary-build cleanup changed ({count} matches)")
+makefile.write_text(source.replace(cleanup, "\t: # Preserve objects for dSYM generation.\n"))
+
+libass = Path(sys.argv[2])
+source = libass.read_text()
+anchor = "cd ${SRC_DIR}\n\n"
+if source.count(anchor) != 1:
+    raise SystemExit("Upstream libass build entry changed")
+libass.write_text(source.replace(anchor, anchor + 'export CFLAGS="${CFLAGS:-} -g"\n\n'))
+PY
 cp "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch" \
   "$upstream/patches/libmpv-hevc-alpha-output.patch"
 # The injected FFmpeg prefix lives outside libmpv-darwin-build. Teach its

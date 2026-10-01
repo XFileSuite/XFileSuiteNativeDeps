@@ -23,10 +23,6 @@ on:
         type: choice
         options: [all, macos, windows]
         default: all
-      purge_all_deps:
-        description: Delete all existing native dependency objects in R2 before a full rebuild
-        type: boolean
-        default: false
 
 concurrency:
   group: native-deps-${{ github.event_name }}-${{ github.ref }}
@@ -87,71 +83,10 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  purge-r2:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.purge_all_deps }}
-    runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    steps:
-      - name: Validate purge scope and credentials
-        run: |
-          if [ -n "${{ inputs.component }}" ] && [ "${{ inputs.component }}" != all ]; then
-            echo "::error::purge_all_deps requires component=all and platform=all"
-            exit 1
-          fi
-          if [ "${{ inputs.platform }}" != all ]; then
-            echo "::error::purge_all_deps requires component=all and platform=all"
-            exit 1
-          fi
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Purge all native dependency objects from R2
-        run: |
-          node <<'NODE'
-          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-          const token = process.env.CLOUDFLARE_API_TOKEN;
-          const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/xfilesuite-releases/objects`;
-
-          async function request(path, options = {}) {
-            const response = await fetch(`${baseUrl}${path}`, {
-              ...options,
-              headers: { Authorization: `Bearer ${token}`, ...options.headers },
-            });
-            const body = await response.json();
-            if (!response.ok || !body.success) {
-              throw new Error(JSON.stringify(body.errors || body));
-            }
-            return body;
-          }
-
-          async function main() {
-            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/oxipng-', 'deps/media-runtime-', 'deps/sbom-']) {
-              let cursor;
-              do {
-                const query = new URLSearchParams({ prefix, per_page: '1000' });
-                if (cursor) query.set('cursor', cursor);
-                const page = await request(`?${query}`);
-                for (const object of page.result || []) {
-                  const key = object.key;
-                  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
-                  await request(`/${encodedKey}`, { method: 'DELETE' });
-                  console.log(`Deleted ${key}`);
-                }
-                cursor = page.result_info?.cursor || page.result_info?.cursors?.after;
-              } while (cursor);
-            }
-          }
-
-          main().catch((error) => {
-            console.error(error);
-            process.exit(1);
-          });
-          NODE
-
   publish-macos:
-    needs: purge-r2
-    if: ${{ always() && (needs.purge-r2.result == 'success' || needs.purge-r2.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos') }}
+    # R2 keys are versioned by content hash. Historical manifests can still
+    # reference older objects, so publishing must never purge them first.
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos') }}
     runs-on: macos-14
     permissions:
       contents: write
@@ -424,10 +359,9 @@ jobs:
             git -C "$RUNNER_TEMP/XFileSuite" push origin HEAD:main
           fi
   publish-windows:
-    needs: purge-r2
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && (needs.purge-r2.result == 'success' || needs.purge-r2.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     runs-on: windows-latest
     permissions:
       contents: write
