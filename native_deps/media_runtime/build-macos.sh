@@ -211,6 +211,13 @@ done < <(
     grep -E '/libass([.][0-9]+)*[.]dylib$' || true
 )
 
+# This is the final load-command mutation of the helper binary.  The App
+# project retains the conditional check as a guard, but must not change UUIDs
+# after the dSYM has been generated during runtime packaging.
+if ! otool -l "$shared_ffmpeg" | grep -A2 'LC_RPATH' | grep -q 'path @executable_path/../Frameworks '; then
+  install_name_tool -add_rpath '@executable_path/../Frameworks' "$shared_ffmpeg"
+fi
+
 echo "==> Ad-hoc signing the relocatable runtime"
 while IFS= read -r framework; do
   codesign --force --sign - --timestamp=none "$framework"

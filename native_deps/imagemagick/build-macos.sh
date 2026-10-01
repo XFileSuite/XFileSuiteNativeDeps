@@ -22,9 +22,11 @@ OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 ARCHITECTURES=(arm64 x86_64)
 BUNDLE_NAME="imagemagick-macos-universal"
+MAKE_COMMAND="${MAKE_COMMAND:-/usr/bin/make}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }; }
-for tool in autoreconf cmake curl lipo make tar install_name_tool otool; do need "$tool"; done
+for tool in autoreconf cmake curl lipo tar install_name_tool otool; do need "$tool"; done
+[[ -x "$MAKE_COMMAND" ]] || { echo "Missing usable make: $MAKE_COMMAND" >&2; exit 1; }
 download() {
   [ -f "$2" ] && return 0
   # Bash 3.2 (macOS) treats an empty "${arr[@]}" as unbound under `set -u`.
@@ -40,10 +42,11 @@ extract() { mkdir -p "$2"; tar -xf "$1" -C "$2" --strip-components=1; }
 
 build_cmake_shared() {
   local arch="$1" prefix="$2" source="$3"; shift 3
-  cmake -S "$source" -B "$source/build-$arch" -DCMAKE_BUILD_TYPE=Release \
+  cmake -S "$source" -B "$source/build-$arch" -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_OSX_ARCHITECTURES="$arch" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=ON "$@"
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_MAKE_PROGRAM="$MAKE_COMMAND" "$@"
   cmake --build "$source/build-$arch" --parallel "$JOBS"
   cmake --install "$source/build-$arch"
 }
@@ -113,19 +116,20 @@ EOF
   # All pinned image delegates are shared so MagickCore, LibRaw, and future
   # App-side FFI can load the same runtime libraries independently.
   cmake -S "$WORK_DIR/sources/mozjpeg" -B "$WORK_DIR/sources/mozjpeg/build-$arch" \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$prefix" \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX="$prefix" \
     -DCMAKE_OSX_ARCHITECTURES="$arch" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_SHARED=ON -DENABLE_STATIC=OFF \
-    -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF
+    -DWITH_TURBOJPEG=OFF -DWITH_JAVA=OFF -DPNG_SUPPORTED=OFF \
+    -DCMAKE_MAKE_PROGRAM="$MAKE_COMMAND"
   cmake --build "$WORK_DIR/sources/mozjpeg/build-$arch" --parallel "$JOBS"
   cmake --install "$WORK_DIR/sources/mozjpeg/build-$arch"
   (
     cd "$WORK_DIR/sources/libpng"
-    make distclean >/dev/null 2>&1 || true
-    CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -fPIC" \
+    "$MAKE_COMMAND" distclean >/dev/null 2>&1 || true
+    CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -g -fPIC" \
       LDFLAGS="-arch $arch -mmacosx-version-min=11.0" \
       ./configure --prefix="$prefix" --enable-shared --disable-static
-    make -j"$JOBS" && make install
+    "$MAKE_COMMAND" -j"$JOBS" && "$MAKE_COMMAND" install
   )
   build_cmake_shared "$arch" "$prefix" "$WORK_DIR/sources/libwebp" \
     -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF \
@@ -138,11 +142,11 @@ EOF
     cd "$WORK_DIR/sources/libraw"
     # GitHub tag archives do not ship the generated Autotools configure script.
     autoreconf -fi
-    make distclean >/dev/null 2>&1 || true
+    "$MAKE_COMMAND" distclean >/dev/null 2>&1 || true
     # LibRaw disables the imported X3F parser unless USE_X3FTOOLS is set.
     # XFileSuite advertises Sigma X3F support, so keep this capability on.
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
-      CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3" \
+      CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -g" CXXFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -g" \
       CPPFLAGS="-I$prefix/include -DUSE_X3FTOOLS" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib" \
       ./configure --prefix="$prefix" --enable-shared --disable-static --disable-examples --disable-lcms --enable-jpeg
     grep -Eq '(^|[[:space:]])-DUSE_JPEG([[:space:]]|$)' Makefile || {
@@ -153,7 +157,7 @@ EOF
       echo "LibRaw did not enable Sigma X3F support on $arch." >&2
       exit 1
     }
-    make -j"$JOBS" && make install
+    "$MAKE_COMMAND" -j"$JOBS" && "$MAKE_COMMAND" install
     cat > .xfilesuite-x3f-capability.cpp <<'EOF'
 #include <libraw/libraw.h>
 int main() {
@@ -180,7 +184,7 @@ EOF
     # the target/SDK flags from this environment and fails Autoconf's CPP
     # sanity check.  clang -E is the supported preprocessor invocation.
     export CC=clang CXX=clang++ CPP='clang -E'
-    export CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -I$prefix/include"
+    export CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -g -I$prefix/include"
     export CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-arch $arch -mmacosx-version-min=11.0 -L$prefix/lib"
     # Keep Autoconf's compiler probes independent from runtime delegates.
     # Delegate libraries are discovered by pkg-config during their individual
@@ -228,7 +232,7 @@ EOF
         exit 1
       }
     done
-    make -j"$JOBS" && make install
+    "$MAKE_COMMAND" -j"$JOBS" && "$MAKE_COMMAND" install
   )
 done
 
@@ -612,3 +616,12 @@ done
 rm -rf "$verify_dir"
 trap - EXIT
 shasum -a 256 "$archive" > "$archive.sha256"
+
+# Create the private, UUID-verified symbols artifact only after every lipo and
+# install-name rewrite above.  App staging copies these files directly into
+# Contents/Resources under the same basename.
+symbol_mappings=()
+while IFS= read -r -d '' binary; do
+  symbol_mappings+=("Contents/Resources/$(basename "$binary")=$binary")
+done < <(find "$bundle" -maxdepth 1 -type f \( -name '*.dylib' -o -name magick \) -print0 | sort -z)
+"$SCRIPT_DIR/../macos-symbols.sh" "$OUTPUT_DIR/$BUNDLE_NAME.symbols.tar.gz" "${symbol_mappings[@]}"

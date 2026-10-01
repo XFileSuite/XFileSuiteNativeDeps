@@ -263,6 +263,10 @@ jobs:
               sha = `shasum -a 256 native_deps/imagemagick/dist/imagemagick-macos-universal.tar.gz`.split.first
               item["bundleSha256"] = sha
               item["r2Key"] = "deps/imagemagick-macos-universal-#{sha}.tar.gz"
+              symbol_sha = `shasum -a 256 native_deps/imagemagick/dist/imagemagick-macos-universal.symbols.tar.gz`.split.first
+              item["symbolsSha256"] = symbol_sha
+              item["symbolsRelease"] = "macos-symbols-imagemagick-#{symbol_sha}"
+              item["symbolsUrl"] = "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/#{item["symbolsRelease"]}/imagemagick-macos-universal.symbols.tar.gz"
               item["sourceRelease"] = "imagemagick-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
             end
             if ["all", "resvg"].include?(component)
@@ -270,6 +274,10 @@ jobs:
               sha = `shasum -a 256 native_deps/resvg/dist/resvg-macos-universal`.split.first
               item["binarySha256"] = sha
               item["r2Key"] = "deps/resvg-macos-universal-#{sha}"
+              symbol_sha = `shasum -a 256 native_deps/resvg/dist/resvg-macos-universal.symbols.tar.gz`.split.first
+              item["symbolsSha256"] = symbol_sha
+              item["symbolsRelease"] = "macos-symbols-resvg-#{symbol_sha}"
+              item["symbolsUrl"] = "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/#{item["symbolsRelease"]}/resvg-macos-universal.symbols.tar.gz"
               item["sourceRelease"] = "resvg-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
             end
             if ["all", "oxipng"].include?(component)
@@ -277,6 +285,10 @@ jobs:
               sha = `shasum -a 256 native_deps/oxipng/dist/oxipng-macos-universal.tar.gz`.split.first
               item["bundleSha256"] = sha
               item["r2Key"] = "deps/oxipng-macos-universal-#{sha}.tar.gz"
+              symbol_sha = `shasum -a 256 native_deps/oxipng/dist/oxipng-macos-universal.symbols.tar.gz`.split.first
+              item["symbolsSha256"] = symbol_sha
+              item["symbolsRelease"] = "macos-symbols-oxipng-#{symbol_sha}"
+              item["symbolsUrl"] = "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/#{item["symbolsRelease"]}/oxipng-macos-universal.symbols.tar.gz"
               item["sourceRelease"] = "https://github.com/oxipng/oxipng/releases/tag/v#{item["version"]}"
             end
             if ["all", "media-runtime"].include?(component)
@@ -290,6 +302,11 @@ jobs:
               sha = `shasum -a 256 #{archive}`.split.first
               item["bundleSha256"] = sha
               item["r2Key"] = "deps/media-runtime-macos-#{item["version"]}-#{sha}"
+              symbol_archive = Dir["native_deps/media_runtime/dist/media-runtime-*.symbols.tar.gz"].first
+              symbol_sha = `shasum -a 256 #{symbol_archive}`.split.first
+              item["symbolsSha256"] = symbol_sha
+              item["symbolsRelease"] = "macos-symbols-media-runtime-#{symbol_sha}"
+              item["symbolsUrl"] = "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/#{item["symbolsRelease"]}/#{File.basename(symbol_archive)}"
               item["sourceRelease"] = "media-runtime-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
             end
             File.write(path, JSON.pretty_generate(data) + "\n")
@@ -314,6 +331,30 @@ jobs:
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
             archive="$(find native_deps/media_runtime/dist -name 'xfilesuite-*-source.tar.gz' -maxdepth 1 -print -quit)"
             publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "sourceRelease")')" "$archive"
+          fi
+      - name: Publish private macOS symbol archives on GitHub
+        run: |
+          release_repo="XFileSuite/XFileSuiteNativeDeps"
+          publish_symbols() {
+            component="$1"
+            archive="$2"
+            release="$(ruby -rjson -e 'puts JSON.parse(File.read(ARGV[0])).dig("components", ARGV[1], "symbolsRelease")' native_deps/manifests/macos.json "$component")"
+            test -n "$release"
+            gh release view "$release" --repo "$release_repo" >/dev/null 2>&1 || \
+              gh release create "$release" --repo "$release_repo" --title "$release" --notes "Private macOS dSYM archive for XFileSuite crash symbolication."
+            gh release upload "$release" "$archive" --repo "$release_repo" --clobber
+          }
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
+            publish_symbols imagemagick native_deps/imagemagick/dist/imagemagick-macos-universal.symbols.tar.gz
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = resvg ]; then
+            publish_symbols resvg native_deps/resvg/dist/resvg-macos-universal.symbols.tar.gz
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = oxipng ]; then
+            publish_symbols oxipng native_deps/oxipng/dist/oxipng-macos-universal.symbols.tar.gz
+          fi
+          if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
+            publish_symbols mediaRuntime "$(find native_deps/media_runtime/dist -name 'media-runtime-*.symbols.tar.gz' -maxdepth 1 -print -quit)"
           fi
       - name: Upload only selected runtime binaries to R2
         run: |

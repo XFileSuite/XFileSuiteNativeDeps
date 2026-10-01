@@ -13,6 +13,16 @@ WORK_DIR="$SCRIPT_DIR/work/ffi"
 LICENSE_FILE="$SCRIPT_DIR/LICENSE"
 TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+# Keep debug information through lipo so the companion dSYM contains usable
+# source locations. The separate symbol archive is never shipped in the App.
+export CARGO_PROFILE_RELEASE_DEBUG=1
+export CARGO_PROFILE_RELEASE_STRIP=none
+
+# Homebrew may leave an x86_64 cargo first in PATH on Apple Silicon. Prefer a
+# working rustup toolchain when it is already installed for the current user.
+if ! cargo --version >/dev/null 2>&1 && [[ -x "$HOME/.cargo/bin/cargo" ]]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+fi
 
 command -v cargo >/dev/null || { echo 'Rust cargo is required to build liboxipng.' >&2; exit 1; }
 command -v rustup >/dev/null || { echo 'rustup is required to build liboxipng.' >&2; exit 1; }
@@ -52,6 +62,8 @@ fi
 nm -gU "$stage/liboxipng.dylib" | grep -q ' _oxipng_optimize_file$'
 nm -gU "$stage/liboxipng.dylib" | grep -q ' _oxipng_optimize_memory$'
 nm -gU "$stage/liboxipng.dylib" | grep -q ' _oxipng_version$'
+"$SCRIPT_DIR/../macos-symbols.sh" "$OUTPUT_DIR/oxipng-macos-universal.symbols.tar.gz" \
+  'Contents/Resources/liboxipng.dylib'="$stage/liboxipng.dylib"
 
 cp "$FFI_DIR/include/oxipng.h" "$stage/native-headers/oxipng-$VERSION/oxipng.h"
 cat > "$stage/native-headers/versions.env" <<EOF

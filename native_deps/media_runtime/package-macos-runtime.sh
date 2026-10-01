@@ -63,4 +63,14 @@ EOF
 rm -f "$ARCHIVE" "$ARCHIVE.sha256"
 tar -czf "$ARCHIVE" -C "$WORK_DIR" "$RELEASE_ID"
 shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+
+# XCFrameworks contain the same universal framework binaries that CocoaPods
+# embeds in Contents/Frameworks.  Generate dSYMs from this final, relocated
+# runtime (after all lipo/install-name changes) and keep them out of ARCHIVE.
+symbol_mappings=("Contents/Resources/ffmpeg=$STAGE_DIR/Tools/ffmpeg")
+while IFS= read -r -d '' binary; do
+  name="$(basename "$binary")"
+  symbol_mappings+=("Contents/Frameworks/${name}.framework/Versions/A/${name}=$binary")
+done < <(find "$STAGE_DIR/Frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print0 | sort -z)
+"$SCRIPT_DIR/../macos-symbols.sh" "$DIST_DIR/$RELEASE_ID.symbols.tar.gz" "${symbol_mappings[@]}"
 echo "$ARCHIVE"

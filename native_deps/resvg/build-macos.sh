@@ -8,6 +8,17 @@ WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 OUTPUT_DIR="${OUTPUT_DIR:-$SCRIPT_DIR/dist}"
 TARGETS=(aarch64-apple-darwin x86_64-apple-darwin)
 
+# Retain DWARF in the release objects. The separately published dSYM is never
+# shipped in the App; it is required for post-release crash symbolication.
+export CARGO_PROFILE_RELEASE_DEBUG=1
+export CARGO_PROFILE_RELEASE_STRIP=none
+
+# Homebrew may leave an x86_64 cargo first in PATH on Apple Silicon. Prefer a
+# working rustup toolchain when it is already installed for the current user.
+if ! cargo --version >/dev/null 2>&1 && [[ -x "$HOME/.cargo/bin/cargo" ]]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
 command -v cargo >/dev/null || { echo 'Rust cargo is required.' >&2; exit 1; }
 command -v rustup >/dev/null || { echo 'rustup is required.' >&2; exit 1; }
 command -v lipo >/dev/null || { echo 'Xcode lipo is required.' >&2; exit 1; }
@@ -21,7 +32,10 @@ done
 output="$OUTPUT_DIR/resvg-macos-universal"
 lipo -create "$WORK_DIR/aarch64-apple-darwin/bin/resvg" "$WORK_DIR/x86_64-apple-darwin/bin/resvg" -output "$output"
 chmod +x "$output"
-lipo "$output" -verify_arch arm64 x86_64
+lipo -verify_arch arm64 "$output"
+lipo -verify_arch x86_64 "$output"
 "$output" --version | grep -Fx "$VERSION"
 otool -L "$output" | grep -E '(/opt/homebrew/|/usr/local/|/opt/local/)' && { echo 'Unexpected non-system dylib.' >&2; exit 1; } || true
 shasum -a 256 "$output" > "$output.sha256"
+"$SCRIPT_DIR/../macos-symbols.sh" "$OUTPUT_DIR/resvg-macos-universal.symbols.tar.gz" \
+  'Contents/Resources/resvg'="$output"

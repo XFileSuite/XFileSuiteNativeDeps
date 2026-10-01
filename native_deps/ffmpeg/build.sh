@@ -376,7 +376,9 @@ build_ogg_arch() {
   export MACOSX_DEPLOYMENT_TARGET="$MIN_MACOS"
   export CC CXX SDKROOT="$SDK"
 
-  local CFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O3"
+  # Retain DWARF in the final shared runtime. media_runtime packages matching
+  # dSYMs after all lipo/install-name mutations have completed.
+  local CFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS -O3 -g"
   local LDFLAGS="-arch $ARCH -isysroot $SDK -mmacosx-version-min=$MIN_MACOS"
 
   echo ""
@@ -391,7 +393,7 @@ build_ogg_arch() {
     --host="${ARCH/arm64/aarch64}-apple-darwin" \
     --disable-shared \
     --enable-static \
-    --disable-debug \
+    --enable-debug \
     --disable-dependency-tracking
 
   make -j"$JOBS"
