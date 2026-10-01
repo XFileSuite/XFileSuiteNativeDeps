@@ -50,6 +50,12 @@ Pushing a `v*` tag on `XFileSuiteSource` dispatches:
 Do not run App packaging from this repository's own tags; NativeDeps tags are
 reserved for corresponding-source dependency releases.
 
+The macOS DMG and ZIP require a `Developer ID Application` certificate for team
+`MV5NNZW2VB`. The workflow signs the non-sandboxed App, notarizes and staples
+the App, then signs, notarizes, and staples the DMG before uploading either package.
+Missing signing credentials stop the build before any package is published.
+Apple Distribution is for the separate Mac App Store archive, not this DMG.
+
 ## Required repository secrets
 
 | Secret | Purpose |
@@ -59,6 +65,16 @@ reserved for corresponding-source dependency releases.
 | `XFILESUITE_SOURCE_WRITE_TOKEN` | Fine-grained token with Contents read/write on `XFileSuiteSource` and `XFileSuite`; it mirrors manifests after a successful native-deps publish, and publishes Windows installer GitHub Releases to `XFileSuite`. |
 | `FILEPEEK_REPO_TOKEN` | Read-only Contents on `XFileSuiteSource` so App packaging can checkout a release tag. |
 | `XFILESUITECLOUD_DISPATCH_TOKEN` | Dispatch `XFileSuiteCloud` after staging assets are ready. |
+| `MACOS_DEVELOPER_ID_P12_BASE64` | Base64 of a Developer ID Application `.p12` containing the certificate and private key for team `MV5NNZW2VB`. |
+| `MACOS_DEVELOPER_ID_P12_PASSWORD` | Password used when exporting that `.p12`. |
+| `APPLE_NOTARY_KEY_BASE64` | Base64 of the App Store Connect API key `.p8` used by `notarytool`. |
+| `APPLE_NOTARY_KEY_ID` | Key ID of that App Store Connect API key. |
+| `APPLE_NOTARY_ISSUER_ID` | Issuer ID of the App Store Connect API key. |
 
 The workflow's built-in `GITHUB_TOKEN` publishes corresponding-source releases in this repository.
 `XFILESUITE_SOURCE_WRITE_TOKEN` must not be exposed outside GitHub Actions.
+Create the Developer ID Application certificate in the Apple Developer account,
+export it with its private key from Keychain Access, and add the five signing
+values as repository or organization secrets. Keep the `.p12`, `.p8`, and their
+passwords out of the repository and release artifacts. A first CI run must
+confirm Apple notarization accepts the bundled native frameworks and tools.

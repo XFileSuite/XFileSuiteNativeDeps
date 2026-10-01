@@ -14,6 +14,20 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Require Developer ID signing and notarization credentials
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          for name in DEVELOPER_ID_P12_BASE64 DEVELOPER_ID_P12_PASSWORD NOTARY_KEY_BASE64 NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing $name; refusing to publish an unsigned macOS package"
+              exit 1
+            fi
+          done
       - name: Checkout private repo
         uses: actions/checkout@v4
         with:
@@ -49,13 +63,16 @@ jobs:
         run: |
           /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/Runner/DebugProfile.entitlements
           /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/Runner/Release.entitlements
-      - name: Override code signing for CI (ad-hoc)
+          /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/MusicLibraryLauncher/MusicLibraryLauncher.entitlements
+          /usr/libexec/PlistBuddy -c "Set :com.apple.security.app-sandbox false" macos/Runner/sandboxed_tool.entitlements
+          /usr/libexec/PlistBuddy -c "Delete :com.apple.security.inherit" macos/Runner/sandboxed_tool.entitlements
+      - name: Use temporary build signing before Developer ID packaging
         run: |
           PBXPROJ="macos/Runner.xcodeproj/project.pbxproj"
-          # Replace Apple Development / Automatic signing with ad-hoc / Manual for Release & Profile targets
+          # The app is signed with Developer ID after all bundled resources are staged.
           sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = "-"/g' "$PBXPROJ"
           sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
-          sed -i '' '/DEVELOPMENT_TEAM = JJ8T5Y738R/d' "$PBXPROJ"
+          sed -i '' '/DEVELOPMENT_TEAM = /d' "$PBXPROJ"
       - run: flutter build macos --release --obfuscate --split-debug-info=symbols --dart-define=IS_SANDBOX=false
       - name: Verify bundled third-party license notices
         run: |
@@ -72,12 +89,65 @@ jobs:
           if [ -d "FilePeek.app" ] && [ ! -d "XFileSuite.app" ]; then
             mv FilePeek.app XFileSuite.app
           fi
-      - name: Ad-hoc sign app bundle
+      - name: Import Developer ID certificate and sign app bundle
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
         run: |
+          set -euo pipefail
           APP_PATH="build/macos/Build/Products/Release/XFileSuite.app"
-          xattr -cr "$APP_PATH" || true
-          codesign --force --deep --sign - "$APP_PATH"
+          test -d "$APP_PATH"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")" = 'com.xfilesuite.app.xfilesuite'
+          HELPER_PATH="$APP_PATH/Contents/Helpers/XFileSuite Music Library.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$HELPER_PATH/Contents/Info.plist")" = 'com.xfilesuite.app.xfilesuite.music-library-launcher'
+          KEYCHAIN_PATH="$RUNNER_TEMP/xfilesuite-signing.keychain-db"
+          P12_PATH="$RUNNER_TEMP/xfilesuite-developer-id.p12"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$P12_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$P12_PATH" -k "$KEYCHAIN_PATH" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | awk '/Developer ID Application:/ && /MV5NNZW2VB/ {print $2}')"
+          test -n "$SIGNING_IDENTITY"
+          test "$(printf '%s\n' "$SIGNING_IDENTITY" | wc -l | tr -d ' ')" = 1
+          rm -f "$P12_PATH"
+          xattr -cr "$APP_PATH"
+          # Xcode does not treat CLI tools and dylibs under Resources as nested code.
+          while IFS= read -r -d '' binary; do
+            if file -b "$binary" | grep -q 'Mach-O'; then
+              codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$binary"
+            fi
+          done < <(find "$APP_PATH/Contents/Resources" -type f -print0)
+          codesign --force --deep --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
+            --entitlements macos/Runner/Release.entitlements "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign -dv --verbose=3 "$APP_PATH" 2>&1 | grep -F 'TeamIdentifier=MV5NNZW2VB'
+          codesign -dv --verbose=3 "$APP_PATH" 2>&1 | grep -F 'Authority=Developer ID Application:'
+          codesign -dv --verbose=3 "$HELPER_PATH" 2>&1 | grep -F 'TeamIdentifier=MV5NNZW2VB'
+          codesign -dv --verbose=3 "$HELPER_PATH" 2>&1 | grep -F 'Authority=Developer ID Application:'
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/xfilesuite-entitlements.plist" 2>/dev/null
+          test "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$RUNNER_TEMP/xfilesuite-entitlements.plist")" = false
+      - name: Notarize and staple app bundle
+        env:
+          NOTARY_KEY_BASE64: ${{ secrets.APPLE_NOTARY_KEY_BASE64 }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          APP_PATH="build/macos/Build/Products/Release/XFileSuite.app"
+          NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          printf '%s' "$NOTARY_KEY_BASE64" | base64 --decode > "$NOTARY_KEY"
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/xfilesuite-notary.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/xfilesuite-notary.zip" \
+            --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --output-format json > "$RUNNER_TEMP/xfilesuite-app-notary.json"
+          jq -e '.status == "Accepted"' "$RUNNER_TEMP/xfilesuite-app-notary.json"
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          spctl --assess --type execute --verbose "$APP_PATH"
       - run: brew install create-dmg
       - name: Create DMG
         run: |
@@ -86,29 +156,38 @@ jobs:
           rm -rf "$DMG_DIR"
           mkdir -p "$DMG_DIR"
           cp -R "build/macos/Build/Products/Release/XFileSuite.app" "$DMG_DIR/"
-          cat > "$DMG_DIR/打开说明.txt" <<'EOF'
-          XFileSuite 打开说明
-
-          如果 macOS 提示“无法验证开发者”，请使用下面任意一种方式打开：
-
-          方式一：推荐
-          右键或 Control + 点按 XFileSuite.app，选择“打开”，再点击“仍要打开”。
-          这会对当前 App 永久生效，下次可以直接双击打开。
-
-          方式二：高级用户
-          如果已经把 App 拖到“应用程序”，可在终端执行：
-
-          xattr -r -d com.apple.quarantine /Applications/XFileSuite.app
-
-          然后重新打开 XFileSuite。
-          EOF
-          create-dmg --volname "XFileSuite" --window-pos 200 120 --window-size 720 400 --icon-size 100 --icon "XFileSuite.app" 160 170 --hide-extension "XFileSuite.app" --icon "打开说明.txt" 360 170 --app-drop-link 560 170 "XFileSuite-${TAG}.dmg" "$DMG_DIR"
+          create-dmg --volname "XFileSuite" --window-pos 200 120 --window-size 620 400 --icon-size 100 --icon "XFileSuite.app" 160 170 --hide-extension "XFileSuite.app" --app-drop-link 420 170 "XFileSuite-${TAG}.dmg" "$DMG_DIR"
+      - name: Notarize and staple DMG
+        env:
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          NOTARY_KEY="$RUNNER_TEMP/AuthKey_${NOTARY_KEY_ID}.p8"
+          DMG="XFileSuite-${TAG}.dmg"
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning "$RUNNER_TEMP/xfilesuite-signing.keychain-db" | awk '/Developer ID Application:/ && /MV5NNZW2VB/ {print $2}')"
+          test -n "$SIGNING_IDENTITY"
+          codesign --force --timestamp --sign "$SIGNING_IDENTITY" "$DMG"
+          codesign --verify --verbose=2 "$DMG"
+          xcrun notarytool submit "$DMG" \
+            --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --output-format json > "$RUNNER_TEMP/xfilesuite-dmg-notary.json"
+          jq -e '.status == "Accepted"' "$RUNNER_TEMP/xfilesuite-dmg-notary.json"
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose "$DMG"
       - name: Create ZIP for auto-update
         run: |
           TAG="${{ github.event.inputs.tag }}"
           cd build/macos/Build/Products/Release
           ditto -c -k --keepParent XFileSuite.app "$GITHUB_WORKSPACE/XFileSuite-${TAG}-macos.zip"
           test -f "$GITHUB_WORKSPACE/XFileSuite-${TAG}-macos.zip"
+      - name: Remove temporary signing credentials
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/xfilesuite-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/xfilesuite-developer-id.p12" "$RUNNER_TEMP"/AuthKey_*.p8
       - name: Upload DMG to Cloudflare R2
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
