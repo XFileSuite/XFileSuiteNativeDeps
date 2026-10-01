@@ -74,7 +74,7 @@ git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
 # Upstream removes each build directory immediately after copying the dylib,
 # leaving the final framework with an empty dSYM. Keep objects until runtime
 # packaging has produced its symbol archive.
-python3 - "$upstream/Makefile" "$upstream/scripts/libass/build.sh" <<'PY'
+python3 - "$upstream/Makefile" <<'PY'
 from pathlib import Path
 import sys
 
@@ -85,13 +85,6 @@ count = source.count(cleanup)
 if count < 8:
     raise SystemExit(f"Upstream temporary-build cleanup changed ({count} matches)")
 makefile.write_text(source.replace(cleanup, "\t: # Preserve objects for dSYM generation.\n"))
-
-libass = Path(sys.argv[2])
-source = libass.read_text()
-anchor = "cd ${SRC_DIR}\n\n"
-if source.count(anchor) != 1:
-    raise SystemExit("Upstream libass build entry changed")
-libass.write_text(source.replace(anchor, anchor + 'export CFLAGS="${CFLAGS:-} -g"\n\n'))
 PY
 cp "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch" \
   "$upstream/patches/libmpv-hevc-alpha-output.patch"
@@ -114,6 +107,12 @@ done
 # Align mpv and all of its static helper libraries with the application and
 # shared FFmpeg deployment target.
 sed -i '' 's/-mmacosx-version-min=10.9/-mmacosx-version-min=11.0/g' \
+  "$upstream/cross-files/macos-arm64.ini" \
+  "$upstream/cross-files/macos-amd64.ini"
+# Meson's external-project wrapper derives Autoconf flags from these cross-file
+# arguments and sanitizes the shell environment. Keep DWARF here so libass's
+# final universal framework can produce a real UUID-matched dSYM.
+sed -i '' "/^c_args = /s/]$/, '-g']/" \
   "$upstream/cross-files/macos-arm64.ini" \
   "$upstream/cross-files/macos-amd64.ini"
 # SourceForge's redirect endpoint regularly stalls on GitHub macOS runners.
