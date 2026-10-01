@@ -57,9 +57,12 @@ for framework in Mpv Avcodec Avformat Avutil Avfilter Swresample Swscale; do
     exit 1
   fi
 done
-while IFS= read -r binary; do
+while IFS= read -r -d '' framework; do
+  name="$(basename "$framework" .framework)"
+  binary="$framework/Versions/A/$name"
+  need_file "$binary"
   assert_relocatable "$binary"
-done < <(find "$FRAMEWORKS_DIR" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print)
+done < <(find "$FRAMEWORKS_DIR" -type d -name '*.framework' -print0)
 
 if ! otool -L "$FFMPEG" | grep -q '@rpath/libavcodec'; then
   echo "ffmpeg does not use the shared Avcodec.framework runtime" >&2

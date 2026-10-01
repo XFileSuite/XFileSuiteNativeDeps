@@ -51,10 +51,15 @@ EOF
 # embeds in Contents/Frameworks.  Generate dSYMs from this final, relocated
 # runtime (after all lipo/install-name changes) and keep them out of ARCHIVE.
 symbol_mappings=("Contents/Resources/ffmpeg=$STAGE_DIR/Tools/ffmpeg")
-while IFS= read -r -d '' binary; do
-  name="$(basename "$binary")"
+while IFS= read -r -d '' framework; do
+  name="$(basename "$framework" .framework)"
+  binary="$framework/Versions/A/$name"
+  [[ -f "$binary" ]] || {
+    echo "Missing framework executable for symbols: $binary" >&2
+    exit 1
+  }
   symbol_mappings+=("Contents/Frameworks/${name}.framework/Versions/A/${name}=$binary")
-done < <(find "$STAGE_DIR/Frameworks" -type f -path '*/Versions/A/*' ! -path '*/Resources/*' -print0 | sort -z)
+done < <(find "$STAGE_DIR/Frameworks" -type d -name '*.framework' -print0 | sort -z)
 "$SCRIPT_DIR/../macos-symbols.sh" "$DIST_DIR/$RELEASE_ID.symbols.tar.gz" "${symbol_mappings[@]}"
 
 # The dSYM helper has already checked every dSYM against these unstripped
