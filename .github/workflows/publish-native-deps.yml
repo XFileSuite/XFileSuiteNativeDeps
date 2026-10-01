@@ -5,11 +5,13 @@ on:
     paths:
       - .github/workflows/publish-native-deps.yml
       - native_deps/ffmpeg/**
+      - native_deps/macos-symbols.sh
       - native_deps/media_runtime/**
   pull_request:
     paths:
       - .github/workflows/publish-native-deps.yml
       - native_deps/ffmpeg/**
+      - native_deps/macos-symbols.sh
       - native_deps/media_runtime/**
   workflow_dispatch:
     inputs:
