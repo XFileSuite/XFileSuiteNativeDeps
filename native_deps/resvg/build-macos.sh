@@ -32,8 +32,8 @@ done
 output="$OUTPUT_DIR/resvg-macos-universal"
 lipo -create "$WORK_DIR/aarch64-apple-darwin/bin/resvg" "$WORK_DIR/x86_64-apple-darwin/bin/resvg" -output "$output"
 chmod +x "$output"
-lipo -verify_arch arm64 "$output"
-lipo -verify_arch x86_64 "$output"
+lipo "$output" -verify_arch arm64
+lipo "$output" -verify_arch x86_64
 "$output" --version | grep -Fx "$VERSION"
 otool -L "$output" | grep -E '(/opt/homebrew/|/usr/local/|/opt/local/)' && { echo 'Unexpected non-system dylib.' >&2; exit 1; } || true
 shasum -a 256 "$output" > "$output.sha256"
