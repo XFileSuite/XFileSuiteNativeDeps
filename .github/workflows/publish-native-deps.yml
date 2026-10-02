@@ -257,12 +257,16 @@ jobs:
                 "releaseRevision" => 1,
                 "architecture" => "universal"
               }
-              archive = Dir["native_deps/media_runtime/dist/media-runtime-*.tar.gz"].first
+              release_id = "media-runtime-macos-#{item["version"]}-xfilesuite.#{item.fetch("releaseRevision")}"
+              archive = "native_deps/media_runtime/dist/#{release_id}.tar.gz"
+              abort "Missing macOS media runtime archive: #{archive}" unless File.file?(archive)
               sha = `shasum -a 256 #{archive}`.split.first
               item["bundleSha256"] = sha
               item["r2Key"] = "deps/media-runtime-macos-#{item["version"]}-#{sha}"
-              symbol_archive = Dir["native_deps/media_runtime/dist/media-runtime-*.symbols.tar.gz"].first
+              symbol_archive = "native_deps/media_runtime/dist/#{release_id}.symbols.tar.gz"
+              abort "Missing macOS media symbols archive: #{symbol_archive}" unless File.file?(symbol_archive)
               symbol_sha = `shasum -a 256 #{symbol_archive}`.split.first
+              abort "macOS media runtime archive resolved to symbols archive" if sha == symbol_sha
               item["symbolsSha256"] = symbol_sha
               item["symbolsRelease"] = "macos-symbols-media-runtime-#{symbol_sha}"
               item["symbolsUrl"] = "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/#{item["symbolsRelease"]}/#{File.basename(symbol_archive)}"
@@ -347,7 +351,13 @@ jobs:
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "oxipng", "r2Key")')" --file native_deps/oxipng/dist/oxipng-macos-universal.tar.gz --remote
           fi
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
-            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "r2Key")')" --file "$(find native_deps/media_runtime/dist -name 'media-runtime-*.tar.gz' -maxdepth 1 -print -quit)" --remote
+            media_release="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "sourceRelease")')"
+            media_archive="native_deps/media_runtime/dist/$media_release.tar.gz"
+            test -f "$media_archive" || { echo "Missing macOS media runtime archive: $media_archive" >&2; exit 1; }
+            media_sha="$(shasum -a 256 "$media_archive" | awk '{print $1}')"
+            expected_media_sha="$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "bundleSha256")')"
+            test "$media_sha" = "$expected_media_sha" || { echo "macOS media runtime archive SHA-256 mismatch" >&2; exit 1; }
+            npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "r2Key")')" --file "$media_archive" --remote
           fi
       - name: Upload macOS SBOM
         if: ${{ inputs.mode == 'publish' }}
