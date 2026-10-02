@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-10-01T15:25:16Z",
+  "generatedAt": "2026-10-02T00:58:11Z",
   "platform": "windows",
   "manifestId": "native-deps-windows-2026.07.20.1",
   "components": [
@@ -10,7 +10,7 @@
       "releaseRevision": 3,
       "architecture": "x64",
       "license": "ImageMagick License",
-      "r2Key": "deps/imagemagick-windows-x64-872e6ea8243a33e119ce479dc9ae1e357a302ef55db141dce9b3bfab40d1c9ec.zip",
+      "r2Key": "deps/imagemagick-windows-x64-6b3552be033eab94a73fe79268ca1cf5cdf447d4bb3ff44b2d850a1d2eaf53d2.zip",
       "sourceRelease": "imagemagick-windows-7.1.2-29-xfilesuite.3",
       "subComponents": [
         {
@@ -34,7 +34,7 @@
           "license": "MIT"
         }
       ],
-      "bundleSha256": "872e6ea8243a33e119ce479dc9ae1e357a302ef55db141dce9b3bfab40d1c9ec"
+      "bundleSha256": "6b3552be033eab94a73fe79268ca1cf5cdf447d4bb3ff44b2d850a1d2eaf53d2"
     },
     {
       "name": "oxipng",
@@ -42,12 +42,12 @@
       "releaseRevision": 1,
       "architecture": "x64",
       "license": "MIT",
-      "r2Key": "deps/oxipng-windows-x64-852b6c380aa3e41ea029ae93c52b1221daff5aeffce11f409a6cab02db4d19d2.zip",
+      "r2Key": "deps/oxipng-windows-x64-fdc578b97887a58f25807fa10b0d8d6ec87965b3cbe69a7e0757399df68f8def.zip",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0",
       "subComponents": [
 
       ],
-      "bundleSha256": "852b6c380aa3e41ea029ae93c52b1221daff5aeffce11f409a6cab02db4d19d2"
+      "bundleSha256": "fdc578b97887a58f25807fa10b0d8d6ec87965b3cbe69a7e0757399df68f8def"
     },
     {
       "name": "mediaRuntime",
@@ -55,7 +55,7 @@
       "releaseRevision": 3,
       "architecture": "x64",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-6805aa77973cd41e50d6c55d43f0b4f6600864a98265d549f2fb88ea88abacfb",
+      "r2Key": "deps/media-runtime-windows-8.1.2-mpv-0.41.0-47959d78cf11579b9bf699c5228ca63316646c6af21c1f6e16dd2262f1681bbe",
       "sourceRelease": "media-runtime-windows-8.1.2-mpv-0.41.0-xfilesuite.3",
       "subComponents": [
         {
@@ -143,7 +143,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "6805aa77973cd41e50d6c55d43f0b4f6600864a98265d549f2fb88ea88abacfb"
+      "bundleSha256": "47959d78cf11579b9bf699c5228ca63316646c6af21c1f6e16dd2262f1681bbe"
     }
   ]
 }
