@@ -15,8 +15,13 @@ on:
       - native_deps/media_runtime/**
   workflow_dispatch:
     inputs:
+      mode:
+        description: Build and inspect artifacts, or publish them
+        type: choice
+        options: [build-only, publish]
+        default: build-only
       component:
-        description: Component to rebuild and publish
+        description: Component to rebuild
         type: choice
         options: [all, media-runtime, imagemagick, resvg, oxipng]
         default: all
@@ -116,6 +121,7 @@ jobs:
           go-version: stable
           cache: false
       - name: Validate release credentials
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           test -n "$SOURCE_WRITE_TOKEN"
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -248,7 +254,25 @@ jobs:
             end
             File.write(path, JSON.pretty_generate(data) + "\n")
           '
+      - name: Generate macOS SBOM
+        run: ruby native_deps/generate-sbom.rb native_deps/manifests/macos.json native_deps/sbom-macos.json
+      - name: Upload macOS preflight artifacts
+        if: ${{ inputs.mode == 'build-only' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-native-deps-preflight-${{ inputs.component }}
+          path: |
+            native_deps/manifests/macos.json
+            native_deps/sbom-macos.json
+            native_deps/imagemagick/dist/*.tar.gz
+            native_deps/resvg/dist/resvg-macos-universal
+            native_deps/resvg/dist/*.tar.gz
+            native_deps/oxipng/dist/*.tar.gz
+            native_deps/media_runtime/dist/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
       - name: Publish corresponding source on GitHub
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           release_repo="XFileSuite/XFileSuite"
           publish() {
@@ -270,6 +294,7 @@ jobs:
             publish "$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "sourceRelease")')" "$archive"
           fi
       - name: Publish private macOS symbol archives on GitHub
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           release_repo="XFileSuite/XFileSuiteNativeDeps"
           publish_symbols() {
@@ -294,6 +319,7 @@ jobs:
             publish_symbols mediaRuntime "$(find native_deps/media_runtime/dist -name 'media-runtime-*.symbols.tar.gz' -maxdepth 1 -print -quit)"
           fi
       - name: Upload only selected runtime binaries to R2
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = imagemagick ]; then
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "imagemagick", "r2Key")')" --file native_deps/imagemagick/dist/imagemagick-macos-universal.tar.gz --remote
@@ -307,11 +333,12 @@ jobs:
           if [ "$COMPONENT" = all ] || [ "$COMPONENT" = media-runtime ]; then
             npx wrangler r2 object put "xfilesuite-releases/$(ruby -rjson -e 'puts JSON.parse(File.read("native_deps/manifests/macos.json")).dig("components", "mediaRuntime", "r2Key")')" --file "$(find native_deps/media_runtime/dist -name 'media-runtime-*.tar.gz' -maxdepth 1 -print -quit)" --remote
           fi
-      - name: Generate and upload macOS SBOM
+      - name: Upload macOS SBOM
+        if: ${{ inputs.mode == 'publish' }}
         run: |
-          ruby native_deps/generate-sbom.rb native_deps/manifests/macos.json native_deps/sbom-macos.json
           npx wrangler r2 object put "xfilesuite-releases/deps/sbom-macos.json" --file native_deps/sbom-macos.json --remote
       - name: Commit the canonical public manifest
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           git config user.name "xfilesuite-release-bot"
           git config user.email "release-bot@xfilesuite.com"
@@ -334,6 +361,7 @@ jobs:
             done
           fi
       - name: Mirror manifest to the private App source repository
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           git clone "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuiteSource.git" "$RUNNER_TEMP/XFileSuiteSource" --depth 1
           cp native_deps/manifests/macos.json "$RUNNER_TEMP/XFileSuiteSource/native_deps/manifests/macos.json"
@@ -347,6 +375,7 @@ jobs:
             git -C "$RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
           fi
       - name: Publish current manifest to the public repository
+        if: ${{ inputs.mode == 'publish' }}
         run: |
           gh repo clone XFileSuite/XFileSuite "$RUNNER_TEMP/XFileSuite" -- --depth 1
           git -C "$RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:${SOURCE_WRITE_TOKEN}@github.com/XFileSuite/XFileSuite.git"
@@ -363,7 +392,7 @@ jobs:
   publish-windows:
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
     runs-on: windows-latest
     permissions:
       contents: write
