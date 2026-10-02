@@ -52,7 +52,8 @@ build_cmake_shared() {
 }
 
 # Rebuild sources/prefixes, but retain downloads to make CI retries inexpensive.
-rm -rf "$WORK_DIR/sources" "$WORK_DIR"/prefix-* "$WORK_DIR"/build-imagemagick-* "$OUTPUT_DIR"
+rm -rf "$WORK_DIR/sources" "$WORK_DIR"/prefix-* "$WORK_DIR"/build-imagemagick-* \
+  "$WORK_DIR"/build-libpng-* "$WORK_DIR"/build-libraw-* "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR/downloads" "$WORK_DIR/sources" "$OUTPUT_DIR"
 download "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/${IMAGEMAGICK_VERSION}" "$WORK_DIR/downloads/imagemagick-${IMAGEMAGICK_VERSION}.tar.gz"
 download "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/${LIBRAW_VERSION}" "$WORK_DIR/downloads/libraw-${LIBRAW_VERSION}.tar.gz"
@@ -123,9 +124,12 @@ EOF
     -DCMAKE_MAKE_PROGRAM="$MAKE_COMMAND"
   cmake --build "$WORK_DIR/sources/mozjpeg/build-$arch" --parallel "$JOBS"
   cmake --install "$WORK_DIR/sources/mozjpeg/build-$arch"
+  # dsymutil reads the object paths recorded in each Mach-O debug map after
+  # lipo. Keep both architectures' Autotools objects until symbols are packed.
+  libpng_build="$WORK_DIR/build-libpng-$arch"
+  cp -R "$WORK_DIR/sources/libpng" "$libpng_build"
   (
-    cd "$WORK_DIR/sources/libpng"
-    "$MAKE_COMMAND" distclean >/dev/null 2>&1 || true
+    cd "$libpng_build"
     CC="clang -arch $arch -mmacosx-version-min=11.0" CFLAGS="-arch $arch -mmacosx-version-min=11.0 -O3 -g -fPIC" \
       LDFLAGS="-arch $arch -mmacosx-version-min=11.0" \
       ./configure --prefix="$prefix" --enable-shared --disable-static
@@ -138,11 +142,12 @@ EOF
   build_cmake_shared "$arch" "$prefix" "$WORK_DIR/sources/libtiff" \
     -Dtiff-tools=OFF -Dtiff-tests=OFF -Dtiff-contrib=OFF -Dtiff-docs=OFF \
     -Djpeg=OFF -Dwebp=OFF -Dlzma=OFF -Dzstd=OFF -Dlibdeflate=OFF
+  libraw_build="$WORK_DIR/build-libraw-$arch"
+  cp -R "$WORK_DIR/sources/libraw" "$libraw_build"
   (
-    cd "$WORK_DIR/sources/libraw"
+    cd "$libraw_build"
     # GitHub tag archives do not ship the generated Autotools configure script.
     autoreconf -fi
-    "$MAKE_COMMAND" distclean >/dev/null 2>&1 || true
     # LibRaw disables the imported X3F parser unless USE_X3FTOOLS is set.
     # XFileSuite advertises Sigma X3F support, so keep this capability on.
     CC="clang -arch $arch -mmacosx-version-min=11.0" CXX="clang++ -arch $arch -mmacosx-version-min=11.0" \
