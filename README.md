@@ -21,7 +21,11 @@ own upstream licenses.
 `Publish Native Dependencies` builds selected macOS and Windows components,
 creates the corresponding-source archives and checksums, publishes them as
 releases in this repository, uploads the runtime artifacts to Cloudflare R2,
-and removes the superseded R2 objects only after a successful publish.
+and leaves earlier content-addressed R2 objects in place by default. For a
+full publish, the optional `purge_all_deps` input deletes existing native
+dependency objects after both platforms publish, while retaining every object
+referenced by the new manifests. Old manifests may still refer to those deleted
+objects, so enable it only when those versions no longer need to be downloadable.
 
 The final manifests are committed here, then mirrored to:
 
@@ -33,7 +37,10 @@ The final manifests are committed here, then mirrored to:
 
 1. Edit `native_deps/manifests/macos.json` and/or `windows.json` on `main`.
 2. Open **Actions → Publish Native Dependencies → Run workflow**.
-3. Select the component and platform.
+3. Select `mode=build-only` to inspect macOS build artifacts, or `mode=publish`
+   to upload and mirror the dependency manifest. Select the component and
+   platform. A full `publish` run may also select `purge_all_deps`; this
+   requires `component=all` and `platform=all` and defaults to off.
 
 Do not edit `binarySha256`, `bundleSha256`, `r2Key`, or `sourceRelease` by
 hand. The workflow writes them from the final artifact.
