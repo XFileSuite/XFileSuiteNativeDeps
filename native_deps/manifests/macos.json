@@ -7,45 +7,45 @@
       "version": "7.1.2-29",
       "releaseRevision": 4,
       "architecture": "universal",
-      "r2Key": "deps/imagemagick-macos-universal-7935657c011333aaac248d8a04d6916814bc5297669819a93dbe6a642858849c.tar.gz",
-      "bundleSha256": "7935657c011333aaac248d8a04d6916814bc5297669819a93dbe6a642858849c",
+      "r2Key": "deps/imagemagick-macos-universal-8bf6a2b5ce16582a5f17f665127ecf8f994498530b7b699708867580c8429e05.tar.gz",
+      "bundleSha256": "8bf6a2b5ce16582a5f17f665127ecf8f994498530b7b699708867580c8429e05",
       "sourceRelease": "imagemagick-macos-7.1.2-29-xfilesuite.4",
-      "symbolsSha256": "d5115f12324aedb00bbf1229fa2e6f0680dc854c25a833dd1942c87384060585",
-      "symbolsRelease": "macos-symbols-imagemagick-d5115f12324aedb00bbf1229fa2e6f0680dc854c25a833dd1942c87384060585",
-      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-imagemagick-d5115f12324aedb00bbf1229fa2e6f0680dc854c25a833dd1942c87384060585/imagemagick-macos-universal.symbols.tar.gz"
+      "symbolsSha256": "c6e950f93fa51416fe4a0bb86c16ecbf1345128f83d06d07a8ed5574d1f7348f",
+      "symbolsRelease": "macos-symbols-imagemagick-c6e950f93fa51416fe4a0bb86c16ecbf1345128f83d06d07a8ed5574d1f7348f",
+      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-imagemagick-c6e950f93fa51416fe4a0bb86c16ecbf1345128f83d06d07a8ed5574d1f7348f/imagemagick-macos-universal.symbols.tar.gz"
     },
     "resvg": {
       "version": "0.47.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/resvg-macos-universal-2e5b93a622653da4c0637dcbd75a2585ac17bf54ae7cee99d42bdffd4317f410",
-      "binarySha256": "2e5b93a622653da4c0637dcbd75a2585ac17bf54ae7cee99d42bdffd4317f410",
+      "r2Key": "deps/resvg-macos-universal-3e790682a517f62b552bc56052703a9a7e38f078e79a29d9a40f429bdb95df9d",
+      "binarySha256": "3e790682a517f62b552bc56052703a9a7e38f078e79a29d9a40f429bdb95df9d",
       "sourceRelease": "resvg-macos-0.47.0-xfilesuite.1",
-      "symbolsSha256": "f7fa3aa4a4c17e5121128ffaa3853b5e4c033b617ccf07fdf93a4a78075a485b",
-      "symbolsRelease": "macos-symbols-resvg-f7fa3aa4a4c17e5121128ffaa3853b5e4c033b617ccf07fdf93a4a78075a485b",
-      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-resvg-f7fa3aa4a4c17e5121128ffaa3853b5e4c033b617ccf07fdf93a4a78075a485b/resvg-macos-universal.symbols.tar.gz"
+      "symbolsSha256": "f46c14447c2cf3f60e4175f3e0826f26b6efaee906c78f6003796c21ef3f498f",
+      "symbolsRelease": "macos-symbols-resvg-f46c14447c2cf3f60e4175f3e0826f26b6efaee906c78f6003796c21ef3f498f",
+      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-resvg-f46c14447c2cf3f60e4175f3e0826f26b6efaee906c78f6003796c21ef3f498f/resvg-macos-universal.symbols.tar.gz"
     },
     "oxipng": {
       "version": "10.2.0",
       "releaseRevision": 1,
       "architecture": "universal",
-      "r2Key": "deps/oxipng-macos-universal-b2058cf30257ead9ab6b2b42483ed6f889bfc38520f9ff8b4cbc1e5af66ba02e.tar.gz",
-      "bundleSha256": "b2058cf30257ead9ab6b2b42483ed6f889bfc38520f9ff8b4cbc1e5af66ba02e",
+      "r2Key": "deps/oxipng-macos-universal-d7a58f068095534f9c2fb9755e5463cd118f22ac583ecdec76b2aedf7108e71b.tar.gz",
+      "bundleSha256": "d7a58f068095534f9c2fb9755e5463cd118f22ac583ecdec76b2aedf7108e71b",
       "sourceRelease": "https://github.com/oxipng/oxipng/releases/tag/v10.2.0",
-      "symbolsSha256": "289315d71e9c8d30390a08820a85018d313941433b1c53915861a450d7c501e9",
-      "symbolsRelease": "macos-symbols-oxipng-289315d71e9c8d30390a08820a85018d313941433b1c53915861a450d7c501e9",
-      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-oxipng-289315d71e9c8d30390a08820a85018d313941433b1c53915861a450d7c501e9/oxipng-macos-universal.symbols.tar.gz"
+      "symbolsSha256": "894cacf7607613cb60f5f99da948f59488dd89c878c4e327b6e409f5fd5078d3",
+      "symbolsRelease": "macos-symbols-oxipng-894cacf7607613cb60f5f99da948f59488dd89c878c4e327b6e409f5fd5078d3",
+      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-oxipng-894cacf7607613cb60f5f99da948f59488dd89c878c4e327b6e409f5fd5078d3/oxipng-macos-universal.symbols.tar.gz"
     },
     "mediaRuntime": {
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 3,
       "architecture": "universal",
-      "bundleSha256": "f7bb8db7513d7e5a7a32fe4d0ddbc7ea06e681ab449451949055aa66c7e06118",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-f7bb8db7513d7e5a7a32fe4d0ddbc7ea06e681ab449451949055aa66c7e06118",
+      "bundleSha256": "e78a9fc9c01f72ec60478219927f670c7590a1509b3ecc8360b77f08f9cdb700",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e78a9fc9c01f72ec60478219927f670c7590a1509b3ecc8360b77f08f9cdb700",
       "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3",
-      "symbolsSha256": "f7bb8db7513d7e5a7a32fe4d0ddbc7ea06e681ab449451949055aa66c7e06118",
-      "symbolsRelease": "macos-symbols-media-runtime-f7bb8db7513d7e5a7a32fe4d0ddbc7ea06e681ab449451949055aa66c7e06118",
-      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-media-runtime-f7bb8db7513d7e5a7a32fe4d0ddbc7ea06e681ab449451949055aa66c7e06118/media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3.symbols.tar.gz"
+      "symbolsSha256": "2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3",
+      "symbolsRelease": "macos-symbols-media-runtime-2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3",
+      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-media-runtime-2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3/media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3.symbols.tar.gz"
     }
   }
 }
