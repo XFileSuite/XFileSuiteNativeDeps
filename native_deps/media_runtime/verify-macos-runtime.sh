@@ -40,6 +40,7 @@ assert_relocatable() {
 }
 
 need_file "$FFMPEG"
+need_file "$RUNTIME_DIR/metadata/MPV_BACKPORTS.json"
 for license in \
   NOTICE.md FFmpeg-LGPL-2.1.txt mpv-Copyright.txt libpng-LICENSE.txt \
   dav1d-COPYING.txt libass-COPYING.txt FreeType-FTL.txt \
@@ -206,5 +207,14 @@ for framework in Mpv Avcodec Avformat Avutil Avfilter Swresample Swscale; do
     exit 1
   fi
 done
+
+
+# Exercise the packaged ABI and TLS behavior, not only static feature markers.
+probe_args=()
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  probe_args+=(--trusted-url "https://raw.githubusercontent.com/XFileSuite/XFileSuiteNativeDeps/${GITHUB_SHA}/native_deps/media_runtime/tests/fixtures/tone.wav")
+fi
+NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
+  python3 "$SCRIPT_DIR/tests/runtime_probe.py" "$mpv_binary" "${probe_args[@]}"
 
 echo "macOS media runtime verified"

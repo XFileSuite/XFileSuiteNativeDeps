@@ -1,0 +1,75 @@
+{
+  "base": "v0.41.0",
+  "existingPatches": [
+    "libmpv-hevc-alpha-output.patch",
+    "libmpv-coreaudio-macos27.patch"
+  ],
+  "groups": {
+    "common": {
+      "patch": "libmpv-041-common-fixes.patch",
+      "upstreamCommits": [
+        "c66204b69ba201cf6611daae7e515442eed4b9cd screenshot: correctly detect hardware frame",
+        "4bbf014f098b52ea3888812f8738ad3016d89501 sub/draw_bmp: fix rgba alpha blending",
+        "fdb996adbc49b705268528b2ad1c3b2cdf23618f sd_ass: clear num_packets_animated on every reset",
+        "9ccd8899ff28c4f6bdd113026d307af3d46133c5 sub/draw_bmp: limit memset to available width in last slice",
+        "09900a0ff016c24409a4e6f95012260ed1107d7e demux/packet_pool: incrementally free old packets on pop",
+        "6bdacac99153b5a487d108e11d2f8d7678afd2fd player/loadfile: fix stack-overflow on EDL metadata track",
+        "74271a7d80f6c59185699d0d6d2d0b64bcbe90ae sub/sd_ass: subtitle timing rounding errors",
+        "fb5345809dc7fef8d40ee27c8e21d931314c9e3a sub/sd_ass: fix animated state indexing for reordered packets",
+        "7bc56a77a9e4d24d0ea20af9a1c97d9a7a764232 bitmap_packer: return -1 instead of aborting on invalid bitmap size",
+        "48e6c35c0e056d9e4ff04b98e012416697736d8a demux: interrupt blocking reads whose result would be discarded",
+        "19aaa33a860794338847f0d24e5e409307a6a6b2 sd_ass: keep the seen and animated state on the original packet",
+        "f71da2a9a5a9c758eb05e575bc05571cfaf53f6d sub/sd_ass: deduplicate packets without file position by content hash"
+      ],
+      "files": [
+        "demux/demux.c",
+        "demux/demux.h",
+        "demux/demux_lavf.c",
+        "demux/packet_pool.c",
+        "player/loadfile.c",
+        "player/screenshot.c",
+        "stream/stream_lavf.c",
+        "sub/draw_bmp.c",
+        "sub/sd_ass.c",
+        "video/out/bitmap_packer.c"
+      ]
+    },
+    "coreaudio": {
+      "patch": "libmpv-041-coreaudio-fixes.patch",
+      "upstreamCommits": [
+        "af067b5ea8e5fe396ebd9d3f895e51a7e75b3c09 ao_coreaudio: cleanup ao on init failure",
+        "c5d391adba7bd024954d0df1e0405f5749f4d4ca ao_coreaudio: register hotplug after succesful audiounit init",
+        "cefe15d9ab68d221202ad16561a51c51f3190995 ao_coreaudio_chmap: prioritise preferred stereo layout over default",
+        "a441084d4ad5a13e4a7605a29086784c41eacb6e ao_coreaudio_chmap: add missing mono label to speaker mapping",
+        "0680ab2c1d157cf167c0ada1d4f453ebbb4f953c ao_coreaudio_chmap: don't advertise mono support unconditionally",
+        "debae1eb6f888c1e5a5cdc8416957eb0b3fee5c3 ao_coreaudio_chmap: properly map preferred stereo layout",
+        "72c34d11458a13609f2abfb39341cf3978496d3e ao_coreaudio_chmap: fix memory leak in ca_layout_to_mp_chmap",
+        "76f198a9d28a604de1b219000d74d4131f1b599c ao_coreaudio: reload ao on device change"
+      ],
+      "files": [
+        "audio/out/ao_coreaudio.c",
+        "audio/out/ao_coreaudio_chmap.c"
+      ]
+    },
+    "windows": {
+      "patch": "libmpv-041-windows-fixes.patch",
+      "upstreamCommits": [
+        "986dd6387d64e98f9cafa9124cc5a16d4b018f7c ao_wasapi: fix retry budget on DEVICE_INVALIDATED",
+        "07c8c16bef24b878a77eee7f99c5cd201a01c63b vd_lavc: allow disabling codec hwdec per-device",
+        "1d8cb602ace9af307d15f79e25f5bff88f568620 video/d3d: exclude HEVC on known crashing Intel drivers",
+        "2a49cc01d627577d26333ccfd7b429bcd1307fb1 video/d3d: exclude VP9 on known broken Intel drivers"
+      ],
+      "files": [
+        "audio/out/ao_wasapi_utils.c",
+        "video/d3d.c",
+        "video/decode/vd_lavc.c",
+        "video/hwdec.h"
+      ]
+    }
+  },
+  "tlsPolicy": {
+    "verifyByDefault": true,
+    "upstreamReference": "ee3d72ce02349040d03cab3f2506d0518157e1a2",
+    "adaptation": "0.41 stream_lavf defaults, system SecureTransport/SChannel trust stores"
+  }
+}

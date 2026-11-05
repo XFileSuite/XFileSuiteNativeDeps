@@ -65,3 +65,35 @@ and shared playback remain enabled; no exclusive-output workaround is used.
 After rebuilding, verify ordinary CoreAudio output on macOS 27 with mono and
 stereo files, simultaneous playback in another app, and output-device switching.
 Static framework verification alone does not cover this runtime failure.
+
+## Stable 0.41 backports (macOS revision 5 / Windows revision 4)
+
+The runtime remains FFmpeg 8.1.2 + mpv 0.41.0 + libplacebo 6.338.2.
+`patches/mpv-041-backports.json` records the exact upstream commits and affected
+files; the same record is packaged as `metadata/MPV_BACKPORTS.json`.
+
+- Common fixes cover EDL/subtitle bounds, invalid bitmap sizes, hardware-frame
+  screenshots, subtitle packet timing/deduplication, cancellable demux reads,
+  and gradual packet-pool reclamation. The 0.41 packet cleanup semantics and
+  the existing HEVC Alpha patch are preserved.
+- macOS additionally fixes failed-AO cleanup, hotplug registration/reload and
+  preferred/mono/multichannel layout mapping.
+- Windows explicitly enables WASAPI (required with `auto_features=disabled`),
+  verifies the configured feature and packaged driver, fixes device-invalidated
+  retry timing and avoids known-broken Intel HEVC/VP9 drivers.
+- TLS verification defaults to **yes** in 0.41's `stream_lavf` configuration,
+  using SecureTransport/SChannel system trust stores. It is not conditional on
+  libcurl or a libavformat 63 upgrade. No automatic certificate bypass is added.
+
+Both package verifiers exercise the packaged ABI via `tests/runtime_probe.py`:
+local load/seek/stop cycles, a 78x64 subtitle screenshot, EDL metadata, plain
+HTTP, rejection of an untrusted local HTTPS chain and normal system-trusted
+HTTPS in Actions. macOS also tests an isolated explicit CA, wrong hostname and
+expired leaf. Generated test roots are never installed in system trust stores.
+Headless Windows Actions cannot establish physical speaker/wake-up behavior;
+that acceptance requires a Windows audio device. Driver presence is mandatory
+regardless of whether the runner has an endpoint.
+
+After installing a newly built runtime, repeat the App's real video/audio,
+output-device and screenshot paths. Keep the existing local hardware-screenshot
+fallback until its replacement is separately accepted.

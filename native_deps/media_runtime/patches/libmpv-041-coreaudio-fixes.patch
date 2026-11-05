@@ -1,0 +1,182 @@
+Backported to mpv v0.41.0 from upstream commits:
+  af067b5ea8e5fe396ebd9d3f895e51a7e75b3c09 ao_coreaudio: cleanup ao on init failure
+  c5d391adba7bd024954d0df1e0405f5749f4d4ca ao_coreaudio: register hotplug after succesful audiounit init
+  cefe15d9ab68d221202ad16561a51c51f3190995 ao_coreaudio_chmap: prioritise preferred stereo layout over default
+  a441084d4ad5a13e4a7605a29086784c41eacb6e ao_coreaudio_chmap: add missing mono label to speaker mapping
+  0680ab2c1d157cf167c0ada1d4f453ebbb4f953c ao_coreaudio_chmap: don't advertise mono support unconditionally
+  debae1eb6f888c1e5a5cdc8416957eb0b3fee5c3 ao_coreaudio_chmap: properly map preferred stereo layout
+  72c34d11458a13609f2abfb39341cf3978496d3e ao_coreaudio_chmap: fix memory leak in ca_layout_to_mp_chmap
+  76f198a9d28a604de1b219000d74d4131f1b599c ao_coreaudio: reload ao on device change
+
+--- a/audio/out/ao_coreaudio.c
++++ b/audio/out/ao_coreaudio.c
+@@ -141,6 +141,7 @@
+ static void reinit_latency(struct ao *ao);
+ static bool register_hotplug_cb(struct ao *ao);
+ static void unregister_hotplug_cb(struct ao *ao);
++static void uninit(struct ao *ao);
+ 
+ static bool reinit_device(struct ao *ao) {
+     struct priv *p = ao->priv;
+@@ -167,9 +168,6 @@
+     if (!reinit_device(ao))
+         goto coreaudio_error;
+ 
+-    if (!register_hotplug_cb(ao))
+-        goto coreaudio_error;
+-
+     if (p->change_physical_format)
+         init_physical_format(ao);
+ 
+@@ -181,6 +179,9 @@
+     if (!init_audiounit(ao, asbd))
+         goto coreaudio_error;
+ 
++    if (!register_hotplug_cb(ao))
++        goto coreaudio_error;
++
+     reinit_latency(ao);
+     ao->device_buffer = av_rescale(p->hw_latency_ns, ao->samplerate, 1000000000) * 2;
+ 
+@@ -190,6 +191,7 @@
+     return CONTROL_OK;
+ 
+ coreaudio_error:
++    uninit(ao);
+     return CONTROL_ERROR;
+ }
+ 
+@@ -424,14 +426,18 @@
+ {
+     struct priv *p = ao->priv;
+ 
+-    dispatch_sync(p->queue, ^{
+-        cancel_and_release_idle_work(p);
+-    });
+-    dispatch_release(p->queue);
+-
+-    AudioOutputUnitStop(p->audio_unit);
+-    AudioUnitUninitialize(p->audio_unit);
+-    AudioComponentInstanceDispose(p->audio_unit);
++    if (p->queue) {
++        dispatch_sync(p->queue, ^{
++            cancel_and_release_idle_work(p);
++        });
++        dispatch_release(p->queue);
++    }
++
++    if (p->audio_unit) {
++        AudioOutputUnitStop(p->audio_unit);
++        AudioUnitUninitialize(p->audio_unit);
++        AudioComponentInstanceDispose(p->audio_unit);
++    }
+ 
+     if (p->original_asbd.mFormatID) {
+         OSStatus err = CA_SET(p->original_asbd_stream,
+@@ -450,9 +456,14 @@
+     struct ao *ao = ctx;
+     struct priv *p = ao->priv;
+     MP_VERBOSE(ao, "Handling potential hotplug event...\n");
++    AudioDeviceID old_device = p->device;
+     reinit_device(ao);
+-    if (p->audio_unit)
+-        reinit_latency(ao);
++    if (p->audio_unit) {
++        if (p->device != old_device)
++            ao_request_reload(ao);
++        else
++            reinit_latency(ao);
++    }
+     ao_hotplug_event(ao);
+     return noErr;
+ }
+--- a/audio/out/ao_coreaudio_chmap.c
++++ b/audio/out/ao_coreaudio_chmap.c
+@@ -28,6 +28,7 @@
+     { kAudioChannelLabel_Left,                 MP_SPEAKER_ID_FL   },
+     { kAudioChannelLabel_Right,                MP_SPEAKER_ID_FR   },
+     { kAudioChannelLabel_Center,               MP_SPEAKER_ID_FC   },
++    { kAudioChannelLabel_Mono,                 MP_SPEAKER_ID_FC   },
+     { kAudioChannelLabel_LFEScreen,            MP_SPEAKER_ID_LFE  },
+     { kAudioChannelLabel_LeftSurround,         MP_SPEAKER_ID_BL   },
+     { kAudioChannelLabel_RightSurround,        MP_SPEAKER_ID_BR   },
+@@ -376,7 +377,7 @@
+     if (l->mNumberChannelDescriptions > MP_NUM_CHANNELS) {
+         MP_VERBOSE(ao, "layout has too many descriptions (%u, max: %d)\n",
+                    (unsigned) l->mNumberChannelDescriptions, MP_NUM_CHANNELS);
+-        return false;
++        goto coreaudio_error;
+     }
+ 
+     chmap->num = l->mNumberChannelDescriptions;
+@@ -437,7 +438,6 @@
+ {
+     OSStatus err;
+     uint32_t channels[2];
+-    const int nch = MP_ARRAY_SIZE(channels);
+     AudioChannelLayout *r = NULL;
+ 
+     AudioObjectPropertyAddress p_addr = (AudioObjectPropertyAddress) {
+@@ -450,18 +450,26 @@
+     err = AudioObjectGetPropertyData(device, &p_addr, 0, NULL, &psize, channels);
+     CHECK_CA_ERROR("could not get device preferred stereo layout");
+ 
++    uint32_t left = channels[0], right = channels[1];
++    if (!left || !right || left == right || left > MP_NUM_CHANNELS || right > MP_NUM_CHANNELS) {
++        MP_VERBOSE(ao, "ignoring invalid preferred stereo layout [%u,%u]\n", left, right);
++        goto coreaudio_error;
++    }
++
++    MP_VERBOSE(ao, "found valid preferred stereo layout [%u,%u]\n", left, right);
++
++    uint32_t nch = MPMAX(left, right);
+     psize = sizeof(AudioChannelLayout) + nch * sizeof(AudioChannelDescription);
+     r = talloc_zero_size(talloc_ctx, psize);
+     r->mChannelLayoutTag = kAudioChannelLayoutTag_UseChannelDescriptions;
+     r->mNumberChannelDescriptions = nch;
+ 
+-    AudioChannelDescription desc = {0};
+-    desc.mChannelFlags = kAudioChannelFlags_AllOff;
+-
+-    for(int i = 0; i < nch; i++) {
+-        desc.mChannelLabel = channels[i];
+-        r->mChannelDescriptions[i] = desc;
+-    }
++    for (uint32_t i = 0; i < nch; i++) {
++        r->mChannelDescriptions[i].mChannelFlags = kAudioChannelFlags_AllOff;
++        r->mChannelDescriptions[i].mChannelLabel = kAudioChannelLabel_Unknown;
++    }
++    r->mChannelDescriptions[left - 1].mChannelLabel = kAudioChannelLabel_Left;
++    r->mChannelDescriptions[right - 1].mChannelLabel = kAudioChannelLabel_Right;
+ 
+ coreaudio_error:
+     return r;
+@@ -472,15 +480,15 @@
+ {
+     void *ta_ctx = talloc_new(NULL);
+     struct mp_chmap chmap;
++
++    AudioChannelLayout *sl = ca_query_stereo_layout(ao, device, ta_ctx);
++    if (sl && ca_layout_to_mp_chmap(ao, sl, &chmap))
++        mp_chmap_sel_add_map(s, &chmap);
+ 
+     AudioChannelLayout *ml = ca_query_layout(ao, device, ta_ctx);
+     if (ml && ca_layout_to_mp_chmap(ao, ml, &chmap))
+         mp_chmap_sel_add_map(s, &chmap);
+ 
+-    AudioChannelLayout *sl = ca_query_stereo_layout(ao, device, ta_ctx);
+-    if (sl && ca_layout_to_mp_chmap(ao, sl, &chmap))
+-        mp_chmap_sel_add_map(s, &chmap);
+-
+     talloc_free(ta_ctx);
+ }
+ 
+@@ -491,8 +499,6 @@
+ 
+     if (!chmap_sel.num_chmaps)
+         mp_chmap_sel_add_map(&chmap_sel, &(struct mp_chmap)MP_CHMAP_INIT_STEREO);
+-
+-    mp_chmap_sel_add_map(&chmap_sel, &(struct mp_chmap)MP_CHMAP_INIT_MONO);
+ 
+     if (!ao_chmap_sel_adjust(ao, &chmap_sel, &ao->channels)) {
+         MP_ERR(ao, "could not select a suitable channel map among the "

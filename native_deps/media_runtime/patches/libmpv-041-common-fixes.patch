@@ -1,0 +1,372 @@
+Backported to mpv v0.41.0 from upstream commits:
+  c66204b69ba201cf6611daae7e515442eed4b9cd screenshot: correctly detect hardware frame
+  4bbf014f098b52ea3888812f8738ad3016d89501 sub/draw_bmp: fix rgba alpha blending
+  fdb996adbc49b705268528b2ad1c3b2cdf23618f sd_ass: clear num_packets_animated on every reset
+  9ccd8899ff28c4f6bdd113026d307af3d46133c5 sub/draw_bmp: limit memset to available width in last slice
+  09900a0ff016c24409a4e6f95012260ed1107d7e demux/packet_pool: incrementally free old packets on pop
+  6bdacac99153b5a487d108e11d2f8d7678afd2fd player/loadfile: fix stack-overflow on EDL metadata track
+  74271a7d80f6c59185699d0d6d2d0b64bcbe90ae sub/sd_ass: subtitle timing rounding errors
+  fb5345809dc7fef8d40ee27c8e21d931314c9e3a sub/sd_ass: fix animated state indexing for reordered packets
+  7bc56a77a9e4d24d0ea20af9a1c97d9a7a764232 bitmap_packer: return -1 instead of aborting on invalid bitmap size
+  48e6c35c0e056d9e4ff04b98e012416697736d8a demux: interrupt blocking reads whose result would be discarded
+  19aaa33a860794338847f0d24e5e409307a6a6b2 sd_ass: keep the seen and animated state on the original packet
+  f71da2a9a5a9c758eb05e575bc05571cfaf53f6d sub/sd_ass: deduplicate packets without file position by content hash
+
+TLS verification is enabled explicitly in the 0.41 stream_lavf defaults,
+using the existing FFmpeg SecureTransport/SChannel system trust stores.
+Packet pool cleanup retains 0.41 AVPacket and talloc cleanup semantics.
+HLS cancellation is adapted to the 0.41 demuxer retry loop.
+
+--- a/demux/demux.c
++++ b/demux/demux.c
+@@ -172,7 +172,7 @@
+ 
+     // -- All the following fields are protected by lock.
+ 
+-    bool thread_terminate;
++    atomic_bool thread_terminate;   // read unlocked by demux_read_interrupted()
+     bool threading;
+     bool shutdown_async;
+     void (*wakeup_cb)(void *ctx);
+@@ -229,7 +229,8 @@
+ 
+     bool tracks_switched;       // thread needs to inform demuxer of this
+ 
+-    bool seeking;               // there's a seek queued
++    atomic_bool seeking;        // there's a seek queued; read unlocked
++                                // by demux_read_interrupted()
+     int seek_flags;             // flags for next seek (if seeking==true)
+     double seek_pts;
+ 
+@@ -2260,7 +2261,7 @@
+     struct demux_packet *pkt = NULL;
+ 
+     bool eof = true;
+-    if (demux->desc->read_packet && !demux_cancel_test(demux))
++    if (demux->desc->read_packet && !demux_read_interrupted(demux))
+         eof = !demux->desc->read_packet(demux, &pkt);
+ 
+     mp_mutex_lock(&in->lock);
+@@ -4609,6 +4610,16 @@
+     return mp_cancel_test(demuxer->cancel);
+ }
+ 
++// Returns true if a blocking read should be aborted as soon as possible,
++// because its result will be discarded anyway.
++bool demux_read_interrupted(struct demuxer *demuxer)
++{
++    struct demux_internal *in = demuxer->in;
++    return atomic_load_explicit(&in->seeking, memory_order_relaxed) ||
++           atomic_load_explicit(&in->thread_terminate, memory_order_relaxed) ||
++           demux_cancel_test(demuxer);
++}
++
+ struct demux_chapter *demux_copy_chapter_data(struct demux_chapter *c, int num)
+ {
+     struct demux_chapter *new = talloc_array(NULL, struct demux_chapter, num);
+--- a/demux/demux.h
++++ b/demux/demux.h
+@@ -319,6 +319,7 @@
+ void demux_start_prefetch(struct demuxer *demuxer);
+ 
+ bool demux_cancel_test(struct demuxer *demuxer);
++bool demux_read_interrupted(struct demuxer *demuxer);
+ 
+ void demux_flush(struct demuxer *demuxer);
+ int demux_seek(struct demuxer *demuxer, double rel_seek_secs, int flags);
+--- a/demux/demux_lavf.c
++++ b/demux/demux_lavf.c
+@@ -902,8 +902,7 @@
+ 
+ static int interrupt_cb(void *ctx)
+ {
+-    struct demuxer *demuxer = ctx;
+-    return mp_cancel_test(demuxer->cancel);
++    return demux_read_interrupted(ctx);
+ }
+ 
+ static int block_io_open(struct AVFormatContext *s, AVIOContext **pb,
+@@ -1224,6 +1223,10 @@
+         av_packet_free(&pkt);
+         if (r == AVERROR_EOF)
+             return false;
++        if (demux_read_interrupted(demux)) {
++            MP_VERBOSE(demux, "read interrupted: %s.\n", av_err2str(r));
++            return false;
++        }
+         MP_WARN(demux, "error reading packet: %s.\n", av_err2str(r));
+         if (priv->retry_counter >= 10) {
+             MP_ERR(demux, "...treating it as fatal error.\n");
+--- a/demux/packet_pool.c
++++ b/demux/packet_pool.c
+@@ -104,6 +104,39 @@
+ #endif
+ }
+ 
++// Number of most-recently-pushed packets kept at the head of the freelist for
++// fast reuse. Pop walks at most this many cold-cache nodes per call, so we keep
++// it small.
++#define POOL_HOT_RESERVE 16
++
++// Maximum number of packets freed per pop, starting after the hot reserve.
++// Acts as a self-balancing GC. After a large push, for example on cache reset,
++// the pool will shrink across multiple subsequent pops. This value has to be
++// reasonably higher than POOL_HOT_RESERVE to make the clearing effective, but
++// not too high to avoid const of big GC baches on each pop.
++#define POOL_GC_BATCH 64
++
++// Detach up to POOL_GC_BATCH packets from the pool, starting after the
++// first POOL_HOT_RESERVE entries. Must be called locked.
++static inline struct demux_packet *pool_gc_detach(struct demux_packet_pool *pool)
++{
++    struct demux_packet *cat_reserve = pool->packets;
++    for (int i = 1; cat_reserve && i < POOL_HOT_RESERVE; i++)
++        cat_reserve = cat_reserve->next;
++
++    if (!cat_reserve || !cat_reserve->next)
++        return NULL;
++
++    struct demux_packet *gc = cat_reserve->next;
++    struct demux_packet *cut_rest = gc;
++    for (int i = 1; cut_rest->next && i < POOL_GC_BATCH; i++)
++        cut_rest = cut_rest->next;
++
++    cat_reserve->next = cut_rest->next;
++    cut_rest->next = NULL;
++    return gc;
++}
++
+ struct demux_packet *demux_packet_pool_pop(struct demux_packet_pool *pool)
+ {
+     mp_mutex_lock(&pool->lock);
+@@ -112,6 +145,7 @@
+         pool->packets = dp->next;
+         dp->next = NULL;
+     }
++    struct demux_packet *gc = pool_gc_detach(pool);
+     mp_mutex_unlock(&pool->lock);
+ 
+     // Clear the packet from possible external references. This is done in the
+@@ -125,6 +159,8 @@
+             av_packet_unref(dp->avpacket);
+         ta_free_children(dp);
+     }
++    // Detached while locked, released without blocking other pool users.
++    free_demux_packets(gc);
+ 
+     return dp;
+ }
+--- a/player/loadfile.c
++++ b/player/loadfile.c
+@@ -968,8 +968,12 @@
+     struct subfn *list = find_external_files(mpctx->global, mpctx->filename, opts);
+     talloc_steal(tmp, list);
+ 
+-    int sc[STREAM_TYPE_COUNT] = {0};
++    // demux_edl allocates metadata track with type set to STREAM_TYPE_COUNT,
++    // count this too, even though it won't have any effect on the selection.
++    int sc[STREAM_TYPE_COUNT + 1] = {0};
+     for (int n = 0; n < mpctx->num_tracks; n++) {
++        mp_assert(mpctx->tracks[n]->type >= 0);
++        mp_assert(mpctx->tracks[n]->type <= STREAM_TYPE_COUNT);
+         if (!mpctx->tracks[n]->attached_picture)
+             sc[mpctx->tracks[n]->type]++;
+     }
+--- a/player/screenshot.c
++++ b/player/screenshot.c
+@@ -377,7 +377,7 @@
+     }
+ 
+     // vo_get_current_frame() can return a hardware frame, which we have to download first.
+-    if (image && image->fmt.flags & MP_IMGFLAG_HWACCEL) {
++    if (image && IMGFMT_IS_HWACCEL(image->imgfmt)) {
+         struct mp_image *nimage = mp_image_hw_download(image, NULL);
+         talloc_free(image);
+         if (!nimage)
+--- a/stream/stream_lavf.c
++++ b/stream/stream_lavf.c
+@@ -72,6 +72,8 @@
+     .defaults = &(const struct stream_lavf_params){
+         .useragent = "libmpv",
+         .timeout = 60,
++        // SecureTransport and SChannel use their system trust stores.
++        .tls_verify = true,
+     },
+ };
+ 
+--- a/sub/draw_bmp.c
++++ b/sub/draw_bmp.c
+@@ -354,10 +354,10 @@
+             unsigned int dstg = (dstpix >>  8) & 0xFF;
+             unsigned int dstr = (dstpix >> 16) & 0xFF;
+             unsigned int dsta = (dstpix >> 24) & 0xFF;
+-            dstb = srcb + dstb * (255 * 255 - srca) / (255 * 255);
+-            dstg = srcg + dstg * (255 * 255 - srca) / (255 * 255);
+-            dstr = srcr + dstr * (255 * 255 - srca) / (255 * 255);
+-            dsta = srca + dsta * (255 * 255 - srca) / (255 * 255);
++            dstb = srcb + dstb * (255 - srca) / 255;
++            dstg = srcg + dstg * (255 - srca) / 255;
++            dstr = srcr + dstr * (255 - srca) / 255;
++            dsta = srca + dsta * (255 - srca) / 255;
+             dstrow[x] = dstb | (dstg << 8) | (dstr << 16) | (dsta << 24);
+         }
+         dst += dst_stride;
+@@ -485,9 +485,9 @@
+         for (int sx = 0; sx < p->s_w; sx++) {
+             struct slice *s = &line[sx];
+ 
+-            // Ensure this final slice doesn't extend beyond the width of p->s_w
+-            if (s->x1 == SLICE_W && sx == p->s_w - 1 && y == p->rgba_overlay->h - 1)
+-                s->x1 = MPMIN(p->w - ((p->s_w - 1) * SLICE_W), s->x1);
++            // Ensure the last slice doesn't extend beyond the total width.
++            if (sx == p->s_w - 1)
++                s->x1 = MPMIN(p->w - (sx * SLICE_W), s->x1);
+ 
+             if (s->x0 <= s->x1) {
+                 memset(px + s->x0, 0, (s->x1 - s->x0) * 4);
+--- a/sub/sd_ass.c
++++ b/sub/sd_ass.c
+@@ -59,14 +59,13 @@
+     struct mp_osd_res osd;
+     struct seen_packet *seen_packets;
+     int num_seen_packets;
+-    int *packets_animated;
+-    int num_packets_animated;
+     bool check_animated;
+ };
+ 
+ struct seen_packet {
+     int64_t pos;
+     double pts;
++    int animated; // -1 is unknown
+ };
+ 
+ #undef OPT_BASE_STRUCT
+@@ -385,8 +384,12 @@
+     }
+ 
+     ass_process_chunk(ctx->ass_track, pkt->buffer, pkt->len,
+-                      llrint(pkt->pts * 1000),
+-                      llrint(pkt->duration * 1000));
++                      floor(pkt->pts * 1000 + 1e-6),
++                      floor(pkt->duration * 1000 + 1e-6));
++    if (pkt != orig_pkt)
++        talloc_free(pkt);
++    // the seen and animated state is kept on the original packet
++    pkt = orig_pkt;
+ 
+     // This bookkeeping only has any practical use for ASS subs
+     // over a VO with no video.
+@@ -401,43 +404,52 @@
+                 if (ctx->check_animated && pkt->animated != 1)
+                     pkt->animated = is_animated(event->Text);
+             }
+-            MP_TARRAY_APPEND(ctx, ctx->packets_animated, ctx->num_packets_animated, pkt->animated);
++            ctx->seen_packets[pkt->seen_pos].animated = pkt->animated;
+         } else {
+-            if (ctx->check_animated && ctx->packets_animated[pkt->seen_pos] == -1) {
++            if (ctx->check_animated && ctx->seen_packets[pkt->seen_pos].animated == -1) {
+                 for (int n = track->n_events - 1; n >= 0; n--) {
+                     if (n + 1 == old_n_events || pkt->animated == 1)
+                         break;
+                     ASS_Event *event = &track->events[n];
+-                    ctx->packets_animated[pkt->seen_pos] = is_animated(event->Text);
+-                    pkt->animated = ctx->packets_animated[pkt->seen_pos];
++                    ctx->seen_packets[pkt->seen_pos].animated = is_animated(event->Text);
++                    pkt->animated = ctx->seen_packets[pkt->seen_pos].animated;
+                 }
+             } else {
+-                pkt->animated = ctx->packets_animated[pkt->seen_pos];
++                pkt->animated = ctx->seen_packets[pkt->seen_pos].animated;
+             }
+         }
+     }
+-
+-    if (pkt != orig_pkt)
+-        talloc_free(pkt);
++}
++
++// 64-bit FNV-1a
++static inline uint64_t hash_data(const unsigned char *data, size_t len)
++{
++    uint64_t hash = 0xcbf29ce484222325; // offset basis
++    for (size_t n = 0; n < len; n++)
++        hash = (hash ^ data[n]) * 0x100000001b3; // FNV prime
++    return hash;
+ }
+ 
+ // Test if the packet with the given file position and pts was already consumed.
+ // Return false if the packet is new (and add it to the internal list), and
+-// return true if it was already seen.
++// return true if it was already seen. Packets without a file position are
++// identified by a hash of their contents instead.
+ static bool check_packet_seen(struct sd *sd, struct demux_packet *packet)
+ {
+     struct sd_ass_priv *priv = sd->priv;
++    int64_t pos = packet->pos >= 0 ? packet->pos
++                                   : hash_data(packet->buffer, packet->len);
+     int a = 0;
+     int b = priv->num_seen_packets;
+     while (a < b) {
+         int mid = a + (b - a) / 2;
+         struct seen_packet *seen_packet = &priv->seen_packets[mid];
+-        if (packet->pos == seen_packet->pos && packet->pts == seen_packet->pts) {
++        if (pos == seen_packet->pos && packet->pts == seen_packet->pts) {
+             packet->seen_pos = mid;
+             return true;
+         }
+-        if (packet->pos > seen_packet->pos ||
+-            (packet->pos == seen_packet->pos && packet->pts > seen_packet->pts)) {
++        if (pos > seen_packet->pos ||
++            (pos == seen_packet->pos && packet->pts > seen_packet->pts)) {
+             a = mid + 1;
+         } else {
+             b = mid;
+@@ -445,7 +457,7 @@
+     }
+     packet->seen_pos = a;
+     MP_TARRAY_INSERT_AT(priv, priv->seen_packets, priv->num_seen_packets, a,
+-                        (struct seen_packet){packet->pos, packet->pts});
++                        (struct seen_packet){pos, packet->pts, -1});
+     return false;
+ }
+ 
+@@ -459,8 +471,7 @@
+     packet->sub_duration = packet->duration;
+ 
+     if (ctx->converter) {
+-        if (!sd->opts->sub_clear_on_seek && packet->pos >= 0 &&
+-            check_packet_seen(sd, packet))
++        if (!sd->opts->sub_clear_on_seek && check_packet_seen(sd, packet))
+             return;
+ 
+         double sub_pts = 0;
+@@ -662,7 +673,7 @@
+     if (pts == MP_NOPTS_VALUE)
+         return 0;
+ 
+-    long long ts = llrint(pts * 1000);
++    long long ts = floor(pts * 1000 + 1e-6);
+ 
+     if (!sd->opts->sub_fix_timing ||
+         sd->shared_opts->ass_style_override[sd->order] == ASS_STYLE_OVERRIDE_NONE)
+@@ -1021,7 +1032,7 @@
+     switch (cmd) {
+     case SD_CTRL_SUB_STEP: {
+         double *a = arg;
+-        long long ts = llrint(a[0] * 1000.0);
++        long long ts = floor(a[0] * 1000.0 + 1e-6);
+         long long res = ass_step_sub(ctx->ass_track, ts, a[1]);
+         if (!res)
+             return false;
+--- a/video/out/bitmap_packer.c
++++ b/video/out/bitmap_packer.c
+@@ -140,7 +140,7 @@
+         }
+         if (in[i].x < 0 || in [i].x > 65535 || in[i].y < 0 || in[i].y > 65535) {
+             fprintf(stderr, "Invalid OSD / subtitle bitmap size\n");
+-            abort();
++            return -1;
+         }
+         xmax = MPMAX(xmax, in[i].x);
+         ymax = MPMAX(ymax, in[i].y);

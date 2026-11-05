@@ -1,0 +1,150 @@
+Backported to mpv v0.41.0 from upstream commits:
+  986dd6387d64e98f9cafa9124cc5a16d4b018f7c ao_wasapi: fix retry budget on DEVICE_INVALIDATED
+  07c8c16bef24b878a77eee7f99c5cd201a01c63b vd_lavc: allow disabling codec hwdec per-device
+  1d8cb602ace9af307d15f79e25f5bff88f568620 video/d3d: exclude HEVC on known crashing Intel drivers
+  2a49cc01d627577d26333ccfd7b429bcd1307fb1 video/d3d: exclude VP9 on known broken Intel drivers
+
+--- a/audio/out/ao_wasapi_utils.c
++++ b/audio/out/ao_wasapi_utils.c
+@@ -1013,7 +1013,7 @@
+ {
+     struct wasapi_state *state = ao->priv;
+     MP_DBG(ao, "Init wasapi thread\n");
+-    int64_t retry_wait = MP_TIME_US_TO_NS(1);
++    int64_t retry_wait = MP_TIME_MS_TO_NS(1);
+     bool align_hack = false;
+     HRESULT hr;
+ 
+@@ -1096,14 +1096,14 @@
+         goto retry;
+     case AUDCLNT_E_DEVICE_IN_USE:
+     case AUDCLNT_E_DEVICE_INVALIDATED:
+-        if (retry_wait > MP_TIME_US_TO_NS(8)) {
++        if (retry_wait > MP_TIME_MS_TO_NS(1000)) {
+             MP_FATAL(ao, "Bad device retry failed\n");
+             return false;
+         }
+         wasapi_thread_uninit(ao);
+-        MP_WARN(ao, "Retrying in %"PRId64" ns\n", retry_wait);
++        MP_WARN(ao, "Retrying in %.0f ms\n", MP_TIME_NS_TO_MS(retry_wait));
+         mp_sleep_ns(retry_wait);
+-        retry_wait *= 2;
++        retry_wait *= 10;
+         goto retry;
+     }
+     return SUCCEEDED(hr);
+--- a/video/d3d.c
++++ b/video/d3d.c
+@@ -17,6 +17,8 @@
+ 
+ #include "config.h"
+ 
++#include <dxgi.h>
++
+ #include <libavcodec/avcodec.h>
+ 
+ #include <libavutil/hwcontext.h>
+@@ -79,6 +81,66 @@
+     return !FAILED(hr) && (supported & D3D11_BIND_DECODER);
+ }
+ 
++#define D3D_DRIVER_VERSION(a, b, c, d) \
++    (((uint64_t)(a) << 48) | ((uint64_t)(b) << 32) | \
++     ((uint64_t)(c) << 16) | (uint64_t)(d))
++
++static const struct d3d11_codec_blocklist_entry {
++    int av_codec_id;
++    unsigned vendor_id;
++    uint64_t min_version;
++    uint64_t max_version;
++} d3d11_codec_blocklist[] = {
++    // HEVC decoding crashes on Intel
++    {AV_CODEC_ID_HEVC, 0x8086, D3D_DRIVER_VERSION(20, 19, 15, 4284),
++                               D3D_DRIVER_VERSION(20, 19, 15, 5172)},
++    // VP9 decoder does not accept bitstreams, even when advertised
++    {AV_CODEC_ID_VP9,  0x8086, D3D_DRIVER_VERSION(23, 20, 16, 4974),
++                               D3D_DRIVER_VERSION(23, 20, 16, 5044)},
++};
++
++static bool d3d11_is_codec_allowed(AVBufferRef *device_ref, int av_codec_id)
++{
++    AVHWDeviceContext *ctx = (void *)device_ref->data;
++    AVD3D11VADeviceContext *hwctx = ctx->hwctx;
++    ID3D11Device *device = hwctx->device;
++
++    bool allowed = true;
++    IDXGIDevice *dxgi_dev = NULL;
++    IDXGIAdapter *adapter = NULL;
++
++    if (FAILED(ID3D11Device_QueryInterface(device, &IID_IDXGIDevice,
++                                           (void **)&dxgi_dev)))
++        goto done;
++    if (FAILED(IDXGIDevice_GetAdapter(dxgi_dev, &adapter)))
++        goto done;
++
++    DXGI_ADAPTER_DESC desc;
++    if (FAILED(IDXGIAdapter_GetDesc(adapter, &desc)))
++        goto done;
++
++    LARGE_INTEGER umd_version;
++    if (FAILED(IDXGIAdapter_CheckInterfaceSupport(adapter, &IID_IDXGIDevice,
++                                                  &umd_version)))
++        goto done;
++    uint64_t version = umd_version.QuadPart;
++
++    for (int i = 0; i < MP_ARRAY_SIZE(d3d11_codec_blocklist); i++) {
++        const struct d3d11_codec_blocklist_entry *e = &d3d11_codec_blocklist[i];
++        if (av_codec_id == e->av_codec_id && desc.VendorId == e->vendor_id &&
++            version >= e->min_version && version <= e->max_version)
++        {
++            allowed = false;
++            break;
++        }
++    }
++
++done:
++    SAFE_RELEASE(adapter);
++    SAFE_RELEASE(dxgi_dev);
++    return allowed;
++}
++
+ static void d3d11_refine_hwframes(AVBufferRef *hw_frames_ctx)
+ {
+     AVHWFramesContext *fctx = (void *)hw_frames_ctx->data;
+@@ -144,6 +206,7 @@
+     .av_hwdevice_type       = AV_HWDEVICE_TYPE_D3D11VA,
+     .refine_hwframes        = d3d11_refine_hwframes,
+     .create_dev             = d3d11_create_standalone,
++    .is_codec_allowed       = d3d11_is_codec_allowed,
+ };
+ 
+ #if HAVE_D3D9_HWACCEL
+--- a/video/decode/vd_lavc.c
++++ b/video/decode/vd_lavc.c
+@@ -585,6 +585,14 @@
+ 
+                     const struct hwcontext_fns *fns =
+                                 hwdec_get_hwcontext_fns(hwdec->lavc_device);
++                    if (fns && fns->is_codec_allowed &&
++                        !fns->is_codec_allowed(ctx->hwdec_dev, hwdec->codec->id))
++                    {
++                        MP_WARN(vd, "Hardware decoding of '%s' is disabled on this "
++                                    "device.\n", codec);
++                        av_buffer_unref(&ctx->hwdec_dev);
++                        continue;
++                    }
+                     if (fns && fns->is_emulated && fns->is_emulated(ctx->hwdec_dev)) {
+                         if (hwdec_auto) {
+                             MP_VERBOSE(vd, "Not using emulated API.\n");
+--- a/video/hwdec.h
++++ b/video/hwdec.h
+@@ -109,6 +109,9 @@
+                                       struct hwcontext_create_dev_params *params);
+     // Return whether this is using some sort of sub-optimal emulation layer.
+     bool (*is_emulated)(struct AVBufferRef *hw_device_ctx);
++    // Return whether hardware decoding of the given codec is allowed on this
++    // device. If NULL, all codecs are assumed to be allowed.
++    bool (*is_codec_allowed)(struct AVBufferRef *hw_device_ctx, int av_codec_id);
+ };
+ 
+ // The parameter is of type enum AVHWDeviceType (as in int to avoid extensive

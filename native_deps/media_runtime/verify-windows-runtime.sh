@@ -25,7 +25,17 @@ need_file() {
 
 # ── Required files ────────────────────────────────────────────────
 need_file "$FFMPEG"
+need_file "$RUNTIME_DIR/metadata/MPV_BACKPORTS.json"
 need_file "$BIN_DIR/libmpv-2.dll"
+# The driver name is present in every compiled WASAPI ao_driver structure,
+# independent of whether the headless build runner has a physical endpoint.
+python3 - "$BIN_DIR/libmpv-2.dll" <<'PY_WASAPI'
+from pathlib import Path
+import sys
+if b'wasapi\0' not in Path(sys.argv[1]).read_bytes():
+    raise SystemExit('Packaged libmpv has no WASAPI audio output driver')
+PY_WASAPI
+
 need_file "$BIN_DIR/libEGL.dll"
 need_file "$BIN_DIR/libGLESv2.dll"
 need_file "$BIN_DIR/libfontconfig-1.dll"
@@ -172,5 +182,15 @@ if [[ "${VERIFY_ALPHA_VIDEO:-0}" == "1" ]]; then
     exit 1
   fi
 fi
+
+
+
+# Exercise the packaged ABI and TLS behavior, not only static feature markers.
+probe_args=()
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  probe_args+=(--trusted-url "https://raw.githubusercontent.com/XFileSuite/XFileSuiteNativeDeps/${GITHUB_SHA}/native_deps/media_runtime/tests/fixtures/tone.wav")
+fi
+NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 \
+  python3 "$SCRIPT_DIR/tests/runtime_probe.py" "$BIN_DIR/libmpv-2.dll" "${probe_args[@]}"
 
 echo "Windows media runtime verified"

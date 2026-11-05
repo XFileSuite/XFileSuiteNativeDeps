@@ -6,7 +6,7 @@ FRAMEWORKS_SOURCE="${FRAMEWORKS_SOURCE:?set FRAMEWORKS_SOURCE to the directory c
 FFMPEG_BINARY="${FFMPEG_BINARY:?set FFMPEG_BINARY to the shared-runtime ffmpeg executable}"
 LICENSES_SOURCE="${LICENSES_SOURCE:?set LICENSES_SOURCE to the collected runtime licenses}"
 VERSION="${VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-4}"
+RELEASE_REVISION="${RELEASE_REVISION:-5}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 RELEASE_ID="media-runtime-macos-${VERSION}-xfilesuite.${RELEASE_REVISION}"
@@ -19,6 +19,7 @@ cp -R "$FRAMEWORKS_SOURCE"/*.xcframework "$STAGE_DIR/Frameworks/"
 cp "$FFMPEG_BINARY" "$STAGE_DIR/Tools/ffmpeg"
 chmod +x "$STAGE_DIR/Tools/ffmpeg"
 cp -R "$LICENSES_SOURCE"/. "$STAGE_DIR/licenses/"
+cp "$SCRIPT_DIR/patches/mpv-041-backports.json" "$STAGE_DIR/metadata/MPV_BACKPORTS.json"
 
 # FFmpeg already records @rpath/libav*.dylib and searches ../lib. These aliases
 # point into the same framework binaries used by libmpv; no dylib is duplicated.

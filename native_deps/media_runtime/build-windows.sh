@@ -20,7 +20,7 @@ NATIVE_DEPS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORK_DIR="${WORK_DIR:-$SCRIPT_DIR/work}"
 DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-3}"
+RELEASE_REVISION="${RELEASE_REVISION:-4}"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.1.2}"
 MPV_VERSION="${MPV_VERSION:-0.41.0}"
 MPV_SHA256="${MPV_SHA256:-ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209}"
@@ -141,6 +141,8 @@ rm -rf "$mpv_src"
 tar -xzf "$mpv_archive" -C "$WORK_DIR"
 need_dir "$mpv_src"
 patch -p1 -d "$mpv_src" < "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch"
+patch -p1 -d "$mpv_src" < "$SCRIPT_DIR/patches/libmpv-041-common-fixes.patch"
+patch -p1 -d "$mpv_src" < "$SCRIPT_DIR/patches/libmpv-041-windows-fixes.patch"
 
 # libplacebo is a hard dependency of mpv 0.41. Build it as a subproject.
 libplacebo_dir="$mpv_src/subprojects/libplacebo"
@@ -186,6 +188,7 @@ mkdir -p "$mpv_prefix"
     -Dgl=enabled \
     -Dplain-gl=enabled \
     -Dwin32-threads=enabled \
+    -Dwasapi=enabled \
     -Dgl-win32=disabled \
     -Degl-angle=disabled \
     -Degl-angle-lib=disabled \
@@ -209,6 +212,12 @@ mkdir -p "$mpv_prefix"
     -Dlibplacebo:libdovi=disabled \
     -Dlibplacebo:unwind=disabled \
     -Dlibplacebo:xxhash=disabled
+
+  # auto_features=disabled must never silently remove the only native AO.
+  grep -Eq '^#define HAVE_WASAPI 1$' build/config.h || {
+    echo "WASAPI audio output is missing from the configured runtime" >&2
+    exit 1
+  }
 
   current_phase="mpv compilation"
   meson compile -C build
@@ -359,6 +368,7 @@ current_phase="runtime staging"
 stage="$WORK_DIR/stage"
 rm -rf "$stage"
 mkdir -p "$stage/bin" "$stage/lib" "$stage/include/mpv" "$stage/licenses" "$stage/metadata"
+cp "$SCRIPT_DIR/patches/mpv-041-backports.json" "$stage/metadata/MPV_BACKPORTS.json"
 
 # Shared FFmpeg DLLs + ffmpeg.exe
 cp "$ffmpeg_output/bin/"avcodec-*.dll "$ffmpeg_output/bin/"avdevice-*.dll "$ffmpeg_output/bin/"avformat-*.dll \
