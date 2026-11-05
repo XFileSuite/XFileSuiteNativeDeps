@@ -1,6 +1,6 @@
 {
   "sbomVersion": "1.0",
-  "generatedAt": "2026-11-05T12:43:21Z",
+  "generatedAt": "2026-11-05T15:53:23Z",
   "platform": "macos",
   "manifestId": "native-deps-macos-2026.07.30.1",
   "components": [
@@ -65,11 +65,11 @@
     {
       "name": "mediaRuntime",
       "version": "8.1.2-mpv-0.41.0",
-      "releaseRevision": 4,
+      "releaseRevision": 5,
       "architecture": "universal",
       "license": "LGPL-2.1 aggregate; see subComponents for bundled licenses",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e7ede4ccbc5b583b853f7258b8eda15706c86eb9a542e909f0dd1d6729663e75",
-      "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.4",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-be8adc813c4f0fe036547fd85e246b574dbd2a393edf98322ccd5645f3738f66",
+      "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.5",
       "subComponents": [
         {
           "name": "ffmpeg",
@@ -140,7 +140,7 @@
           "license": "BSD-3-Clause"
         }
       ],
-      "bundleSha256": "e7ede4ccbc5b583b853f7258b8eda15706c86eb9a542e909f0dd1d6729663e75"
+      "bundleSha256": "be8adc813c4f0fe036547fd85e246b574dbd2a393edf98322ccd5645f3738f66"
     }
   ]
 }
