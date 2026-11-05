@@ -98,6 +98,14 @@ for mapping in 'libavcodec*:Avcodec' 'libavformat*:Avformat'; do
 done
 
 mpv_binary="$(framework_binary Mpv)"
+# Catch stale cached mpv builds that still contain the rejected ChannelMap call.
+# Store strings before matching to avoid SIGPIPE under pipefail.
+mpv_strings="$(strings "$mpv_binary")"
+if grep -Fq 'unable to set the input channel layout on the audio unit' <<<"$mpv_strings"; then
+  echo "libmpv is missing the macOS 27 CoreAudio ChannelMap fix" >&2
+  exit 1
+fi
+
 if nm -u "$mpv_binary" | grep -Eq '_(clipboard_backend_mac|cocoa_(init|uninit|set)_)'; then
   echo "libmpv contains an unresolved macOS application bridge" >&2
   exit 1

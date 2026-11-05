@@ -206,6 +206,18 @@ arm_ffmpeg="build/intermediate/ffmpeg_macos-arm64-video-default"
 amd_ffmpeg="build/intermediate/ffmpeg_macos-amd64-video-default"
 xcframework_target="build/intermediate/xcframeworks_macos-universal-video-default"
 
+# The upstream Makefile tracks dependency directories, not our replacement
+# build script or patch inputs. Restored caches can therefore retain old mpv
+# code. Rebuild mpv and its packaging layers while keeping expensive codec
+# dependency caches intact.
+for mpv_arch in arm64 amd64; do
+  rm -rf "$upstream/build/intermediate/mpv_macos-${mpv_arch}-video" \
+    "$upstream/build/intermediate/libs-arch_macos-${mpv_arch}-video-default"
+done
+rm -rf "$upstream/build/intermediate/libs_macos-universal-video-default" \
+  "$upstream/build/intermediate/frameworks_macos-universal-video-default" \
+  "$upstream/$xcframework_target"
+
 echo "==> Building LGPL libmpv and the XCFramework set"
 (
   cd "$upstream"
