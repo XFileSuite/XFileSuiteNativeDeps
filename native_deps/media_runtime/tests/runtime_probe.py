@@ -202,10 +202,14 @@ def run(args):
             player.close()
         # Metadata entries with a non-matching stream index stay harmless.
         edl = directory / 'metadata.edl'
-        edl.write_text('# mpv EDL v0\n!track_meta,index=999,title=fixture\ntone.wav\n')
+        # EDL uses URL/slash syntax; do not let Windows backslashes or CRLF
+        # become part of the referenced media name.
+        media_uri = (directory / 'tone.wav').as_uri()
+        edl.write_text('# mpv EDL v0\n!track_meta,index=999,title=fixture\n' +
+                       media_uri + '\n', newline='\n')
         player = Player(lib, options)
         try:
-            assert player.load(str(edl)), 'EDL metadata source failed'
+            assert player.load(edl.as_posix()), 'EDL metadata source failed: ' + '; '.join(player.errors)
             results.append('EDL metadata track loaded without abort')
         finally:
             player.close()
@@ -245,12 +249,20 @@ def run(args):
             finally:
                 httpd.shutdown(); httpd.server_close()
     if args.trusted_url:
-        player = Player(lib, options)
-        try:
-            assert player.load(args.trusted_url, timeout=25), 'System-trusted HTTPS failed'
-            results.append('system-trusted HTTPS playback')
-        finally:
-            player.close()
+        # Only the positive external-network control is retried; certificate
+        # rejection checks above must pass on their first attempt.
+        for attempt in range(3):
+            player = Player(lib, {**options, 'network-timeout': '15'})
+            try:
+                loaded = player.load(args.trusted_url, timeout=25)
+                errors = list(player.errors)
+            finally:
+                player.close()
+            if loaded:
+                results.append('system-trusted HTTPS playback')
+                break
+        else:
+            raise AssertionError('System-trusted HTTPS failed: ' + '; '.join(errors))
     print(json.dumps({'passed': results, 'platform': os.name}, indent=2))
 
 
