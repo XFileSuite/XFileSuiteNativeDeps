@@ -52,3 +52,16 @@ The macOS manifest publishes only this shared runtime. It does not publish or
 download a second standalone FFmpeg bundle. `native_deps/ffmpeg/build.sh` is
 retained as the common FFmpeg 8.1.2 builder used by this runtime and by the
 separate Windows dependency workflow.
+
+## CoreAudio on macOS 27
+
+The macOS mpv 0.41.0 build backports upstream commit
+`3dae21b1ed4793912a8f9de1c5eb3cf32d227bce` through
+`patches/libmpv-coreaudio-macos27.patch`. It removes an invalid
+`kAudioOutputUnitProperty_ChannelMap` payload that macOS 27 rejects with
+`-50`, preventing shared audio output from initializing. Channel negotiation
+and shared playback remain enabled; no exclusive-output workaround is used.
+
+After rebuilding, verify ordinary CoreAudio output on macOS 27 with mono and
+stereo files, simultaneous playback in another app, and output-device switching.
+Static framework verification alone does not cover this runtime failure.

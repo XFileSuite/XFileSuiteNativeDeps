@@ -8,7 +8,7 @@ DIST_DIR="${DIST_DIR:-$SCRIPT_DIR/dist}"
 UPSTREAM_TAG="${LIBMPV_DARWIN_BUILD_TAG:-v0.6.0}"
 UPSTREAM_COMMIT="${LIBMPV_DARWIN_BUILD_COMMIT:-4286f5557bdccc0747030e3c376ce5cd160a96a0}"
 RUNTIME_VERSION="${RUNTIME_VERSION:-8.1.2-mpv-0.41.0}"
-RELEASE_REVISION="${RELEASE_REVISION:-3}"
+RELEASE_REVISION="${RELEASE_REVISION:-4}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
 
 need() {
@@ -88,6 +88,8 @@ makefile.write_text(source.replace(cleanup, "\t: # Preserve objects for dSYM gen
 PY
 cp "$SCRIPT_DIR/patches/libmpv-hevc-alpha-output.patch" \
   "$upstream/patches/libmpv-hevc-alpha-output.patch"
+cp "$SCRIPT_DIR/patches/libmpv-coreaudio-macos27.patch" \
+  "$upstream/patches/libmpv-coreaudio-macos27.patch"
 # The injected FFmpeg prefix lives outside libmpv-darwin-build. Teach its
 # per-architecture relinker to normalize those paths before lipo/frameworks.
 # The replacement must preserve upstream shell variables.
