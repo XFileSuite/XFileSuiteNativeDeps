@@ -95,6 +95,10 @@ ffmpeg_output="$ffmpeg_dist/ffmpeg-${FFMPEG_VERSION}-windows-x64"
 # Execute the produced PE file as the intermediate smoke test. The final
 # package verifier checks every DLL, import library and public header after
 # staging, avoiding unreliable intermediate MSYS glob/file predicates.
+if [[ ! -f "$ffmpeg_output/bin/ffmpeg.exe" ]]; then
+  echo "FFmpeg builder failed before producing its executable (status $ffmpeg_builder_status)" >&2
+  exit 1
+fi
 PATH="$ffmpeg_output/bin:$PATH" "$ffmpeg_output/bin/ffmpeg.exe" -version >/dev/null
 if [[ "$ffmpeg_builder_status" != 0 ]]; then
   echo "  Note: MSYS2 wrapper returned $ffmpeg_builder_status after a complete, smoke-tested FFmpeg build"

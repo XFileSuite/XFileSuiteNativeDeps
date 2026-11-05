@@ -37,8 +37,18 @@ archive="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 source_dir="$WORK_DIR/ffmpeg-${FFMPEG_VERSION}"
 if [[ ! -f "$archive" ]] || [[ "$(sha256sum "$archive" | awk '{print $1}')" != "$FFMPEG_TARBALL_SHA256" ]]; then
   rm -f "$archive"
-  curl --fail --location --retry 5 --retry-all-errors --retry-delay 1 --connect-timeout 30 \
-    --output "$archive" "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+  for source_url in \
+    "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" \
+    "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/ffmpeg-source-${FFMPEG_VERSION}/ffmpeg-${FFMPEG_VERSION}.tar.xz"; do
+    if curl --fail --location --retry 2 --retry-all-errors --retry-delay 1 --connect-timeout 20 \
+      --output "$archive.part" "$source_url" && \
+      [[ "$(sha256sum "$archive.part" | awk '{print $1}')" = "$FFMPEG_TARBALL_SHA256" ]]; then
+      mv "$archive.part" "$archive"
+      break
+    fi
+    rm -f "$archive.part"
+  done
+  [[ -f "$archive" ]] || { echo "Unable to download checksum-pinned FFmpeg source" >&2; exit 1; }
 fi
 test "$(sha256sum "$archive" | awk '{print $1}')" = "$FFMPEG_TARBALL_SHA256"
 rm -rf "$source_dir"
