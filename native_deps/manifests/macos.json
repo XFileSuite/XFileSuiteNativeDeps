@@ -40,12 +40,12 @@
       "version": "8.1.2-mpv-0.41.0",
       "releaseRevision": 4,
       "architecture": "universal",
-      "bundleSha256": "e78a9fc9c01f72ec60478219927f670c7590a1509b3ecc8360b77f08f9cdb700",
-      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e78a9fc9c01f72ec60478219927f670c7590a1509b3ecc8360b77f08f9cdb700",
-      "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3",
-      "symbolsSha256": "2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3",
-      "symbolsRelease": "macos-symbols-media-runtime-2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3",
-      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-media-runtime-2433d0e722c067af37766d01afe88f56166108f9c955499d85b4bedbfb86f7d3/media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.3.symbols.tar.gz"
+      "bundleSha256": "e7ede4ccbc5b583b853f7258b8eda15706c86eb9a542e909f0dd1d6729663e75",
+      "r2Key": "deps/media-runtime-macos-8.1.2-mpv-0.41.0-e7ede4ccbc5b583b853f7258b8eda15706c86eb9a542e909f0dd1d6729663e75",
+      "sourceRelease": "media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.4",
+      "symbolsSha256": "08ecc4bbc58dcd48cfbf7ce613c64f052973d437a9d02bae1e7f6d4ef47e6e36",
+      "symbolsRelease": "macos-symbols-media-runtime-08ecc4bbc58dcd48cfbf7ce613c64f052973d437a9d02bae1e7f6d4ef47e6e36",
+      "symbolsUrl": "https://github.com/XFileSuite/XFileSuiteNativeDeps/releases/download/macos-symbols-media-runtime-08ecc4bbc58dcd48cfbf7ce613c64f052973d437a9d02bae1e7f6d4ef47e6e36/media-runtime-macos-8.1.2-mpv-0.41.0-xfilesuite.4.symbols.tar.gz"
     }
   }
 }
