@@ -117,12 +117,111 @@ jobs:
   publish-ios:
     needs: validate-inputs
     if: ${{ always() && needs.validate-inputs.result == 'success' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' }}
-    uses: ./.github/workflows/build-ios-deps.yml
+    runs-on: macos-15
+    timeout-minutes: 180
     permissions:
       contents: write
-    with:
-      mode: ${{ inputs.mode }}
-    secrets: inherit
+    env:
+      GH_TOKEN: ${{ secrets.XFILESUITE_SOURCE_WRITE_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Validate publication scope and credentials
+        if: ${{ inputs.mode == 'publish' }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test -n "$GH_TOKEN"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - name: Install build tools
+        run: |
+          brew install autoconf automake libtool cmake ninja pkg-config
+          python3 -m venv "$RUNNER_TEMP/ios-build-tools"
+          "$RUNNER_TEMP/ios-build-tools/bin/pip" install 'meson==1.11.2'
+          echo "$RUNNER_TEMP/ios-build-tools/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            native_deps/ios/work/downloads
+            ~/.cargo/registry
+          key: ios-sources-${{ hashFiles('native_deps/ios/sources.lock.json', 'native_deps/oxipng/ffi/Cargo.lock') }}
+      - name: Check build guardrails
+        run: python3 -m unittest discover -s native_deps/ios/tests -p 'test_*.py'
+      - name: Build device and simulator libraries
+        run: |
+          set -o pipefail
+          python3 native_deps/ios/build.py 2>&1 | tee ios-build.log
+      - name: Package corresponding source
+        run: |
+          set -o pipefail
+          python3 native_deps/ios/package-source.py 2>&1 | tee ios-source-package.log
+      - name: Prepare iOS release manifest and SBOM
+        run: python3 native_deps/ios/release-metadata.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-deps-build-log
+          path: |
+            ios-build.log
+            ios-source-package.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xfilesuite-ios-native-deps
+          path: |
+            native_deps/ios/dist/*.tar.gz*
+            native_deps/manifests/ios.json
+            native_deps/sbom-ios.json
+          if-no-files-found: error
+          compression-level: 0
+      - name: Publish iOS source and runtime
+        if: ${{ inputs.mode == 'publish' }}
+        run: |
+          release="$(python3 -c 'import json; print(json.load(open("native_deps/manifests/ios.json"))["components"]["iosRuntime"]["sourceRelease"])')"
+          key="$(python3 -c 'import json; print(json.load(open("native_deps/manifests/ios.json"))["components"]["iosRuntime"]["r2Key"])')"
+          if ! gh release view "$release" --repo XFileSuite/XFileSuite >/dev/null 2>&1; then
+            gh release create "$release" --repo XFileSuite/XFileSuite --title "$release" --notes 'Corresponding iOS native dependency source, licenses, build records and checksums.'
+          fi
+          gh release upload "$release" native_deps/ios/dist/xfilesuite-ios-source.tar.gz* native_deps/manifests/ios.json native_deps/sbom-ios.json --repo XFileSuite/XFileSuite --clobber
+          npx wrangler r2 object put "xfilesuite-releases/$key" --file native_deps/ios/dist/xfilesuite-ios.tar.gz --remote
+          npx wrangler r2 object put xfilesuite-releases/deps/sbom-ios.json --file native_deps/sbom-ios.json --remote
+      - name: Publish iOS manifests
+        if: ${{ inputs.mode == 'publish' }}
+        run: |
+          # Retry manifest-only pushes when desktop publication updates main concurrently.
+          push_manifest() {
+            for attempt in 1 2 3; do
+              if git -C "$1" push origin HEAD:main; then return 0; fi
+              if [ "$attempt" = 3 ]; then return 1; fi
+              git -C "$1" fetch origin main || return 1
+              git -C "$1" rebase origin/main || return 1
+            done
+          }
+          git config user.name xfilesuite-release-bot
+          git config user.email release-bot@xfilesuite.com
+          git add native_deps/manifests/ios.json native_deps/sbom-ios.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: publish iOS native dependency manifest and SBOM'
+            push_manifest .
+          fi
+          gh repo clone XFileSuite/XFileSuite "$RUNNER_TEMP/ios-public-manifest" -- --depth 1
+          public="$RUNNER_TEMP/ios-public-manifest"
+          git -C "$public" remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/XFileSuite/XFileSuite.git"
+          mkdir -p "$public/native-deps"
+          cp native_deps/manifests/ios.json "$public/native-deps/ios.json"
+          cp native_deps/sbom-ios.json "$public/native-deps/sbom-ios.json"
+          git -C "$public" config user.name xfilesuite-release-bot
+          git -C "$public" config user.email release-bot@xfilesuite.com
+          git -C "$public" add native-deps/ios.json native-deps/sbom-ios.json
+          if ! git -C "$public" diff --cached --quiet; then
+            git -C "$public" commit -m 'chore: publish iOS native dependency manifest and SBOM'
+            push_manifest "$public"
+          fi
+
 
   publish-macos:
     needs: validate-inputs

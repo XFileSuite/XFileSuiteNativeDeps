@@ -35,7 +35,7 @@ no automatic push release. The CI Rust version is pinned.
 
 For publication, use **Publish Native Dependencies** with `mode=publish`,
 `component=all` and `platform=ios` (or `platform=all` for all three platforms).
-The shared iOS workflow uploads the runtime to a SHA-256-addressed R2 key,
+The iOS job uploads the runtime to a SHA-256-addressed R2 key,
 publishes corresponding source/checksums to a GitHub Release, and commits
 `native_deps/manifests/ios.json` and `native_deps/sbom-ios.json` here and to the
 public repository. `mode=build-only` prepares these files as Actions artifacts
