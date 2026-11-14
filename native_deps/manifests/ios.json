@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "platform": "ios",
+  "minimumIOS": "15.0",
+  "components": {
+    "iosRuntime": {
+      "bundleSha256": "37dbd89d4385e956fbecc1b50451a2b4512fb624139ba735227a2ea95a1baf9d",
+      "r2Key": "deps/ios-native-deps-37dbd89d4385e956fbecc1b50451a2b4512fb624139ba735227a2ea95a1baf9d.tar.gz",
+      "sourceRelease": "ios-native-deps-33edf27653b592145ccfa5c9",
+      "sourceSha256": "92c038332af37b06e580396814d65c4696232134c48b36c8211362b8a6f81f36",
+      "sourceArchive": "xfilesuite-ios-source.tar.gz",
+      "recipe": "fd193e492acd3bb6b96897f934720deb0fdf8e9604225fd251b5e1dfb56b3c87"
+    }
+  }
+}
