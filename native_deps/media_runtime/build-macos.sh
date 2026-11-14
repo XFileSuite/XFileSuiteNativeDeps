@@ -55,6 +55,7 @@ git -C "$upstream" restore --source="$UPSTREAM_COMMIT" -- \
   cross-files/macos-arm64.ini \
   downloads.lock \
   scripts/libass/build.sh \
+  scripts/freetype/build.sh \
   scripts/libs-arch/relink-dylibs.sh \
   scripts/mpv/build.sh \
   scripts/pkg-config/build.sh \
@@ -70,6 +71,7 @@ fi
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-downloads-retry.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-pkg-config-clang17.patch"
 git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-cmake4-policy.patch"
+git -C "$upstream" apply "$SCRIPT_DIR/patches/libmpv-libpng-modern-macos.patch"
 # dsymutil resolves Mach-O debug maps through the original object files.
 # Upstream removes each build directory immediately after copying the dylib,
 # leaving the final framework with an empty dSYM. Keep objects until runtime

@@ -1,0 +1,15 @@
+--- a/scripts/freetype/build.sh
++++ b/scripts/freetype/build.sh
+@@ -4,6 +4,12 @@
+ set -u # treat unset variables as an error
+ 
+ cd ${SRC_DIR}
++# libpng 1.6.40 mistakes modern SDK TARGET_OS_MAC for a classic Mac compiler.
++# Fetch the checksum-pinned wrap before setup and keep modern Clang on math.h.
++meson subprojects download libpng
++png_private=subprojects/libpng-1.6.40/pngpriv.h
++grep -q 'defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)' "$png_private"
++sed -i '' 's/defined(THINK_C) || defined(__SC__) || defined(TARGET_OS_MAC)/defined(THINK_C) || defined(__SC__)/' "$png_private"
+ meson setup build \
+     --cross-file ${PROJECT_DIR}/cross-files/${OS}-${ARCH}.ini \
+     --prefix="${OUTPUT_DIR}" \
