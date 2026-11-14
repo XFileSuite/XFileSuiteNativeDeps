@@ -44,7 +44,7 @@ for name,spec in sources().items():
 # Pin and vendor both Rust dependency graphs. Config is relative to the source
 # package root; build.py runs cargo from that root so offline rebuilds find it.
 resvg=source('resvg','common')/'crates/c-api/Cargo.toml'
-env=os.environ.copy(); env['PATH']=str(Path.home()/'.cargo/bin')+':'+env['PATH']
+env=os.environ.copy()
 vendor=repo/'vendor'
 result=subprocess.check_output(['cargo','vendor','--locked','--versioned-dirs','--manifest-path',str(NATIVE/'oxipng/ffi/Cargo.toml'),'--sync',str(resvg),str(vendor)],env=env,text=True)
 config=repo/'.cargo/config.toml'; config.parent.mkdir()

@@ -42,7 +42,7 @@ concurrency:
 jobs:
   test-media-runtime:
     if: ${{ github.event_name != 'workflow_dispatch' }}
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -94,33 +94,29 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  validate-r2-purge:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' && inputs.purge_all_deps }}
+  validate-inputs:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Validate purge scope
+      - name: Validate publication selection and cleanup scope
+        env:
+          MODE: ${{ inputs.mode }}
+          COMPONENT: ${{ inputs.component }}
+          PLATFORM: ${{ inputs.platform }}
+          PURGE_ALL_DEPS: ${{ inputs.purge_all_deps }}
         run: |
-          if [ "${{ inputs.component }}" != all ] || [ "${{ inputs.platform }}" != all ]; then
-            echo "::error::purge_all_deps requires mode=publish, component=all, and platform=all"
+          if [ "$PLATFORM" = ios ] && [ "$COMPONENT" != all ]; then
+            echo '::error::iOS is delivered as one complete bundle; select component=all.'
             exit 1
           fi
-
-  validate-ios-selection:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform == 'ios' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require the complete iOS bundle
-        env:
-          COMPONENT: ${{ inputs.component }}
-        run: |
-          if [ "$COMPONENT" != all ]; then
-            echo '::error::iOS is delivered as one complete bundle; select component=all.'
+          if [ "$PURGE_ALL_DEPS" = true ] && { [ "$MODE" != publish ] || [ "$COMPONENT" != all ] || [ "$PLATFORM" != all ]; }; then
+            echo '::error::purge_all_deps requires mode=publish, component=all, and platform=all'
             exit 1
           fi
 
   publish-ios:
-    needs: [validate-r2-purge, validate-ios-selection]
-    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && (needs.validate-ios-selection.result == 'success' || needs.validate-ios-selection.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' }}
+    needs: validate-inputs
+    if: ${{ always() && needs.validate-inputs.result == 'success' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' }}
     uses: ./.github/workflows/build-ios-deps.yml
     permissions:
       contents: write
@@ -129,11 +125,11 @@ jobs:
     secrets: inherit
 
   publish-macos:
-    needs: validate-r2-purge
+    needs: validate-inputs
     # R2 keys are versioned by content hash. Keep historical objects unless
     # the operator explicitly selects cleanup after a full successful publish.
-    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos') }}
-    runs-on: macos-14
+    if: ${{ always() && needs.validate-inputs.result == 'success' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'macos') }}
+    runs-on: macos-15
     permissions:
       contents: write
     env:
@@ -449,10 +445,10 @@ jobs:
             done
           fi
   publish-windows:
-    needs: validate-r2-purge
+    needs: validate-inputs
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') && inputs.component != 'resvg' }}
+    if: ${{ always() && needs.validate-inputs.result == 'success' && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') && inputs.component != 'resvg' }}
     runs-on: windows-latest
     permissions:
       contents: write

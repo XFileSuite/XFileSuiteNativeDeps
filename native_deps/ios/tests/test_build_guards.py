@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -88,6 +89,24 @@ class BuildGuardsTest(unittest.TestCase):
         for target in build.TARGETS:
             self.complete_target(target)
         build.validate_package_inputs(build.COMPONENTS)
+
+
+class ToolchainPathTest(unittest.TestCase):
+    def test_build_config_uses_rust_from_ci_path(self):
+        # CI can install Rust outside ~/.cargo/bin. Exercise actual process
+        # lookup with an isolated PATH instead of mocking command output.
+        with tempfile.TemporaryDirectory() as directory:
+            bindir = Path(directory)
+            for tool, version in [('rustc', 'rustc-ci-fixture'),
+                                  ('xcodebuild', 'xcode-fixture'),
+                                  ('cmake', 'cmake-fixture'),
+                                  ('meson', 'meson-fixture')]:
+                command = bindir/tool
+                command.write_text('#!/bin/sh\necho '+version+'\n')
+                command.chmod(0o755)
+            with patch.dict(os.environ, {'PATH': directory}), patch.object(build, 'recipe_digest', return_value='fixture'):
+                config = build.build_config('/sdk')
+            self.assertEqual(config['rust'], 'rustc-ci-fixture')
 
 
 if __name__ == '__main__':

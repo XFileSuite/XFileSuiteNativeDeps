@@ -62,7 +62,7 @@ def recipe_digest():
 def build_config(sdkpath):
     return dict(minimumIOS=MIN_IOS, sdk=sdkpath,
                 xcode=output(['xcodebuild', '-version']),
-                rust=output([Path.home()/'.cargo/bin/rustc', '--version']),
+                rust=output(['rustc', '--version']),
                 cmake=output(['cmake', '--version']).splitlines()[0],
                 meson=output(['meson', '--version']), recipe=recipe_digest())
 
@@ -239,10 +239,8 @@ class Build:
             args = []
             lib = 'resvg'
         env = dict(self.env, CARGO_TARGET_DIR=str(WORK/'rust-target'), CARGO_PROFILE_RELEASE_DEBUG='1', CARGO_PROFILE_RELEASE_STRIP='none')
-        rustbin = Path.home()/'.cargo/bin'
-        env['PATH'] = str(rustbin)+':'+env['PATH']
-        run([rustbin/'rustup', 'target', 'add', self.rust_target], env=env)
-        run([rustbin/'cargo', 'build', '--release', '--locked', '--manifest-path', src/'Cargo.toml', '--target', self.rust_target, *args], env=env, cwd=NATIVE.parent)
+        run(['rustup', 'target', 'add', self.rust_target], env=env)
+        run(['cargo', 'build', '--release', '--locked', '--manifest-path', src/'Cargo.toml', '--target', self.rust_target, *args], env=env, cwd=NATIVE.parent)
         dest = self.base/'rust'/name
         dest.mkdir(parents=True, exist_ok=True)
         shutil.copy2(WORK/'rust-target'/self.rust_target/'release'/('lib'+lib+'.dylib'), self.prefix/'lib'/('lib'+lib+'.dylib'))
@@ -393,7 +391,7 @@ def package(components):
     shutil.copy2(NATIVE/'oxipng/ffi/Cargo.lock', metadata/'oxipng-Cargo.lock')
     resvg_lock = WORK/'common/sources/resvg/Cargo.lock'
     if resvg_lock.exists(): shutil.copy2(resvg_lock, metadata/'resvg-Cargo.lock')
-    (metadata/'BUILDINFO.json').write_text(json.dumps(dict(minimumIOS=MIN_IOS, targets=TARGETS, components=components, recipe=recipe_digest(), xcode=output(['xcodebuild','-version']), rust=output([Path.home()/'.cargo/bin/rustc','--version']), meson=output(['meson','--version']), frameworks=sorted(p.name for p in framework_root.iterdir())), indent=2)+'\n')
+    (metadata/'BUILDINFO.json').write_text(json.dumps(dict(minimumIOS=MIN_IOS, targets=TARGETS, components=components, recipe=recipe_digest(), xcode=output(['xcodebuild','-version']), rust=output(['rustc','--version']), meson=output(['meson','--version']), frameworks=sorted(p.name for p in framework_root.iterdir())), indent=2)+'\n')
     licenses = stage/'licenses'; licenses.mkdir()
     for name in sources():
         for target in ['device','common']:
@@ -411,7 +409,7 @@ def package(components):
     for name in ['oxipng', 'resvg']:
         if name not in components: continue
         manifest = NATIVE/'oxipng/ffi/Cargo.toml' if name=='oxipng' else WORK/'common/sources/resvg/crates/c-api/Cargo.toml'
-        env = os.environ.copy(); env['PATH'] = str(Path.home()/'.cargo/bin')+':'+env['PATH']
+        env = os.environ.copy()
         data = json.loads(subprocess.check_output(['cargo','metadata','--locked','--format-version=1','--manifest-path',str(manifest),'--filter-platform','aarch64-apple-ios'],env=env,cwd=NATIVE.parent,text=True))
         for crate in data['packages']:
             sbom['rustPackages'].append({key:crate.get(key) for key in ['name','version','license','source']})
