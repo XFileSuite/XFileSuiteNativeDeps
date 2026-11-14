@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Build and inspect macOS/Windows artifacts, or publish them
+        description: Build and inspect macOS/Windows/iOS artifacts, or publish them
         type: choice
         options: [build-only, publish]
         default: build-only
@@ -28,7 +28,7 @@ on:
       platform:
         description: Platform to rebuild and publish
         type: choice
-        options: [all, macos, windows]
+        options: [all, macos, windows, ios]
         default: all
       purge_all_deps:
         description: Delete superseded R2 dependency objects after a successful full publish (all components and platforms only)
@@ -104,6 +104,30 @@ jobs:
             echo "::error::purge_all_deps requires mode=publish, component=all, and platform=all"
             exit 1
           fi
+
+  validate-ios-selection:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform == 'ios' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the complete iOS bundle
+        env:
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          if [ "$COMPONENT" != all ]; then
+            echo '::error::iOS is delivered as one complete bundle; select component=all.'
+            exit 1
+          fi
+
+  publish-ios:
+    # Publish after desktop jobs to avoid adding another concurrent manifest mirror.
+    needs: [validate-r2-purge, validate-ios-selection, publish-macos, publish-windows]
+    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && (needs.validate-ios-selection.result == 'success' || needs.validate-ios-selection.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' && (needs.publish-macos.result == 'success' || needs.publish-macos.result == 'skipped') && (needs.publish-windows.result == 'success' || needs.publish-windows.result == 'skipped') }}
+    uses: ./.github/workflows/build-ios-deps.yml
+    permissions:
+      contents: write
+    with:
+      mode: ${{ inputs.mode }}
+    secrets: inherit
 
   publish-macos:
     needs: validate-r2-purge
@@ -727,8 +751,8 @@ jobs:
           }
 
   purge-r2:
-    needs: [publish-macos, publish-windows]
-    if: ${{ always() && inputs.mode == 'publish' && inputs.purge_all_deps && needs.publish-macos.result == 'success' && needs.publish-windows.result == 'success' }}
+    needs: [publish-macos, publish-windows, publish-ios]
+    if: ${{ always() && inputs.mode == 'publish' && inputs.purge_all_deps && needs.publish-macos.result == 'success' && needs.publish-windows.result == 'success' && needs.publish-ios.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -746,7 +770,7 @@ jobs:
           const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
           const token = process.env.CLOUDFLARE_API_TOKEN;
           const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/xfilesuite-releases/objects`;
-          const manifests = ['macos', 'windows'].map(platform =>
+          const manifests = ['macos', 'windows', 'ios'].map(platform =>
             JSON.parse(fs.readFileSync(`native_deps/manifests/${platform}.json`, 'utf8')));
           const activeKeys = new Set(manifests.flatMap(manifest =>
             Object.values(manifest.components).map(component => component.r2Key).filter(Boolean)));
@@ -765,7 +789,7 @@ jobs:
 
           async function main() {
             const obsoleteKeys = [];
-            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/oxipng-', 'deps/media-runtime-']) {
+            for (const prefix of ['deps/ffmpeg-', 'deps/imagemagick-', 'deps/resvg-', 'deps/oxipng-', 'deps/media-runtime-', 'deps/ios-native-deps-']) {
               let cursor;
               do {
                 const query = new URLSearchParams({ prefix, per_page: '1000' });

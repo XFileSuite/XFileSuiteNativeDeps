@@ -31,7 +31,17 @@ artifacts without publishing or changing the desktop manifests. It runs the
 cache/package regression tests, builds and verifies both platform slices,
 packages corresponding source and uploads runtime/source archives plus their
 checksums. It can be triggered manually or by a matching pull request; there is
-no automatic push release or R2 publication. The CI Rust version is pinned.
+no automatic push release. The CI Rust version is pinned.
+
+For publication, use **Publish Native Dependencies** with `mode=publish`,
+`component=all` and `platform=ios` (or `platform=all` for all three platforms).
+The shared iOS workflow uploads the runtime to a SHA-256-addressed R2 key,
+publishes corresponding source/checksums to a GitHub Release, and commits
+`native_deps/manifests/ios.json` and `native_deps/sbom-ios.json` here and to the
+public repository. `mode=build-only` prepares these files as Actions artifacts
+without publishing. iOS requires the complete bundle: desktop component-specific
+runs skip iOS. Full R2 cleanup waits for all three platforms and retains each
+current manifest's runtime key. No private App manifest is added at this stage.
 
 For a targeted build, use for example:
 

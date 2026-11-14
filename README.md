@@ -18,18 +18,18 @@ own upstream licenses.
 
 ## What the native-deps workflow publishes
 
-`Publish Native Dependencies` builds selected macOS and Windows components,
+`Publish Native Dependencies` builds selected macOS and Windows components and the complete iOS bundle,
 creates the corresponding-source archives and checksums, publishes them as
 releases in this repository, uploads the runtime artifacts to Cloudflare R2,
 and leaves earlier content-addressed R2 objects in place by default. For a
 full publish, the optional `purge_all_deps` input deletes existing native
-dependency objects after both platforms publish, while retaining every object
+dependency objects after all three platforms publish, while retaining every object
 referenced by the new manifests. Old manifests may still refer to those deleted
 objects, so enable it only when those versions no longer need to be downloadable.
 
 The final manifests are committed here, then mirrored to:
 
-- `XFileSuite/XFileSuiteSource` — private App build manifest.
+- `XFileSuite/XFileSuiteSource` — private App build manifest (macOS/Windows only; iOS App integration is deferred).
 - `XFileSuite/XFileSuite` — public `native-deps/` manifest consumed by public
   distribution metadata.
 
@@ -37,9 +37,11 @@ The final manifests are committed here, then mirrored to:
 
 1. Edit `native_deps/manifests/macos.json` and/or `windows.json` on `main`.
 2. Open **Actions → Publish Native Dependencies → Run workflow**.
-3. Select `mode=build-only` to inspect macOS and Windows build artifacts, or `mode=publish`
+3. Select `mode=build-only` to inspect macOS, Windows and iOS build artifacts, or `mode=publish`
    to upload and mirror the dependency manifest. Select the component and
-   platform. A full `publish` run may also select `purge_all_deps`; this
+   platform. Use `platform=all`, `component=all` for all three platforms, or
+   `platform=ios`, `component=all` for iOS alone. iOS is a complete bundle and
+   is skipped for desktop component-specific runs. A full `publish` run may also select `purge_all_deps`; this
    requires `component=all` and `platform=all` and defaults to off.
 
 Do not edit `binarySha256`, `bundleSha256`, `r2Key`, or `sourceRelease` by
@@ -91,9 +93,13 @@ confirm Apple notarization accepts the bundled native frameworks and tools.
 The standalone [iOS builder](native_deps/ios/README.md) prepares arm64 device and
 arm64 simulator XCFrameworks for the image, SVG, PNG optimization and media
 libraries. It includes public headers, symbols, notices, checksums and matching
-source packaging. `Build iOS Native Dependencies` builds downloadable Actions
-artifacts without publishing to R2 or modifying desktop manifests. App-side
-integration remains separate.
+source packaging. The unified **Publish Native Dependencies** workflow includes
+`ios` in its platform selector and includes iOS when both selectors are `all`.
+`build-only` saves Actions artifacts; `publish` uploads the content-addressed
+runtime to R2, publishes matching source/checksums as a GitHub Release in
+`XFileSuite/XFileSuite`, and commits the generated iOS manifest/SBOM here and
+to the public `native-deps/` directory. The standalone **Build iOS Native
+Dependencies** manual/PR entry remains build-only. App integration is deferred.
 
 Windows dependencies support both `build-only` and `publish`, like macOS.
 `build-only` uploads Actions artifacts without release credentials, R2 writes
