@@ -119,9 +119,8 @@ jobs:
           fi
 
   publish-ios:
-    # Publish after desktop jobs to avoid adding another concurrent manifest mirror.
-    needs: [validate-r2-purge, validate-ios-selection, publish-macos, publish-windows]
-    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && (needs.validate-ios-selection.result == 'success' || needs.validate-ios-selection.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' && (needs.publish-macos.result == 'success' || needs.publish-macos.result == 'skipped') && (needs.publish-windows.result == 'success' || needs.publish-windows.result == 'skipped') }}
+    needs: [validate-r2-purge, validate-ios-selection]
+    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && (needs.validate-ios-selection.result == 'success' || needs.validate-ios-selection.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'ios') && inputs.component == 'all' }}
     uses: ./.github/workflows/build-ios-deps.yml
     permissions:
       contents: write
@@ -422,7 +421,12 @@ jobs:
           git -C "$RUNNER_TEMP/XFileSuiteSource" add native_deps/manifests/macos.json native_deps/sbom/sbom-macos.json
           if ! git -C "$RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; then
             git -C "$RUNNER_TEMP/XFileSuiteSource" commit -m "chore: publish macOS native dependency manifest and SBOM"
-            git -C "$RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
+            for attempt in 1 2 3; do
+              if git -C "$RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main; then break; fi
+              if [ "$attempt" = 3 ]; then exit 1; fi
+              git -C "$RUNNER_TEMP/XFileSuiteSource" fetch origin main
+              git -C "$RUNNER_TEMP/XFileSuiteSource" rebase origin/main
+            done
           fi
       - name: Publish current manifest to the public repository
         if: ${{ inputs.mode == 'publish' }}
@@ -437,7 +441,12 @@ jobs:
           git -C "$RUNNER_TEMP/XFileSuite" add native-deps/macos.json native-deps/sbom-macos.json
           if ! git -C "$RUNNER_TEMP/XFileSuite" diff --cached --quiet; then
             git -C "$RUNNER_TEMP/XFileSuite" commit -m "chore: publish macOS native dependency manifest and SBOM"
-            git -C "$RUNNER_TEMP/XFileSuite" push origin HEAD:main
+            for attempt in 1 2 3; do
+              if git -C "$RUNNER_TEMP/XFileSuite" push origin HEAD:main; then break; fi
+              if [ "$attempt" = 3 ]; then exit 1; fi
+              git -C "$RUNNER_TEMP/XFileSuite" fetch origin main
+              git -C "$RUNNER_TEMP/XFileSuite" rebase origin/main
+            done
           fi
   publish-windows:
     needs: validate-r2-purge
@@ -733,8 +742,15 @@ jobs:
           git -C "$env:RUNNER_TEMP/XFileSuiteSource" diff --cached --quiet; if ($LASTEXITCODE -ne 0) {
             git -C "$env:RUNNER_TEMP/XFileSuiteSource" commit -m 'chore: publish Windows native dependency manifest and SBOM'
             if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the Windows manifest in XFileSuiteSource' }
-            git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
-            if ($LASTEXITCODE -ne 0) { throw 'Unable to push the Windows manifest to XFileSuiteSource' }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              git -C "$env:RUNNER_TEMP/XFileSuiteSource" push origin HEAD:main
+              if ($LASTEXITCODE -eq 0) { break }
+              if ($attempt -eq 3) { throw 'Unable to push the Windows manifest to XFileSuiteSource' }
+              git -C "$env:RUNNER_TEMP/XFileSuiteSource" fetch origin main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch XFileSuiteSource before retrying' }
+              git -C "$env:RUNNER_TEMP/XFileSuiteSource" rebase origin/main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to rebase XFileSuiteSource before retrying' }
+            }
           }
           gh repo clone XFileSuite/XFileSuite "$env:RUNNER_TEMP/XFileSuite" -- --depth 1
           git -C "$env:RUNNER_TEMP/XFileSuite" remote set-url origin "https://x-access-token:$env:SOURCE_WRITE_TOKEN@github.com/XFileSuite/XFileSuite.git"
@@ -746,8 +762,15 @@ jobs:
           git -C "$env:RUNNER_TEMP/XFileSuite" diff --cached --quiet; if ($LASTEXITCODE -ne 0) {
             git -C "$env:RUNNER_TEMP/XFileSuite" commit -m 'chore: publish Windows native dependency manifest and SBOM'
             if ($LASTEXITCODE -ne 0) { throw 'Unable to commit the Windows manifest in XFileSuite' }
-            git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main
-            if ($LASTEXITCODE -ne 0) { throw 'Unable to push the Windows manifest to XFileSuite' }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              git -C "$env:RUNNER_TEMP/XFileSuite" push origin HEAD:main
+              if ($LASTEXITCODE -eq 0) { break }
+              if ($attempt -eq 3) { throw 'Unable to push the Windows manifest to XFileSuite' }
+              git -C "$env:RUNNER_TEMP/XFileSuite" fetch origin main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch XFileSuite before retrying' }
+              git -C "$env:RUNNER_TEMP/XFileSuite" rebase origin/main
+              if ($LASTEXITCODE -ne 0) { throw 'Unable to rebase XFileSuite before retrying' }
+            }
           }
 
   purge-r2:
