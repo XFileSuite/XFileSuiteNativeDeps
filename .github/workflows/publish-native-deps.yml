@@ -208,6 +208,19 @@ jobs:
             git commit -m 'chore: publish iOS native dependency manifest and SBOM'
             push_manifest .
           fi
+          # Match desktop publication: mirror the locked inputs into App Source.
+          source_repo="$RUNNER_TEMP/ios-source-manifest"
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/XFileSuite/XFileSuiteSource.git" "$source_repo" --depth 1
+          mkdir -p "$source_repo/native_deps/manifests" "$source_repo/native_deps/sbom"
+          cp native_deps/manifests/ios.json "$source_repo/native_deps/manifests/ios.json"
+          cp native_deps/sbom-ios.json "$source_repo/native_deps/sbom/sbom-ios.json"
+          git -C "$source_repo" config user.name xfilesuite-release-bot
+          git -C "$source_repo" config user.email release-bot@xfilesuite.com
+          git -C "$source_repo" add native_deps/manifests/ios.json native_deps/sbom/sbom-ios.json
+          if ! git -C "$source_repo" diff --cached --quiet; then
+            git -C "$source_repo" commit -m 'chore: publish iOS native dependency manifest and SBOM'
+            push_manifest "$source_repo"
+          fi
           gh repo clone XFileSuite/XFileSuite "$RUNNER_TEMP/ios-public-manifest" -- --depth 1
           public="$RUNNER_TEMP/ios-public-manifest"
           git -C "$public" remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/XFileSuite/XFileSuite.git"
