@@ -1,0 +1,67 @@
+name: Build iOS Native Dependencies
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - native_deps/ios/**
+      - native_deps/oxipng/ffi/**
+      - native_deps/oxipng/LICENSE
+      - LICENSE
+      - native_deps/imagemagick/patches/**
+      - native_deps/ffmpeg/patches/**
+      - native_deps/media_runtime/patches/**
+      - .github/workflows/build-ios-deps.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-deps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - name: Install build tools
+        run: |
+          brew install autoconf automake libtool cmake ninja pkg-config
+          python3 -m venv "$RUNNER_TEMP/ios-build-tools"
+          "$RUNNER_TEMP/ios-build-tools/bin/pip" install 'meson==1.11.2'
+          echo "$RUNNER_TEMP/ios-build-tools/bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            native_deps/ios/work/downloads
+            ~/.cargo/registry
+          key: ios-sources-${{ hashFiles('native_deps/ios/sources.lock.json', 'native_deps/oxipng/ffi/Cargo.lock') }}
+      - name: Check build guardrails
+        run: python3 -m unittest discover -s native_deps/ios/tests -p 'test_*.py'
+      - name: Build device and simulator libraries
+        run: |
+          set -o pipefail
+          python3 native_deps/ios/build.py 2>&1 | tee ios-build.log
+      - name: Package corresponding source
+        run: |
+          set -o pipefail
+          python3 native_deps/ios/package-source.py 2>&1 | tee ios-source-package.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-deps-build-log
+          path: |
+            ios-build.log
+            ios-source-package.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xfilesuite-ios-native-deps
+          path: native_deps/ios/dist/*.tar.gz*
+          if-no-files-found: error
+          compression-level: 0

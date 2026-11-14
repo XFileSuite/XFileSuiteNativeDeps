@@ -1,0 +1,11 @@
+--- a/meson.build
++++ b/meson.build
+@@ -1,5 +1,8 @@
+ project('fribidi', 'c', version: '1.0.13',
+   meson_version : '>= 0.54')
++
++# Native Unicode table generators run on the build machine.
++add_languages('c', native: true)
+ 
+ # New release:
+ #   interface_age++

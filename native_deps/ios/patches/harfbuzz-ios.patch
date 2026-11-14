@@ -1,0 +1,13 @@
+--- a/meson.build
++++ b/meson.build
+@@ -374,6 +374,10 @@
+     endif
+   endif
+ 
++  if name == 'sincosf'
++    found = found and cpp.has_header_symbol('math.h', 'sincosf')
++  endif
++
+   if found
+     harfbuzz_extra_deps += extra_deps
+     conf.set('HAVE_@0@'.format(name.to_upper()), 1)

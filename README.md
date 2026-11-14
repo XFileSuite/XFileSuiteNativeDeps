@@ -37,7 +37,7 @@ The final manifests are committed here, then mirrored to:
 
 1. Edit `native_deps/manifests/macos.json` and/or `windows.json` on `main`.
 2. Open **Actions → Publish Native Dependencies → Run workflow**.
-3. Select `mode=build-only` to inspect macOS build artifacts, or `mode=publish`
+3. Select `mode=build-only` to inspect macOS and Windows build artifacts, or `mode=publish`
    to upload and mirror the dependency manifest. Select the component and
    platform. A full `publish` run may also select `purge_all_deps`; this
    requires `component=all` and `platform=all` and defaults to off.
@@ -85,3 +85,16 @@ export it with its private key from Keychain Access, and add the five signing
 values as repository or organization secrets. Keep the `.p12`, `.p8`, and their
 passwords out of the repository and release artifacts. A first CI run must
 confirm Apple notarization accepts the bundled native frameworks and tools.
+
+## iOS native libraries
+
+The standalone [iOS builder](native_deps/ios/README.md) prepares arm64 device and
+arm64 simulator XCFrameworks for the image, SVG, PNG optimization and media
+libraries. It includes public headers, symbols, notices, checksums and matching
+source packaging. `Build iOS Native Dependencies` builds downloadable Actions
+artifacts without publishing to R2 or modifying desktop manifests. App-side
+integration remains separate.
+
+Windows dependencies support both `build-only` and `publish`, like macOS.
+`build-only` uploads Actions artifacts without release credentials, R2 writes
+or manifest mirroring. App packaging workflows are independent and unchanged.

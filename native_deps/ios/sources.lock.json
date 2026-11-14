@@ -1,0 +1,191 @@
+[
+  {
+    "name": "imagemagick",
+    "version": "7.1.2-29",
+    "url": "https://codeload.github.com/ImageMagick/ImageMagick/tar.gz/refs/tags/7.1.2-29",
+    "sha256": "b05924ad73c6932ba62c9b32f338f0619b90b767162c8b767f3566556187a284",
+    "cache": "imagemagick/work/downloads/imagemagick-7.1.2-29.tar.gz"
+  },
+  {
+    "name": "libraw",
+    "version": "0.22.2",
+    "url": "https://codeload.github.com/LibRaw/LibRaw/tar.gz/refs/tags/0.22.2",
+    "sha256": "627928088300ecde6ca91ffd202e189203f04ad61ad12f0fe9dc57b9a7a0fb3c",
+    "cache": "imagemagick/work/downloads/libraw-0.22.2.tar.gz"
+  },
+  {
+    "name": "mozjpeg",
+    "version": "4.1.1",
+    "url": "https://codeload.github.com/mozilla/mozjpeg/tar.gz/refs/tags/v4.1.1",
+    "sha256": "66b1b8d6b55d263f35f27f55acaaa3234df2a401232de99b6d099e2bb0a9d196",
+    "cache": "imagemagick/work/downloads/mozjpeg-4.1.1.tar.gz"
+  },
+  {
+    "name": "libpng",
+    "version": "1.6.58",
+    "url": "https://codeload.github.com/pnggroup/libpng/tar.gz/refs/tags/v1.6.58",
+    "sha256": "a9d4df463d36a6e5f9c29bd6f4967312d17e996c1854f3511f833924eb1993cf",
+    "cache": "imagemagick/work/downloads/libpng-1.6.58.tar.gz"
+  },
+  {
+    "name": "libwebp",
+    "version": "1.6.0",
+    "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz",
+    "sha256": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564",
+    "cache": "imagemagick/work/downloads/libwebp-1.6.0.tar.gz"
+  },
+  {
+    "name": "libtiff",
+    "version": "4.7.2",
+    "url": "https://download.osgeo.org/libtiff/tiff-4.7.2.tar.gz",
+    "sha256": "672bd7d10aee4606171afb864f3570b83340f6a33e2c186dc0512f7145ffdf6a",
+    "cache": "imagemagick/work/downloads/libtiff-4.7.2.tar.gz"
+  },
+  {
+    "name": "ffmpeg",
+    "version": "8.1.2",
+    "url": "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz",
+    "sha256": "464beb5e7bf0c311e68b45ae2f04e9cc2af88851abb4082231742a74d97b524c",
+    "cache": "media_runtime/work/ffmpeg/ffmpeg-8.1.2.tar.xz"
+  },
+  {
+    "name": "lame",
+    "version": "3.100",
+    "url": "https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz",
+    "sha256": "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
+    "cache": "media_runtime/work/ffmpeg/lame-3.100.tar.gz"
+  },
+  {
+    "name": "libogg",
+    "version": "1.3.5",
+    "url": "https://downloads.xiph.org/releases/ogg/libogg-1.3.5.tar.xz",
+    "sha256": "c4d91be36fc8e54deae7575241e03f4211eb102afb3fc0775fbbc1b740016705",
+    "cache": "media_runtime/work/ffmpeg/libogg-1.3.5.tar.xz"
+  },
+  {
+    "name": "libvorbis",
+    "version": "1.3.7",
+    "url": "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz",
+    "sha256": "b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b",
+    "cache": "media_runtime/work/ffmpeg/libvorbis-1.3.7.tar.xz"
+  },
+  {
+    "name": "libvpx",
+    "version": "1.15.2",
+    "url": "https://codeload.github.com/webmproject/libvpx/tar.gz/refs/tags/v1.15.2",
+    "sha256": "26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa",
+    "cache": "media_runtime/work/ffmpeg/libvpx-1.15.2.tar.gz"
+  },
+  {
+    "name": "opus",
+    "version": "1.5.2",
+    "url": "https://codeload.github.com/xiph/opus/tar.gz/refs/tags/v1.5.2",
+    "sha256": "9480e329e989f70d69886ded470c7f8cfe6c0667cc4196d4837ac9e668fb7404",
+    "cache": "media_runtime/work/ffmpeg/opus-1.5.2.tar.gz"
+  },
+  {
+    "name": "libxml2",
+    "version": "2.11.5",
+    "url": "https://download.gnome.org/sources/libxml2/2.11/libxml2-2.11.5.tar.xz",
+    "sha256": "3727b078c360ec69fa869de14bd6f75d7ee8d36987b071e6928d4720a28df3a6",
+    "cache": "media_runtime/work/ffmpeg/libxml2-2.11.5.tar.xz"
+  },
+  {
+    "name": "dav1d",
+    "version": "1.2.1",
+    "url": "https://code.videolan.org/videolan/dav1d/-/archive/1.2.1/dav1d-1.2.1.tar.bz2",
+    "sha256": "a4003623cdc0109dec3aac8435520aa3fb12c4d69454fa227f2658cdb6dab5fa",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/dav1d-1.2.1.tar.bz2"
+  },
+  {
+    "name": "freetype",
+    "version": "2.13.2",
+    "url": "https://ftp.osuosl.org/pub/blfs/conglomeration/freetype/freetype-2.13.2.tar.xz",
+    "sha256": "12991c4e55c506dd7f9b765933e62fd2be2e06d421505d7950a132e4f1bb484d",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/freetype-2.13.2.tar.xz"
+  },
+  {
+    "name": "fribidi",
+    "version": "1.0.13",
+    "url": "https://github.com/fribidi/fribidi/releases/download/v1.0.13/fribidi-1.0.13.tar.xz",
+    "sha256": "7fa16c80c81bd622f7b198d31356da139cc318a63fc7761217af4130903f54a2",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/fribidi-1.0.13.tar.xz"
+  },
+  {
+    "name": "harfbuzz",
+    "version": "8.1.1",
+    "url": "https://github.com/harfbuzz/harfbuzz/archive/8.1.1.tar.gz",
+    "sha256": "b16e6bc0fc7e6a218583f40c7d201771f2e3072f85ef6e9217b36c1dc6b2aa25",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/harfbuzz-8.1.1.tar.gz"
+  },
+  {
+    "name": "libass",
+    "version": "0.17.1",
+    "url": "https://github.com/libass/libass/releases/download/0.17.1/libass-0.17.1.tar.xz",
+    "sha256": "f0da0bbfba476c16ae3e1cfd862256d30915911f7abaa1b16ce62ee653192784",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/libass-0.17.1.tar.xz"
+  },
+  {
+    "name": "mpv",
+    "version": "0.41.0",
+    "url": "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz",
+    "sha256": "ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/mpv-0.41.0.tar.gz"
+  },
+  {
+    "name": "uchardet",
+    "version": "0.0.8",
+    "url": "https://www.freedesktop.org/software/uchardet/releases/uchardet-0.0.8.tar.xz",
+    "sha256": "e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0",
+    "cache": "media_runtime/work/libmpv-darwin-build/build/intermediate/downloads/uchardet-0.0.8.tar.xz"
+  },
+  {
+    "name": "libplacebo",
+    "version": "6.338.2",
+    "url": "https://codeload.github.com/haasn/libplacebo/tar.gz/refs/tags/v6.338.2",
+    "sha256": "2f1e624e09d72a8c9db70f910f7560e764a1c126dae42acc5b3bcef836a7aec6",
+    "cache": "ios/work/downloads/libplacebo-6.338.2.tar.gz"
+  },
+  {
+    "name": "resvg",
+    "version": "0.47.0",
+    "url": "https://codeload.github.com/linebender/resvg/tar.gz/refs/tags/v0.47.0",
+    "sha256": "7869119fd822983b0a0bc2469bc94d59e7908fc12165fa67a105a4fa25087f9a",
+    "cache": "ios/work/downloads/resvg-0.47.0.tar.gz"
+  },
+  {
+    "name": "libplacebo-glad",
+    "version": "d08b1aa01f8fe57498f04d47b5fa8c48725be877",
+    "url": "https://codeload.github.com/Dav1dde/glad/tar.gz/d08b1aa01f8fe57498f04d47b5fa8c48725be877",
+    "sha256": "7a5fb3299a20e8088a504f3bb2b7247d85c4207706754180a1b4a4840a8728e4",
+    "cache": "ios/work/downloads/libplacebo-glad.tar.gz"
+  },
+  {
+    "name": "libplacebo-fast-float",
+    "version": "2b2395f9ac836ffca6404424bcc252bff7aa80e4",
+    "url": "https://codeload.github.com/fastfloat/fast_float/tar.gz/2b2395f9ac836ffca6404424bcc252bff7aa80e4",
+    "sha256": "230d20e4e4ac1f6a9df92c4d746c6ec536cdb0c085bc8635d4b88cead5dc22cb",
+    "cache": "ios/work/downloads/libplacebo-fast-float.tar.gz"
+  },
+  {
+    "name": "libplacebo-jinja",
+    "version": "b08cd4bc64bb980df86ed2876978ae5735572280",
+    "url": "https://codeload.github.com/pallets/jinja/tar.gz/b08cd4bc64bb980df86ed2876978ae5735572280",
+    "sha256": "9a20bab550a760ccb9b38a45d4fe76be92649206ee04633c646d0935a1872b0e",
+    "cache": "ios/work/downloads/libplacebo-jinja.tar.gz"
+  },
+  {
+    "name": "libplacebo-markupsafe",
+    "version": "c0254f0cfe51720ecc9e72e8896022af29af5b44",
+    "url": "https://codeload.github.com/pallets/markupsafe/tar.gz/c0254f0cfe51720ecc9e72e8896022af29af5b44",
+    "sha256": "1826c5d89cc1aa0b3088f538726d339e0c5cd69fbe03f7b8f9a3f880474d1120",
+    "cache": "ios/work/downloads/libplacebo-markupsafe.tar.gz"
+  },
+  {
+    "name": "libplacebo-vulkan-headers",
+    "version": "d732b2de303ce505169011d438178191136bfb00",
+    "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/d732b2de303ce505169011d438178191136bfb00",
+    "sha256": "570f9ae1e65466dbaf5fcab667abd079dd0a61c4ab86cf535efd492bf70a5b74",
+    "cache": "ios/work/downloads/libplacebo-vulkan-headers.tar.gz"
+  }
+]

@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Build and inspect artifacts, or publish them
+        description: Build and inspect macOS/Windows artifacts, or publish them
         type: choice
         options: [build-only, publish]
         default: build-only
@@ -419,7 +419,7 @@ jobs:
     needs: validate-r2-purge
     # Windows artifacts are continuously prepared, but this workflow never
     # creates a Windows App installer or a public Windows App release.
-    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' && (inputs.platform == 'all' || inputs.platform == 'windows') }}
+    if: ${{ always() && (needs.validate-r2-purge.result == 'success' || needs.validate-r2-purge.result == 'skipped') && github.event_name == 'workflow_dispatch' && (inputs.platform == 'all' || inputs.platform == 'windows') && inputs.component != 'resvg' }}
     runs-on: windows-latest
     permissions:
       contents: write
@@ -437,6 +437,7 @@ jobs:
         shell: pwsh
         run: if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Run from main only.' }
       - name: Validate release credentials
+        if: ${{ inputs.mode == 'publish' }}
         shell: pwsh
         run: |
           if (-not $env:SOURCE_WRITE_TOKEN -or -not $env:CLOUDFLARE_API_TOKEN -or -not $env:CLOUDFLARE_ACCOUNT_ID) {
@@ -614,6 +615,7 @@ jobs:
           $data | ConvertTo-Json -Depth 8 | Set-Content $path
           Get-Content $path -Raw | ConvertFrom-Json | Out-Null
       - name: Publish Windows source, notices and build records on GitHub
+        if: ${{ inputs.mode == 'publish' }}
         shell: pwsh
         run: |
           $releaseRepo = 'XFileSuite/XFileSuite'
@@ -636,6 +638,7 @@ jobs:
           if ($env:COMPONENT -in @('all', 'imagemagick')) { Publish-Source $manifest.components.imagemagick.sourceRelease (Get-ChildItem native_deps/imagemagick/dist-windows/xfilesuite-*-source.tar.gz | Select-Object -First 1).FullName }
           if ($env:COMPONENT -in @('all', 'media-runtime')) { Publish-Source $manifest.components.mediaRuntime.sourceRelease (Get-ChildItem native_deps/media_runtime/dist/xfilesuite-media-runtime-windows-*-source.tar.gz | Select-Object -First 1).FullName }
       - name: Upload Windows runtime dependencies to R2
+        if: ${{ inputs.mode == 'publish' }}
         shell: pwsh
         run: |
           $manifest = Get-Content native_deps/manifests/windows.json -Raw | ConvertFrom-Json
@@ -652,14 +655,33 @@ jobs:
             npx wrangler r2 object put "xfilesuite-releases/$($manifest.components.oxipng.r2Key)" --file "native_deps/oxipng/dist-windows/oxipng-$($manifest.components.oxipng.version)-windows-x64.zip" --remote
             if ($LASTEXITCODE -ne 0) { throw 'Unable to upload the Windows Oxipng runtime to R2' }
           }
-      - name: Generate and upload Windows SBOM
+      - name: Generate Windows SBOM
         shell: pwsh
         run: |
           ruby native_deps/generate-sbom.rb native_deps/manifests/windows.json native_deps/sbom-windows.json
           if ($LASTEXITCODE -ne 0) { throw 'Unable to generate the Windows SBOM' }
+      - name: Upload Windows SBOM to R2
+        if: ${{ inputs.mode == 'publish' }}
+        shell: pwsh
+        run: |
           npx wrangler r2 object put "xfilesuite-releases/deps/sbom-windows.json" --file native_deps/sbom-windows.json --remote
           if ($LASTEXITCODE -ne 0) { throw 'Unable to upload the Windows SBOM to R2' }
+      - name: Upload Windows dependency build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-deps-${{ inputs.component }}
+          path: |
+            native_deps/imagemagick/dist-windows/*.zip
+            native_deps/imagemagick/dist-windows/*source.tar.gz*
+            native_deps/media_runtime/dist/media-runtime-windows-*.tar.gz*
+            native_deps/media_runtime/dist/xfilesuite-media-runtime-windows-*source.tar.gz*
+            native_deps/oxipng/dist-windows/*.zip
+            native_deps/manifests/windows.json
+            native_deps/sbom-windows.json
+          if-no-files-found: error
+          compression-level: 0
       - name: Commit and mirror the Windows manifest
+        if: ${{ inputs.mode == 'publish' }}
         shell: pwsh
         run: |
           git config user.name 'xfilesuite-release-bot'; git config user.email 'release-bot@xfilesuite.com'

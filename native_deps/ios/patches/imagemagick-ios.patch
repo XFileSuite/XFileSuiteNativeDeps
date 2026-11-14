@@ -1,0 +1,28 @@
+--- a/MagickCore/random.c
++++ b/MagickCore/random.c
+@@ -65,7 +65,10 @@
+ #include "MagickCore/timer-private.h"
+ #include "MagickCore/utility.h"
+ #include "MagickCore/utility-private.h"
+-#if defined(MAGICKCORE_HAVE_GETENTROPY)
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++#endif
++#if defined(MAGICKCORE_HAVE_GETENTROPY) && !TARGET_OS_IPHONE
+ #include <sys/random.h>
+ #endif
+ /*
+@@ -393,7 +396,12 @@
+     return(entropy);
+   }
+ #endif
+-#if defined(MAGICKCORE_HAVE_GETENTROPY)
++#if defined(__APPLE__) && TARGET_OS_IPHONE
++  SetStringInfoLength(entropy,MaxEntropyExtent);
++  arc4random_buf(GetStringInfoDatum(entropy),MaxEntropyExtent);
++  UnlockSemaphoreInfo(random_info->semaphore);
++  return(entropy);
++#elif defined(MAGICKCORE_HAVE_GETENTROPY)
+   {
+     int
+       status;
