@@ -93,6 +93,19 @@ class BuildGuardsTest(unittest.TestCase):
             self.complete_target(target)
         build.validate_package_inputs(build.COMPONENTS)
 
+    def test_ktx_installs_header_in_clean_prefix(self):
+        for target in build.TARGETS:
+            with self.subTest(target=target):
+                builder = build.Build(target)
+                self.assertFalse((builder.prefix/'include').exists())
+                # Keep the actual header installation and completion stamp;
+                # compilation itself is covered by native build verification.
+                with patch.object(build, 'source', return_value=self.root/'ktx'), \
+                     patch.object(build, 'run'):
+                    builder.ktx()
+                self.assertEqual((builder.prefix/'include/ktx-preview.h').read_text(), 'fixture')
+                self.assertTrue((builder.base/'built-xfs_ktx').is_file())
+
 
 class ToolchainPathTest(unittest.TestCase):
     def test_build_config_uses_rust_from_ci_path(self):

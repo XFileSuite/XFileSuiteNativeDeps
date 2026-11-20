@@ -233,6 +233,7 @@ class Build:
                  bridge, ROOT/'ktx-blocks.cpp', build/'ktx.framework/ktx', '-lc++', '-lz',
                  '-Wl,-install_name,@rpath/libxfs_ktx.dylib',
                  '-o', self.prefix/'lib/libxfs_ktx.dylib'], env=self.env)
+            (self.prefix/'include').mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT/'ktx-preview.h', self.prefix/'include/ktx-preview.h')
         self.done('xfs_ktx', action)
 
