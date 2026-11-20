@@ -4,12 +4,12 @@
   "minimumIOS": "15.0",
   "components": {
     "iosRuntime": {
-      "bundleSha256": "9f02d08aafb81b99e94eeb05030d83727164e030a9d4dd6fc389ed8afe349293",
-      "r2Key": "deps/ios-native-deps-9f02d08aafb81b99e94eeb05030d83727164e030a9d4dd6fc389ed8afe349293.tar.gz",
-      "sourceRelease": "ios-native-deps-037f1cd98e680a49ad0e190e",
-      "sourceSha256": "03d3606404d23cd825f170a99674db2b3b3827a9f917e0046b44c51dd381b3bd",
+      "bundleSha256": "79cda97c421f6d7af961ac15c920d9c5f6558d40f1964ed65885f1e36e91a777",
+      "r2Key": "deps/ios-native-deps-79cda97c421f6d7af961ac15c920d9c5f6558d40f1964ed65885f1e36e91a777.tar.gz",
+      "sourceRelease": "ios-native-deps-da79b1f3e972a480afd7fa3f",
+      "sourceSha256": "fbd693b77eac8430af94d8055320baffac768255cf86c4f64fa22ace671dd492",
       "sourceArchive": "xfilesuite-ios-source.tar.gz",
-      "recipe": "0626eb4592666d3203cbc6aea3a50c52c0c2d6a1042f48b53fbbd0677588d843"
+      "recipe": "6fa32b918da7da224108086f349c0d8936879d0c1ab4a7bbe6045cc9b41c88f5"
     }
   }
 }
