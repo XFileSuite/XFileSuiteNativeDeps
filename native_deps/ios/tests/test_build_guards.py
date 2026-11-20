@@ -25,7 +25,7 @@ class BuildGuardsTest(unittest.TestCase):
         (self.root/'patches').mkdir()
         (self.root/'build.py').write_text('recipe version one\n')
         (self.root/'sources.lock.json').write_text('[]\n')
-        for name in ('ffmpeg-cli.mk', 'ffmpeg-cli.h'):
+        for name in ('ffmpeg-cli.mk', 'ffmpeg-cli.h', 'ktx-preview.c', 'ktx-preview.h', 'ktx-blocks.cpp', 'bcdec.h'):
             (self.root/name).write_text('fixture')
 
         self.work = self.root/'work'
@@ -44,7 +44,7 @@ class BuildGuardsTest(unittest.TestCase):
         (base/'BUILD_CONFIG.json').write_text(json.dumps(build.build_config('/sdk')))
         for name in ['imagemagick', 'mpv']:
             (base/('built-'+name)).write_text('ok\n')
-        for name in ['oxipng', 'resvg', 'xfs_ffmpeg_cli']:
+        for name in ['oxipng', 'resvg', 'xfs_ffmpeg_cli', 'xfs_ktx']:
             (base/'prefix/lib'/('lib'+name+'.dylib')).write_bytes(b'fixture')
 
     def test_changed_patch_cannot_reuse_completed_component(self):

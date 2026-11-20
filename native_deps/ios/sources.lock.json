@@ -187,5 +187,12 @@
     "url": "https://codeload.github.com/KhronosGroup/Vulkan-Headers/tar.gz/d732b2de303ce505169011d438178191136bfb00",
     "sha256": "570f9ae1e65466dbaf5fcab667abd079dd0a61c4ab86cf535efd492bf70a5b74",
     "cache": "ios/work/downloads/libplacebo-vulkan-headers.tar.gz"
+  },
+  {
+    "name": "ktx",
+    "version": "4.4.2",
+    "url": "https://codeload.github.com/KhronosGroup/KTX-Software/tar.gz/refs/tags/v4.4.2",
+    "sha256": "9412cb45045a503005acd47d98f9e8b47154634a50b4df21e17a1dfa8971d323",
+    "cache": "ios/work/downloads/ktx-4.4.2.tar"
   }
 ]

@@ -129,3 +129,5 @@ dependencies. `smoke-link.py` compiles and links an independent C consumer for
 both platforms. Neither static inspection nor link checks establish runtime
 playback, encoding, memory behavior, hardware decoding or App Store approval.
 Those require an iOS host and device/simulator execution during app integration.
+
+The iOS image component also builds Khronos KTX 4.4.2 into `xfs_ktx.xcframework`. The C preview API supports ordinary 8-bit uncompressed KTX1/KTX2 and BasisLZ/UASTC KTX2 transcoding to RGBA, with individual mip levels and orientation handling. The CPU preview path also supports BC1–BC7 (including signed BC4/BC5 and tone-mapped BC6H), ETC1/ETC2/EAC, LDR ASTC and PVRTC1 4bpp 2D textures. Unsupported formats and arrays/cubemaps return an explicit error. Dimensions are checked before loading the image payload. The vendored bcdec 0.985 header is SHA-256 verified and included in the corresponding sources and license/SBOM inventory. The framework, dSYMs, bridge sources, pinned upstream source archive and license files follow the standard iOS packaging and corresponding-source workflow.

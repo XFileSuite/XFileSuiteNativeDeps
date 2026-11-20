@@ -44,7 +44,7 @@ def sources():
 def recipe_digest():
     # Include inputs shared READ-ONLY with desktop builds. All generated files
     # and patched source trees stay under ios/work instead.
-    paths = [ROOT/'build.py', ROOT/'sources.lock.json', ROOT/'ffmpeg-cli.mk', ROOT/'ffmpeg-cli.h']
+    paths = [ROOT/'build.py', ROOT/'sources.lock.json', ROOT/'ffmpeg-cli.mk', ROOT/'ffmpeg-cli.h', ROOT/'ktx-preview.c', ROOT/'ktx-preview.h', ROOT/'ktx-blocks.cpp', ROOT/'bcdec.h']
     paths += sorted((ROOT/'patches').glob('*.patch'))
     for component in ['imagemagick', 'ffmpeg', 'media_runtime']:
         paths += sorted((NATIVE/component/'patches').glob('*.patch'))
@@ -82,7 +82,7 @@ def validate_package_inputs(components):
         for name in ['imagemagick', 'mpv']:
             if not (base/('built-'+name)).is_file():
                 raise RuntimeError(f'Incomplete {target} build: {name}')
-        for name in ['oxipng', 'resvg', 'xfs_ffmpeg_cli']:
+        for name in ['oxipng', 'resvg', 'xfs_ffmpeg_cli', 'xfs_ktx']:
             if not (base/'prefix/lib'/('lib'+name+'.dylib')).is_file():
                 raise RuntimeError(f'Incomplete {target} build: {name}')
 
@@ -210,7 +210,34 @@ class Build:
             run(['meson', 'install', '-C', build], env=env)
         self.done(name, action)
 
+    def ktx(self):
+        def action():
+            src = source('ktx', self.target)
+            build = self.base/'build/ktx'
+            run(['cmake', '-S', src, '-B', build, '-G', 'Ninja',
+                 '-DCMAKE_SYSTEM_NAME=iOS', '-DCMAKE_OSX_SYSROOT='+self.sdkpath,
+                 '-DCMAKE_OSX_ARCHITECTURES=arm64', '-DCMAKE_OSX_DEPLOYMENT_TARGET='+MIN_IOS,
+                 '-DCMAKE_BUILD_TYPE=RelWithDebInfo', '-DKTX_GIT_VERSION_FULL=v4.4.2',
+                 '-DBUILD_SHARED_LIBS=OFF', '-DKTX_FEATURE_TESTS=OFF', '-DKTX_FEATURE_TOOLS=OFF',
+                 '-DKTX_FEATURE_LOADTEST_APPS=OFF', '-DKTX_FEATURE_GL_UPLOAD=OFF',
+                 '-DKTX_FEATURE_VK_UPLOAD=OFF', '-DKTX_FEATURE_DOC=OFF'], env=self.env)
+            run(['cmake', '--build', build, '--target', 'ktx', '--parallel', JOBS], env=self.env)
+            bridge = self.base/'build/ktx-preview.o'
+            run(['clang', '-c', '-target', self.triple, '-isysroot', self.sdkpath,
+                 '-O2', '-g', '-I'+str(src/'include'), '-I'+str(src/'external/dfdutils'),
+                 ROOT/'ktx-preview.c', '-o', bridge], env=self.env)
+            run(['clang++', '-dynamiclib', '-target', self.triple, '-isysroot', self.sdkpath,
+                 '-O2', '-g', '-I'+str(src/'include'), '-I'+str(src/'external/dfdutils'),
+                 '-I'+str(src/'external/basisu/encoder'),
+                 '-I'+str(src/'external/astc-encoder/Source'), '-std=c++11',
+                 bridge, ROOT/'ktx-blocks.cpp', build/'ktx.framework/ktx', '-lc++', '-lz',
+                 '-Wl,-install_name,@rpath/libxfs_ktx.dylib',
+                 '-o', self.prefix/'lib/libxfs_ktx.dylib'], env=self.env)
+            shutil.copy2(ROOT/'ktx-preview.h', self.prefix/'include/ktx-preview.h')
+        self.done('xfs_ktx', action)
+
     def images(self):
+        self.ktx()
         self.cmake('mozjpeg', ['-DENABLE_SHARED=ON', '-DENABLE_STATIC=OFF', '-DWITH_TURBOJPEG=OFF', '-DPNG_SUPPORTED=OFF'])
         self.cmake('libpng', ['-DPNG_FRAMEWORK=OFF', '-DPNG_SHARED=ON', '-DPNG_STATIC=OFF', '-DPNG_TESTS=OFF', '-DPNG_TOOLS=OFF'])
         self.cmake('libwebp', ['-DWEBP_BUILD_ANIM_UTILS=OFF', '-DWEBP_BUILD_CWEBP=OFF', '-DWEBP_BUILD_DWEBP=OFF', '-DWEBP_BUILD_GIF2WEBP=OFF', '-DWEBP_BUILD_IMG2WEBP=OFF', '-DWEBP_BUILD_VWEBP=OFF', '-DWEBP_BUILD_WEBPINFO=OFF', '-DWEBP_BUILD_WEBPMUX=OFF', '-DWEBP_BUILD_EXTRAS=OFF'])
@@ -420,8 +447,16 @@ def package(components):
                     out = dest/p.relative_to(src); out.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(p,out)
             break
     shutil.copy2(NATIVE/'oxipng/LICENSE', licenses/'OXIPNG-LICENSE.txt')
-    native_licenses = {'imagemagick':'ImageMagick', 'libraw':'LGPL-2.1-only OR CDDL-1.0', 'mozjpeg':'BSD-style/IJG', 'libpng':'Libpng', 'libwebp':'BSD-3-Clause', 'libtiff':'libtiff', 'ffmpeg':'LGPL-2.1-or-later', 'mpv':'LGPL-2.1-or-later', 'libplacebo':'LGPL-2.1-or-later', 'libass':'ISC', 'freetype':'FTL OR GPL-2.0-only', 'fribidi':'LGPL-2.1-or-later', 'harfbuzz':'MIT', 'uchardet':'MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later', 'dav1d':'BSD-2-Clause', 'libogg':'BSD-3-Clause', 'libvorbis':'BSD-3-Clause', 'opus':'BSD-3-Clause', 'lame':'LGPL-2.0-or-later', 'libvpx':'BSD-3-Clause', 'libxml2':'MIT', 'resvg':'MIT OR Apache-2.0', 'libplacebo-vulkan-headers':'Apache-2.0', 'libplacebo-jinja':'BSD-3-Clause', 'libplacebo-markupsafe':'BSD-3-Clause', 'libplacebo-glad':'MIT', 'libplacebo-fast-float':'MIT OR Apache-2.0 OR BSL-1.0'}
+    native_licenses = {'ktx':'Apache-2.0', 'imagemagick':'ImageMagick', 'libraw':'LGPL-2.1-only OR CDDL-1.0', 'mozjpeg':'BSD-style/IJG', 'libpng':'Libpng', 'libwebp':'BSD-3-Clause', 'libtiff':'libtiff', 'ffmpeg':'LGPL-2.1-or-later', 'mpv':'LGPL-2.1-or-later', 'libplacebo':'LGPL-2.1-or-later', 'libass':'ISC', 'freetype':'FTL OR GPL-2.0-only', 'fribidi':'LGPL-2.1-or-later', 'harfbuzz':'MIT', 'uchardet':'MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later', 'dav1d':'BSD-2-Clause', 'libogg':'BSD-3-Clause', 'libvorbis':'BSD-3-Clause', 'opus':'BSD-3-Clause', 'lame':'LGPL-2.0-or-later', 'libvpx':'BSD-3-Clause', 'libxml2':'MIT', 'resvg':'MIT OR Apache-2.0', 'libplacebo-vulkan-headers':'Apache-2.0', 'libplacebo-jinja':'BSD-3-Clause', 'libplacebo-markupsafe':'BSD-3-Clause', 'libplacebo-glad':'MIT', 'libplacebo-fast-float':'MIT OR Apache-2.0 OR BSL-1.0'}
     native_sources = [dict(spec, license=native_licenses[name]) for name,spec in sources().items()]
+    bcdec = ROOT/'bcdec.h'
+    if digest(bcdec) != '134520764d96f70a27db814173616c89ad85db95fbd3328417c7a8c77e7ca189':
+        raise RuntimeError('Vendored bcdec source checksum mismatch')
+    native_sources.append(dict(name='bcdec', version='0.985',
+        url='https://github.com/iOrange/bcdec', sha256=digest(bcdec), license='MIT OR Unlicense'))
+    bcdec_license = licenses/'bcdec'
+    bcdec_license.mkdir()
+    (bcdec_license/'LICENSE.txt').write_text(bcdec.read_text(encoding='utf-8-sig').split('/* LICENSE:', 1)[1].rsplit('*/', 1)[0])
     sbom = {'schemaVersion': 1, 'platform': 'ios', 'sources': native_sources, 'rustPackages': []}
     for name in ['oxipng', 'resvg']:
         if name not in components: continue
