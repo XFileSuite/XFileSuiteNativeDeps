@@ -44,7 +44,7 @@ def sources():
 def recipe_digest():
     # Include inputs shared READ-ONLY with desktop builds. All generated files
     # and patched source trees stay under ios/work instead.
-    paths = [ROOT/'build.py', ROOT/'sources.lock.json']
+    paths = [ROOT/'build.py', ROOT/'sources.lock.json', ROOT/'ffmpeg-cli.mk', ROOT/'ffmpeg-cli.h']
     paths += sorted((ROOT/'patches').glob('*.patch'))
     for component in ['imagemagick', 'ffmpeg', 'media_runtime']:
         paths += sorted((NATIVE/component/'patches').glob('*.patch'))
@@ -82,7 +82,7 @@ def validate_package_inputs(components):
         for name in ['imagemagick', 'mpv']:
             if not (base/('built-'+name)).is_file():
                 raise RuntimeError(f'Incomplete {target} build: {name}')
-        for name in ['oxipng', 'resvg']:
+        for name in ['oxipng', 'resvg', 'xfs_ffmpeg_cli']:
             if not (base/'prefix/lib'/('lib'+name+'.dylib')).is_file():
                 raise RuntimeError(f'Incomplete {target} build: {name}')
 
@@ -274,13 +274,18 @@ class Build:
             src = source('ffmpeg', self.target)
             patch = NATIVE/'ffmpeg/patches/ffmpeg-tls-securetransport-no-private-api.patch'
             if not (src/'.xfs-patched').exists():
-                run(['patch', '-p1', '-i', patch], cwd=src); (src/'.xfs-patched').touch()
+                run(['patch', '-p1', '-i', patch], cwd=src)
+                run(['patch', '-p1', '-i', ROOT/'patches/ffmpeg-embedded-cli.patch'], cwd=src)
+                (src/'.xfs-patched').touch()
             build = self.base/'build/ffmpeg'; build.mkdir(parents=True, exist_ok=True)
             run([src/'configure', '--prefix='+str(self.prefix), '--enable-cross-compile', '--target-os=darwin', '--arch=aarch64', '--cc=clang', '--cxx=clang++', '--sysroot='+self.sdkpath,
                  '--extra-cflags='+self.env['CFLAGS']+' -I'+str(self.prefix/'include'), '--extra-ldflags='+self.env['LDFLAGS'], '--pkg-config=pkg-config', '--pkg-config-flags=--static',
-                 '--enable-shared', '--disable-static', '--disable-stripping', '--disable-programs', '--disable-doc', '--disable-autodetect', '--disable-gpl', '--disable-nonfree', '--disable-version3', '--enable-pic', '--disable-outdevs', '--disable-indevs',
+                 '--enable-shared', '--disable-static', '--disable-stripping', '--enable-ffmpeg', '--disable-ffprobe', '--disable-ffplay', '--disable-doc', '--disable-autodetect', '--disable-gpl', '--disable-nonfree', '--disable-version3', '--enable-pic', '--disable-outdevs', '--disable-indevs',
                  '--enable-libmp3lame', '--enable-libvorbis', '--enable-libvpx', '--enable-libwebp', '--enable-libopus', '--enable-libxml2', '--enable-libass', '--enable-libdav1d', '--enable-videotoolbox', '--enable-audiotoolbox', '--enable-zlib', '--enable-network', '--enable-securetransport'], cwd=build, env=self.env)
-            run(['make', '-j'+JOBS], cwd=build, env=self.env); run(['make', 'install'], cwd=build, env=self.env)
+            run(['make', '-j'+JOBS, 'install-libs', 'install-headers'], cwd=build, env=self.env)
+            cli = self.prefix/'lib/libxfs_ffmpeg_cli.dylib'
+            run(['make', '-j'+JOBS, '-f', 'Makefile', '-f', ROOT/'ffmpeg-cli.mk',
+                 'XFS_CLI_OUTPUT='+str(cli), 'xfs-ffmpeg-cli'], cwd=build, env=self.env)
         self.done('ffmpeg', ffmpeg)
         self.meson('libplacebo', ['-Ddemos=false', '-Dtests=false', '-Dvulkan=disabled', '-Dopengl=enabled', '-Dd3d11=disabled', '-Dglslang=disabled', '-Dshaderc=disabled', '-Dlcms=disabled', '-Ddovi=disabled', '-Dlibdovi=disabled', '-Dunwind=disabled', '-Dxxhash=disabled'])
         src = source('mpv', self.target)
@@ -348,7 +353,12 @@ def package(components):
                 elif not dep.startswith(('/System/Library/', '/usr/lib/')):
                     raise RuntimeError('Unpackaged dependency: '+dep)
             # Preserve include directory structure, including cross-library includes.
-            shutil.copytree(prefix/'include', framework/'Headers')
+            if name == 'xfs_ffmpeg_cli':
+                headers = framework/'Headers'
+                headers.mkdir()
+                shutil.copy2(ROOT/'ffmpeg-cli.h', headers)
+            else:
+                shutil.copytree(prefix/'include', framework/'Headers')
             plist = dict(CFBundleExecutable=name, CFBundleIdentifier='com.xfilesuite.native.'+name.replace('_','-'), CFBundleName=name, CFBundlePackageType='FMWK', CFBundleVersion='1', CFBundleShortVersionString='1.0', MinimumOSVersion=MIN_IOS, CFBundleSupportedPlatforms=['iPhoneOS' if target=='device' else 'iPhoneSimulator'])
             (framework/'Info.plist').write_bytes(plistlib.dumps(plist))
             dsym = framework.with_suffix('.framework.dSYM')

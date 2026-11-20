@@ -16,7 +16,8 @@ def verify(root):
     bundles = sorted(frameworks.glob('*.xcframework'))
     if not bundles: raise RuntimeError('No XCFrameworks')
     dynamic = {}
-    symbols = {'oxipng': ['oxipng_optimize_file', 'oxipng_optimize_memory'],
+    symbols = {'xfs_ffmpeg_cli': ['xfs_ffmpeg_run'],
+               'oxipng': ['oxipng_optimize_file', 'oxipng_optimize_memory'],
                'resvg': ['resvg_render', 'resvg_parse_tree_from_data'],
                'mpv': ['mpv_create','mpv_render_context_create'],
                'avcodec': ['avcodec_version'], 'MagickWand_7_Q16HDRI': ['NewMagickWand']}

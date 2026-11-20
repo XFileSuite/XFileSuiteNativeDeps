@@ -1,10 +1,13 @@
 /* Independent consumer: compile/link now, execute in an iOS host later. */
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <MagickWand/MagickWand.h>
 #include <libraw/libraw.h>
 #include <libavcodec/avcodec.h>
+#include <ffmpeg-cli.h>
 #include <libavformat/avformat.h>
 #include <libavfilter/avfilter.h>
 #include <mpv/client.h>
@@ -28,6 +31,18 @@ int main(void) {
     size_t optimized_len = 0;
     CHECK(oxipng_optimize_memory(png, png_len, &options, &optimized, &optimized_len) == 0);
     CHECK(optimized && optimized_len > 8);
+    char input[] = "/tmp/xfs-cli-smoke.XXXXXX";
+    int descriptor = mkstemp(input);
+    CHECK(descriptor >= 0);
+    ssize_t written = write(descriptor, png, png_len);
+    close(descriptor);
+    char *invalid[] = {"ffmpeg", "-xfs_invalid_option", NULL};
+    char *convert[] = {"ffmpeg", "-f", "png_pipe", "-i", input, "-f", "null", "-", NULL};
+    int failed = xfs_ffmpeg_run(2, invalid, NULL, NULL, NULL);
+    int first = xfs_ffmpeg_run(8, convert, NULL, NULL, NULL);
+    int second = xfs_ffmpeg_run(8, convert, NULL, NULL, NULL);
+    unlink(input);
+    CHECK(written == (ssize_t)png_len && failed < 0 && first == 0 && second == 0);
     oxipng_blob_free(optimized, optimized_len);
     MagickRelinquishMemory(png);
     DestroyPixelWand(pixel);

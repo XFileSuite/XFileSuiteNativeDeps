@@ -1,0 +1,259 @@
+--- a/fftools/cmdutils.c
++++ b/fftools/cmdutils.c
+@@ -610,9 +610,6 @@
+     const AVClass *swr_class = swr_get_class();
+ #endif
+ 
+-    if (!strcmp(opt, "debug") || !strcmp(opt, "fdebug"))
+-        av_log_set_level(AV_LOG_DEBUG);
+-
+     if (!(p = strchr(opt, ':')))
+         p = opt + strlen(opt);
+     av_strlcpy(opt_stripped, opt, FFMIN(sizeof(opt_stripped), p - opt + 1));
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -143,7 +143,21 @@
+ static atomic_int transcode_init_done = 0;
+ static volatile int ffmpeg_exited = 0;
+ static int64_t copy_ts_first_pts = AV_NOPTS_VALUE;
++static int64_t last_time = -1;
++static int first_report = 1;
+ 
++typedef int (*XFSIsCancelled)(void *);
++typedef void (*XFSProgress)(void *, int64_t);
++static XFSIsCancelled is_cancelled;
++static XFSProgress report_progress;
++static void *job_context;
++static atomic_flag job_active = ATOMIC_FLAG_INIT;
++
++static int job_cancelled(void)
++{
++    return is_cancelled && is_cancelled(job_context);
++}
++
+ static void
+ sigterm_handler(int sig)
+ {
+@@ -204,6 +218,7 @@
+ 
+ void term_init(void)
+ {
++    return; /* The host owns terminal and process signals. */
+ #if defined __linux__
+     struct sigaction action = {0};
+     action.sa_handler = sigterm_handler;
+@@ -306,7 +321,7 @@
+ 
+ static int decode_interrupt_cb(void *ctx)
+ {
+-    return received_nb_signals > atomic_load(&transcode_init_done);
++    return job_cancelled();
+ }
+ 
+ const AVIOInterruptCB int_cb = { decode_interrupt_cb, NULL };
+@@ -356,7 +371,6 @@
+ 
+     uninit_opts();
+ 
+-    avformat_network_deinit();
+ 
+     if (received_sigterm) {
+         av_log(NULL, AV_LOG_INFO, "Exiting normally, received signal %d.\n",
+@@ -576,8 +590,6 @@
+     int vid;
+     double bitrate;
+     double speed;
+-    static int64_t last_time = -1;
+-    static int first_report = 1;
+     uint64_t nb_frames_dup = 0, nb_frames_drop = 0;
+     int mins, secs, ms, us;
+     int64_t hours;
+@@ -585,7 +597,7 @@
+     int ret;
+     float t;
+ 
+-    if (!print_stats && !is_last_report && !progress_avio)
++    if (!print_stats && !is_last_report && !progress_avio && !report_progress)
+         return;
+ 
+     if (!is_last_report) {
+@@ -729,6 +741,8 @@
+     }
+ 
+     first_report = 0;
++    if (report_progress && pts != AV_NOPTS_VALUE)
++        report_progress(job_context, FFMAX(0, pts));
+ }
+ 
+ static void print_stream_maps(void)
+@@ -906,7 +920,7 @@
+     while (!sch_wait(sch, stats_period, &transcode_ts)) {
+         int64_t cur_time= av_gettime_relative();
+ 
+-        if (received_nb_signals)
++        if (job_cancelled())
+             break;
+ 
+         /* if 'q' pressed, exits */
+@@ -978,24 +992,36 @@
+ #endif
+ }
+ 
+-int main(int argc, char **argv)
++void xfs_reset_options(void);
++int xfs_ffmpeg_run(int argc, char **argv, XFSIsCancelled cancel,
++                   XFSProgress progress, void *opaque);
++
++int xfs_ffmpeg_run(int argc, char **argv, XFSIsCancelled cancel,
++                   XFSProgress progress, void *opaque)
+ {
+     Scheduler *sch = NULL;
+ 
+     int ret;
+     BenchmarkTimeStamps ti;
+ 
+-    init_dynload();
++    if (atomic_flag_test_and_set(&job_active))
++        return AVERROR(EBUSY);
+ 
+-    setvbuf(stderr,NULL,_IONBF,0); /* win32 runtime needs this */
++    xfs_reset_options();
++    hide_banner = 0;
++    vstats_file = NULL;
++    atomic_store(&transcode_init_done, 0);
++    atomic_store(&nb_output_dumped, 0);
++    copy_ts_first_pts = AV_NOPTS_VALUE;
++    last_time = -1;
++    first_report = 1;
++    is_cancelled = cancel;
++    report_progress = progress;
++    job_context = opaque;
+ 
+-    av_log_set_flags(AV_LOG_SKIP_REPEATED);
+-    parse_loglevel(argc, argv, options);
+-
+ #if CONFIG_AVDEVICE
+     avdevice_register_all();
+ #endif
+-    avformat_network_init();
+ 
+     show_banner(argc, argv, options);
+ 
+@@ -1005,6 +1031,11 @@
+         goto finish;
+     }
+ 
++    if (job_cancelled()) {
++        ret = AVERROR(ECANCELED);
++        goto finish;
++    }
++
+     /* parse options and open all input/output files */
+     ret = ffmpeg_parse_options(argc, argv, sch);
+     if (ret < 0)
+@@ -1044,12 +1075,19 @@
+           (ret == FFMPEG_ERROR_RATE_EXCEEDED) ?  69 : ret;
+ 
+ finish:
+-    if (ret == AVERROR_EXIT)
++    if (job_cancelled())
++        ret = AVERROR(ECANCELED);
++    else if (ret == AVERROR_EXIT)
+         ret = 0;
+ 
+     ffmpeg_cleanup(ret);
+ 
+     sch_free(&sch);
++    nb_input_files = nb_output_files = nb_filtergraphs = nb_decoders = 0;
++    is_cancelled = NULL;
++    report_progress = NULL;
++    job_context = NULL;
++    atomic_flag_clear(&job_active);
+ 
+     av_log(NULL, AV_LOG_VERBOSE, "\n");
+     av_log(NULL, AV_LOG_VERBOSE, "Exiting with exit code %d\n", ret);
+--- a/fftools/ffmpeg_opt.c
++++ b/fftools/ffmpeg_opt.c
+@@ -89,6 +89,40 @@
+ int ignore_unknown_streams = 0;
+ int copy_unknown_streams = 0;
+ int recast_media = 0;
++
++void xfs_reset_options(void);
++void xfs_reset_options(void)
++{
++    dts_delta_threshold = 10;
++    dts_error_threshold = 3600*30;
++    frame_drop_threshold = 0;
++    do_benchmark = 0;
++    do_benchmark_all = 0;
++    do_hex_dump = 0;
++    do_pkt_dump = 0;
++    copy_ts = 0;
++    start_at_zero = 0;
++    copy_tb = -1;
++    debug_ts = 0;
++    exit_on_error = 0;
++    abort_on_flags = 0;
++    print_stats = -1;
++    stdin_interaction = 1;
++    max_error_rate = 2.0/3;
++    filter_complex_nbthreads = 2;
++    filter_buffered_frames = 0;
++    vstats_version = 2;
++    print_graphs = 0;
++    auto_conversion_filters = 1;
++    stats_period = 500000;
++    file_overwrite = 0;
++    no_file_overwrite = 0;
++    ignore_unknown_streams = 0;
++    copy_unknown_streams = 0;
++    recast_media = 0;
++    stdin_interaction = 0;
++}
++
+ 
+ // this struct is passed as the optctx argument
+ // to func_arg() for global options
+@@ -1494,6 +1528,22 @@
+         goto fail;
+     }
+ 
++    for (int i = 0; i < octx.global_opts.nb_opts; i++) {
++        Option *option = &octx.global_opts.opts[i];
++        const char *name = option->opt->name;
++        if (!strcmp(name, "loglevel") || !strcmp(name, "v")) {
++            continue;
++        }
++        if ((option->opt->flags & OPT_EXIT) || !strcmp(name, "report") ||
++            !strcmp(name, "timelimit") || !strcmp(name, "cpuflags") ||
++            !strcmp(name, "cpucount") || !strcmp(name, "max_alloc") ||
++            !strcmp(name, "progress")) {
++            ret = AVERROR(ENOSYS);
++            errmsg = "unsupported embedded global option";
++            goto fail;
++        }
++    }
++
+     /* apply global options */
+     ret = parse_optgroup(&go, &octx.global_opts, options);
+     if (ret < 0) {
+@@ -1502,7 +1552,7 @@
+     }
+ 
+     /* configure terminal and setup signal handlers */
+-    term_init();
++    stdin_interaction = 0;
+ 
+     /* create complex filtergraphs */
+     for (int i = 0; i < go.nb_filtergraphs; i++) {
+--- a/fftools/opt_common.c
++++ b/fftools/opt_common.c
+@@ -1251,6 +1251,7 @@
+ 
+ int opt_loglevel(void *optctx, const char *opt, const char *arg)
+ {
++    return 0; /* The host owns libavutil logging. */
+     const struct { const char *name; int level; } log_levels[] = {
+         { "quiet"  , AV_LOG_QUIET   },
+         { "panic"  , AV_LOG_PANIC   },

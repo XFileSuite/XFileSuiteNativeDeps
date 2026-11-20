@@ -89,11 +89,13 @@ libplacebo, uchardet, Ogg/Vorbis/Opus, LAME and libxml2. VPX is statically linke
 into FFmpeg. Oxipng and resvg expose C APIs in dynamic-framework XCFrameworks, avoiding
 duplicate Rust runtime symbols when linked together.
 
-There are no `ffmpeg`, `ffprobe`, `magick` or `resvg` executables in the package.
-App-side wrappers, a command-string FFmpeg runner, Flutter FFI loading, document
-access and UI/lifecycle integration are separate future work. These upstream
-library APIs are the integration boundary; the app's current desktop `.dylib`
-paths cannot be used on iOS.
+The runtime has no standalone `ffmpeg`, `ffprobe`, `magick` or `resvg`
+executables. `xfs_ffmpeg_cli.xcframework` provides an in-process
+`xfs_ffmpeg_run` entry point compiled from the pinned FFmpeg command frontend.
+It dynamically links the same libav frameworks as mpv. Call it from a background
+queue with an argument array and per-job cancellation/progress callbacks. It
+does not install terminal handlers or redirect process output. FFmpeg options
+that alter host state, such as `-report` and `-cpuflags`, are unavailable.
 
 ## Integration notes
 
