@@ -217,6 +217,21 @@
       "sha256": "570f9ae1e65466dbaf5fcab667abd079dd0a61c4ab86cf535efd492bf70a5b74",
       "cache": "ios/work/downloads/libplacebo-vulkan-headers.tar.gz",
       "license": "Apache-2.0"
+    },
+    {
+      "name": "ktx",
+      "version": "4.4.2",
+      "url": "https://codeload.github.com/KhronosGroup/KTX-Software/tar.gz/refs/tags/v4.4.2",
+      "sha256": "9412cb45045a503005acd47d98f9e8b47154634a50b4df21e17a1dfa8971d323",
+      "cache": "ios/work/downloads/ktx-4.4.2.tar",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "bcdec",
+      "version": "0.985",
+      "url": "https://github.com/iOrange/bcdec",
+      "sha256": "134520764d96f70a27db814173616c89ad85db95fbd3328417c7a8c77e7ca189",
+      "license": "MIT OR Unlicense"
     }
   ],
   "rustPackages": [
