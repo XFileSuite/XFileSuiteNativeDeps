@@ -66,6 +66,14 @@ After rebuilding, verify ordinary CoreAudio output on macOS 27 with mono and
 stereo files, simultaneous playback in another app, and output-device switching.
 Static framework verification alone does not cover this runtime failure.
 
+Windows MINGW64 installs uchardet from the official, pinned MSYS2 `0.0.8-2`
+package because it is no longer in the rolling package index. The builder
+checks SHA-256 and the detached signature with the MSYS2 keyring before
+installing it through pacman. Its package metadata and license continue to
+flow through the existing runtime staging process. This keeps the current
+MINGW64 ABI and subtitle encoding detection; it does not mix UCRT64 libraries
+into the runtime.
+
 ## Stable 0.41 backports (macOS revision 5 / Windows revision 4)
 
 The runtime remains FFmpeg 8.1.2 + mpv 0.41.0 + libplacebo 6.338.2.

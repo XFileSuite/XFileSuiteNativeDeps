@@ -123,6 +123,30 @@ MPV_MSYS2_PACKAGES=(
   mingw-w64-x86_64-iconv
 )
 for pkg in "${MPV_MSYS2_PACKAGES[@]}"; do
+  if [[ "$pkg" == mingw-w64-x86_64-uchardet ]]; then
+    # MINGW64 uchardet was removed from the rolling package index. Keep the
+    # existing ABI using the official signed package, not a UCRT64 DLL.
+    if [[ "$(pacman -Q "$pkg" 2>/dev/null || true)" == "$pkg 0.0.8-2" ]]; then
+      continue
+    fi
+    uchardet_file="mingw-w64-x86_64-uchardet-0.0.8-2-any.pkg.tar.zst"
+    uchardet_archive="$WORK_DIR/$uchardet_file"
+    uchardet_url="https://repo.msys2.org/mingw/mingw64/$uchardet_file"
+    uchardet_sha256="f38f128c4c53ad53fa4d4e5b258dde5e244b8bd5cb986e991778c7f12c71d01a"
+    if [[ ! -f "$uchardet_archive" ]] || ! echo "$uchardet_sha256  $uchardet_archive" | sha256sum -c - >/dev/null 2>&1; then
+      curl -fL --retry 5 --retry-all-errors --connect-timeout 30 \
+        "$uchardet_url" -o "$uchardet_archive.part"
+      echo "$uchardet_sha256  $uchardet_archive.part" | sha256sum -c -
+      mv "$uchardet_archive.part" "$uchardet_archive"
+    fi
+    echo "$uchardet_sha256  $uchardet_archive" | sha256sum -c -
+    curl -fL --retry 5 --retry-all-errors --connect-timeout 30 \
+      "$uchardet_url.sig" -o "$uchardet_archive.sig"
+    pacman-key --verify "$uchardet_archive.sig" "$uchardet_archive"
+    echo "  Installing pinned $pkg 0.0.8-2 from the official archive..."
+    pacman -U --noconfirm "$uchardet_archive"
+    continue
+  fi
   pacman -Q "$pkg" >/dev/null 2>&1 || {
     echo "  Installing $pkg..."
     pacman -S --noconfirm "$pkg"
@@ -337,7 +361,7 @@ This bundle contains the following third-party components:
 | FriBidi | LGPL-2.1 |
 | HarfBuzz | MIT |
 | libxml2 | MIT |
-| uchardet | MPL-2.0 |
+| uchardet 0.0.8-2 (MSYS2 package) | MPL-1.1 |
 | lcms2 | MIT |
 | Expat | MIT |
 | LAME | LGPL-2.0 |

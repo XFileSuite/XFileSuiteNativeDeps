@@ -599,6 +599,7 @@ jobs:
             native_deps/ffmpeg/work-windows
             native_deps/media_runtime/work/*.tar.gz
             native_deps/media_runtime/work/*.7z
+            native_deps/media_runtime/work/*.pkg.tar.zst
             native_deps/media_runtime/work/ffmpeg/*.tar.xz
             native_deps/imagemagick/work-windows/downloads
           key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
@@ -636,7 +637,7 @@ jobs:
             mingw-w64-x86_64-libvpx mingw-w64-x86_64-libwebp mingw-w64-x86_64-opus
             mingw-w64-x86_64-dav1d mingw-w64-x86_64-libass mingw-w64-x86_64-freetype mingw-w64-x86_64-fontconfig
             mingw-w64-x86_64-fribidi mingw-w64-x86_64-harfbuzz mingw-w64-x86_64-libxml2
-            mingw-w64-x86_64-uchardet mingw-w64-x86_64-lcms2 mingw-w64-x86_64-expat
+            mingw-w64-x86_64-lcms2 mingw-w64-x86_64-expat
             mingw-w64-x86_64-iconv p7zip mingw-w64-x86_64-python
             autoconf automake libtool
             mingw-w64-x86_64-zlib mingw-w64-x86_64-bzip2 zip unzip
@@ -691,6 +692,7 @@ jobs:
             native_deps/ffmpeg/work-windows
             native_deps/media_runtime/work/*.tar.gz
             native_deps/media_runtime/work/*.7z
+            native_deps/media_runtime/work/*.pkg.tar.zst
             native_deps/media_runtime/work/ffmpeg/*.tar.xz
             native_deps/imagemagick/work-windows/downloads
           key: windows-src-v3-${{ inputs.component }}-${{ hashFiles('native_deps/ffmpeg/build-windows.sh', 'native_deps/media_runtime/build-windows.sh', 'native_deps/imagemagick/build-windows.sh') }}
