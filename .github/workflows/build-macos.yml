@@ -74,6 +74,8 @@ jobs:
           sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Development"/CODE_SIGN_IDENTITY = "-"/g' "$PBXPROJ"
           sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' "$PBXPROJ"
           sed -i '' '/DEVELOPMENT_TEAM = /d' "$PBXPROJ"
+      - name: Select production analytics channel for direct distribution
+        run: python3 scripts/set_app_channel.py appStore
       - run: flutter build macos --release --obfuscate --split-debug-info=symbols --dart-define=IS_SANDBOX=false
       - name: Verify bundled third-party license notices
         run: |
