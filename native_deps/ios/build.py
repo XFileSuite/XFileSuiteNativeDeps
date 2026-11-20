@@ -278,14 +278,21 @@ class Build:
                 run(['patch', '-p1', '-i', ROOT/'patches/ffmpeg-embedded-cli.patch'], cwd=src)
                 (src/'.xfs-patched').touch()
             build = self.base/'build/ffmpeg'; build.mkdir(parents=True, exist_ok=True)
+            # fftools builds bin2c for the build host. Target flags already
+            # carry the iOS SDK, so keep host tools out of the iOS environment.
+            env = self.env.copy()
+            env.pop('SDKROOT', None)
+            env.pop('IPHONEOS_DEPLOYMENT_TARGET', None)
+            host_sdk = output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'])
+            host_flags = '-isysroot '+host_sdk
             run([src/'configure', '--prefix='+str(self.prefix), '--enable-cross-compile', '--target-os=darwin', '--arch=aarch64', '--cc=clang', '--cxx=clang++', '--sysroot='+self.sdkpath,
-                 '--extra-cflags='+self.env['CFLAGS']+' -I'+str(self.prefix/'include'), '--extra-ldflags='+self.env['LDFLAGS'], '--pkg-config=pkg-config', '--pkg-config-flags=--static',
+                 '--host-cflags='+host_flags, '--host-ldflags='+host_flags, '--extra-cflags='+self.env['CFLAGS']+' -I'+str(self.prefix/'include'), '--extra-ldflags='+self.env['LDFLAGS'], '--pkg-config=pkg-config', '--pkg-config-flags=--static',
                  '--enable-shared', '--disable-static', '--disable-stripping', '--enable-ffmpeg', '--disable-ffprobe', '--disable-ffplay', '--disable-doc', '--disable-autodetect', '--disable-gpl', '--disable-nonfree', '--disable-version3', '--enable-pic', '--disable-outdevs', '--disable-indevs',
-                 '--enable-libmp3lame', '--enable-libvorbis', '--enable-libvpx', '--enable-libwebp', '--enable-libopus', '--enable-libxml2', '--enable-libass', '--enable-libdav1d', '--enable-videotoolbox', '--enable-audiotoolbox', '--enable-zlib', '--enable-network', '--enable-securetransport'], cwd=build, env=self.env)
-            run(['make', '-j'+JOBS, 'install-libs', 'install-headers'], cwd=build, env=self.env)
+                 '--enable-libmp3lame', '--enable-libvorbis', '--enable-libvpx', '--enable-libwebp', '--enable-libopus', '--enable-libxml2', '--enable-libass', '--enable-libdav1d', '--enable-videotoolbox', '--enable-audiotoolbox', '--enable-zlib', '--enable-network', '--enable-securetransport'], cwd=build, env=env)
+            run(['make', '-j'+JOBS, 'install-libs', 'install-headers'], cwd=build, env=env)
             cli = self.prefix/'lib/libxfs_ffmpeg_cli.dylib'
             run(['make', '-j'+JOBS, '-f', 'Makefile', '-f', ROOT/'ffmpeg-cli.mk',
-                 'XFS_CLI_OUTPUT='+str(cli), 'xfs-ffmpeg-cli'], cwd=build, env=self.env)
+                 'XFS_CLI_OUTPUT='+str(cli), 'xfs-ffmpeg-cli'], cwd=build, env=env)
         self.done('ffmpeg', ffmpeg)
         self.meson('libplacebo', ['-Ddemos=false', '-Dtests=false', '-Dvulkan=disabled', '-Dopengl=enabled', '-Dd3d11=disabled', '-Dglslang=disabled', '-Dshaderc=disabled', '-Dlcms=disabled', '-Ddovi=disabled', '-Dlibdovi=disabled', '-Dunwind=disabled', '-Dxxhash=disabled'])
         src = source('mpv', self.target)
