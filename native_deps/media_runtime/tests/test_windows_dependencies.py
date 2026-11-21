@@ -24,6 +24,10 @@ class WindowsDependencyTest(unittest.TestCase):
         self.log = self.base/'commands.log'
         fixture = self.base/'package'
         fixture.write_bytes(b'official-package-fixture')
+        self.config = self.base/'pacman.conf'
+        self.config.write_text('[options]\nSigLevel = Required DatabaseOptional\n'
+                               'LocalFileSigLevel = Optional\n'
+                               '[mingw64]\nInclude = /etc/pacman.d/mirrorlist.mingw64\n')
         self.env = dict(os.environ, WORK_DIR=str(self.work),
                         LOG=str(self.log), FIXTURE=str(fixture),
                         PATH=str(self.bin)+os.pathsep+os.environ['PATH'])
@@ -35,10 +39,22 @@ if [[ "$1" == -Q ]]; then
     echo "$2 $INSTALLED_VERSION"
   fi
 fi
+if [[ "$1" == -U ]]; then
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == --config ]]; then config="$2"; shift; fi
+    archive="$1"
+    shift
+  done
+  grep -Fx 'LocalFileSigLevel = Required TrustedOnly' "$config"
+  [[ -f "$archive.sig" ]] || exit 1
+  [[ "${VERIFY_STATUS:-0}" == 0 ]] || exit 1
+  echo 'installed verified package' >> "$LOG"
+fi
 ''')
         self.command('pacman-key', '''
-echo "verify $*" >> "$LOG"
-exit "${VERIFY_STATUS:-0}"
+echo "pacman-key $*" >> "$LOG"
+echo 'ERROR: You do not have sufficient permissions to run this command.' >&2
+exit 1
 ''')
         self.command('curl', '''
 echo "curl $*" >> "$LOG"
@@ -55,6 +71,7 @@ exit 1
         section = section.replace(
             'f38f128c4c53ad53fa4d4e5b258dde5e244b8bd5cb986e991778c7f12c71d01a',
             hashlib.sha256(fixture.read_bytes()).hexdigest())
+        section = section.replace("' /etc/pacman.conf", "' '" + str(self.config) + "'")
         self.script = 'set -euo pipefail\n' + section
 
     def command(self, name, body):
@@ -71,15 +88,26 @@ exit 1
         self.assertEqual(result.returncode, 0, result.stderr)
         log = self.log.read_text()
         self.assertIn('https://repo.msys2.org/mingw/mingw64/'+FILENAME, log)
-        self.assertIn('verify --verify', log)
-        self.assertIn('pacman -U --noconfirm', log)
-        self.assertLess(log.index('verify --verify'), log.index('pacman -U'))
+        self.assertNotIn('pacman-key ', log)
+        self.assertIn('pacman -U --noconfirm --config', log)
+        self.assertIn('installed verified package', log)
         self.assertNotIn('pacman -S --noconfirm '+PACKAGE, log)
+        self.assertIn('LocalFileSigLevel = Optional', self.config.read_text())
 
     def test_bad_signature_never_installs_package(self):
         self.env['VERIFY_STATUS'] = '1'
         self.assertNotEqual(self.run_install().returncode, 0)
-        self.assertNotIn('pacman -U', self.log.read_text())
+        self.assertNotIn('installed verified package', self.log.read_text())
+
+    def test_signature_is_required_even_when_system_config_disables_it(self):
+        self.config.write_text(self.config.read_text().replace('Optional', 'Never'))
+        result = self.run_install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (self.work/'uchardet-pacman.conf').read_text()
+        self.assertEqual(config.count('LocalFileSigLevel ='), 1)
+        self.assertIn('LocalFileSigLevel = Required TrustedOnly', config)
+        self.assertIn('[mingw64]', config)
+        self.assertIn('LocalFileSigLevel = Never', self.config.read_text())
 
     def test_bad_download_hash_never_installs_package(self):
         Path(self.env['FIXTURE']).write_bytes(b'tampered')

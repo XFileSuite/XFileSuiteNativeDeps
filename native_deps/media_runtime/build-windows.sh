@@ -142,9 +142,20 @@ for pkg in "${MPV_MSYS2_PACKAGES[@]}"; do
     echo "$uchardet_sha256  $uchardet_archive" | sha256sum -c -
     curl -fL --retry 5 --retry-all-errors --connect-timeout 30 \
       "$uchardet_url.sig" -o "$uchardet_archive.sig"
-    pacman-key --verify "$uchardet_archive.sig" "$uchardet_archive"
+    # Let libalpm verify the detached signature using pacman's existing
+    # keyring. pacman-key --verify additionally requires lock-never in
+    # gpg.conf, which a freshly initialized MSYS2 runner does not provide.
+    # Require a trusted signature even if local files are Optional or Never
+    # in the runner's configuration. Do not change its system-wide config.
+    uchardet_pacman_config="$WORK_DIR/uchardet-pacman.conf"
+    awk '
+      /^[[:space:]]*\[options\][[:space:]]*$/ {
+        print; print "LocalFileSigLevel = Required TrustedOnly"; next
+      }
+      !/^[[:space:]]*LocalFileSigLevel[[:space:]]*=/ { print }
+    ' /etc/pacman.conf > "$uchardet_pacman_config"
     echo "  Installing pinned $pkg 0.0.8-2 from the official archive..."
-    pacman -U --noconfirm "$uchardet_archive"
+    pacman -U --noconfirm --config "$uchardet_pacman_config" "$uchardet_archive"
     continue
   fi
   pacman -Q "$pkg" >/dev/null 2>&1 || {

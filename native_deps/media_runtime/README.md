@@ -68,9 +68,11 @@ Static framework verification alone does not cover this runtime failure.
 
 Windows MINGW64 installs uchardet from the official, pinned MSYS2 `0.0.8-2`
 package because it is no longer in the rolling package index. The builder
-checks SHA-256 and the detached signature with the MSYS2 keyring before
-installing it through pacman. Its package metadata and license continue to
-flow through the existing runtime staging process. This keeps the current
+checks SHA-256 and requires a trusted detached signature during pacman
+installation, using the existing MSYS2 keyring and a per-installation config.
+It does not require the `pacman-key --verify` wrapper's extra `lock-never`
+setting or change the system pacman configuration. Package metadata and
+licenses continue to flow through the existing runtime staging process. This keeps the current
 MINGW64 ABI and subtitle encoding detection; it does not mix UCRT64 libraries
 into the runtime.
 
