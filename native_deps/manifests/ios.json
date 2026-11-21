@@ -4,10 +4,10 @@
   "minimumIOS": "15.0",
   "components": {
     "iosRuntime": {
-      "bundleSha256": "76db0ebcd902857eb59331d71ba3d5c8eb3cb2ffa9e470027210b03dde8144c8",
-      "r2Key": "deps/ios-native-deps-76db0ebcd902857eb59331d71ba3d5c8eb3cb2ffa9e470027210b03dde8144c8.tar.gz",
-      "sourceRelease": "ios-native-deps-e4aafe4b4ad1992ff1e492eb",
-      "sourceSha256": "225563797e3951b399fc53673392249ad16cae7ae658acbec80f1dec666b56b8",
+      "bundleSha256": "159d73fec2cc0e9c5e2e2cabff436030a57d05af8cf21b1336ba38611182e854",
+      "r2Key": "deps/ios-native-deps-159d73fec2cc0e9c5e2e2cabff436030a57d05af8cf21b1336ba38611182e854.tar.gz",
+      "sourceRelease": "ios-native-deps-a8b54cec42e3a3262e3b5b8e",
+      "sourceSha256": "386aae1f3f9cc9d510a27fa6672076999f8ccb55b5b9db9fc1f5f2a52253e2d1",
       "sourceArchive": "xfilesuite-ios-source.tar.gz",
       "recipe": "c01ae9f827d6cba9300b17b25c5013448e0ef99b58ac2ffe9f6776750fe4db95"
     }
